@@ -1,0 +1,76 @@
+{
+	"/": [
+		"src/routes/+page.server.ts",
+		"src/routes/+layout.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/admin": [
+		"src/routes/admin/+page.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/api/admin/users": [
+		"src/routes/api/admin/users/+server.ts"
+	],
+	"/api/admin/users/[id]": [
+		"src/routes/api/admin/users/[id]/+server.ts"
+	],
+	"/api/auth/login": [
+		"src/routes/api/auth/login/+server.ts"
+	],
+	"/api/auth/logout": [
+		"src/routes/api/auth/logout/+server.ts"
+	],
+	"/api/auth/me": [
+		"src/routes/api/auth/me/+server.ts"
+	],
+	"/api/avatar": [
+		"src/routes/api/avatar/+server.ts"
+	],
+	"/api/avatar/restore": [
+		"src/routes/api/avatar/restore/+server.ts"
+	],
+	"/api/recordings": [
+		"src/routes/api/recordings/+server.ts"
+	],
+	"/api/recordings/by-date": [
+		"src/routes/api/recordings/by-date/+server.ts"
+	],
+	"/api/recordings/dates": [
+		"src/routes/api/recordings/dates/+server.ts"
+	],
+	"/api/recordings/mine": [
+		"src/routes/api/recordings/mine/+server.ts"
+	],
+	"/api/recordings/[id]": [
+		"src/routes/api/recordings/[id]/+server.ts"
+	],
+	"/api/recordings/[id]/listen": [
+		"src/routes/api/recordings/[id]/listen/+server.ts"
+	],
+	"/login": [
+		"src/routes/login/+page.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/logout": [
+		"src/routes/logout/+page.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/record": [
+		"src/routes/record/+page.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/settings": [
+		"src/routes/settings/+page.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/setup": [
+		"src/routes/setup/+page.server.ts",
+		"src/routes/+layout.server.ts"
+	],
+	"/uploads/avatars/[[path]]": [
+		"src/routes/uploads/avatars/[[path]]/+server.ts"
+	],
+	"/uploads/[file]": [
+		"src/routes/uploads/[file]/+server.ts"
+	]
+}

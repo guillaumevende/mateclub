@@ -1,0 +1,108 @@
+/* Styles partagés entre les pages */
+
+/* Scrollbars stylisées - Mobile: cachées, Desktop: visibles */
+@media (max-width: 768px) {
+	::-webkit-scrollbar {
+		display: none !important;
+	}
+	* {
+		scrollbar-width: none !important;
+		-ms-overflow-style: none !important;
+	}
+}
+
+@media (min-width: 769px) {
+	::-webkit-scrollbar {
+		width: 8px;
+		height: 8px;
+	}
+	::-webkit-scrollbar-track {
+		background: #2a2a4e !important;
+		border-radius: 4px;
+	}
+	::-webkit-scrollbar-thumb {
+		background: #e94560 !important;
+		border-radius: 4px;
+	}
+	::-webkit-scrollbar-thumb:hover {
+		background: #ff6b6b !important;
+	}
+
+	/* Firefox specific */
+	* {
+		scrollbar-width: thin;
+		scrollbar-color: #e94560 #2a2a4e;
+	}
+}
+
+/* Container principal */
+.container {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	padding-bottom: 2rem;
+}
+
+/* Titre principal */
+h1 {
+	color: #e94560;
+	margin-bottom: 1.5rem;
+}
+
+/* Sections */
+section {
+	background: #2a2a4e;
+	padding: 1.5rem;
+	border-radius: 12px;
+	margin-bottom: 1rem;
+}
+
+section:last-of-type {
+	margin-bottom: 0;
+}
+
+/* Titres de section */
+h2 {
+	font-size: 1.25rem;
+	margin-bottom: 1rem;
+	color: #ccc;
+}
+
+/* Formulaires */
+form {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+
+/* Checkbox */
+.checkbox {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	color: #ccc;
+}
+
+.checkbox input {
+	width: auto;
+}
+
+/* Boutons */
+button {
+	padding: 0.75rem 1.5rem;
+}
+
+/* Bouton danger (rouge) */
+.btn-danger {
+	background: #e94560;
+	color: white;
+	border: none;
+	border-radius: 8px;
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.btn-danger:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}

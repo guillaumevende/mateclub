@@ -1,0 +1,747 @@
+<script lang="ts">
+	import { enhance } from '$app/forms';
+	import '$lib/shared.css';
+	import imageCompression from 'browser-image-compression';
+	import { scrollLock } from '$lib/actions/scrollLock';
+
+	type Timezone = { value: string; label: string };
+	let { data, form }: { 
+		data: { 
+			user?: { pseudo: string; avatar: string; daily_notification_hour: number; timezone: string } 
+			timezones: Timezone[]
+			savedImage: string | null
+		}, 
+		form?: { success?: boolean; passwordError?: string; error?: string } 
+	} = $props();
+
+	const emojis = ['☕', '😀', '😎', '🤠', '🥳', '😇', '🤩', '😈', '👻', '🤖', '🎸', '🎮', '🚀', '🍕', '🍺', '🌈', '🔥', '⭐', '❤️'];
+	
+	const PSEUDO_REGEX = /^[a-zA-Z0-9\s\-._àáâãäåæçèéêëìíîïñòóôõöùúûüýÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝŸ]{3,22}$/;
+
+	// État local
+	let pseudo = $state(data.user?.pseudo || '');
+	let password = $state('');
+	let confirmPassword = $state('');
+	let imagePreview = $state<string | null>(null);
+	let isImageAvatar = $state(data.user?.avatar?.includes('avatar_') || false);
+	let selectedEmoji = $state(data.user?.avatar?.includes('avatar_') ? '' : (data.user?.avatar || '☕'));
+	let savedImageFilename = $state(data.savedImage);
+	let showSuccessModal = $state(false);
+	let compressionProgress = $state(0);
+	let isCompressing = $state(false);
+	let isDragging = $state(false);
+	let pendingAvatarFile = $state<File | null>(null);
+	let serverError = $state<string | null>(null);
+	let hourError = $state<string | null>(null);
+	
+	// Convertir daily_notification_hour (minutes ou heures) en format HH:mm pour l'input time
+	function minutesToHHmm(value: number): string {
+		// Si la valeur est < 24, c'est probablement l'ancienne valeur en heures (0-23)
+		// On convertit en minutes
+		let minutes = value;
+		if (value < 24) {
+			minutes = value * 60;
+		}
+		if (typeof minutes !== 'number' || isNaN(minutes)) return '07:00';
+		const h = Math.floor(minutes / 60);
+		const m = minutes % 60;
+		return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+	}
+	let selectedHour = $state('');
+	let selectedTimezone = $state('Europe/Paris');
+	
+	// Initialiser selectedHour après le chargement des données
+	$effect(() => {
+		selectedHour = minutesToHHmm(data.user?.daily_notification_hour ?? 420);
+		selectedTimezone = data.user?.timezone || 'Europe/Paris';
+	});
+	
+	// Synchroniser avec data quand la page recharge
+	$effect(() => {
+		if (data.user) {
+			pseudo = data.user.pseudo;
+			const hasImage = data.user.avatar?.includes('avatar_') || false;
+			isImageAvatar = hasImage;
+			selectedEmoji = hasImage ? '' : (data.user.avatar || '☕');
+			savedImageFilename = data.savedImage;
+		}
+	});
+	
+	// Validation pseudo temps réel
+	let pseudoError = $derived.by(() => {
+		if (pseudo.length === 0) return '';
+		if (pseudo.length < 3) return 'Le pseudo doit contenir au moins 3 caractères';
+		if (pseudo.length > 22) return 'Le pseudo ne doit pas dépasser 22 caractères';
+		if (!PSEUDO_REGEX.test(pseudo)) return 'Caractères non autorisés (emojis et caractères spéciaux interdits)';
+		return '';
+	});
+	
+	let passwordValidation = $derived.by(() => {
+		if (!password && !confirmPassword) return { valid: true, message: '' };
+		if (password.length > 0 && password.length < 10) {
+			return { valid: false, message: 'Le mot de passe doit contenir au moins 10 caractères' };
+		}
+		if (confirmPassword && password !== confirmPassword) {
+			return { valid: false, message: 'Les mots de passe ne correspondent pas' };
+		}
+		if (password.length >= 10 && password === confirmPassword) {
+			return { valid: true, message: 'Mots de passe identiques ✓' };
+		}
+		return { valid: true, message: '' };
+	});
+	
+	function closeSuccessModal() {
+		showSuccessModal = false;
+	}
+	
+	function handleDragOver(e: DragEvent) {
+		e.preventDefault();
+		isDragging = true;
+	}
+
+	function handleDragLeave(e: DragEvent) {
+		e.preventDefault();
+		isDragging = false;
+	}
+
+	async function handleDrop(e: DragEvent) {
+		e.preventDefault();
+		isDragging = false;
+		if (e.dataTransfer?.files && e.dataTransfer.files[0]) {
+			const file = e.dataTransfer.files[0];
+			if (file.type.startsWith('image/')) {
+				await processImageFile(file);
+			}
+		}
+	}
+
+	async function processImageFile(file: File) {
+		isCompressing = true;
+		compressionProgress = 0;
+		
+		try {
+			const options = {
+				maxWidthOrHeight: 800,
+				maxSizeMB: 1,
+				initialQuality: 0.8,
+				useWebWorker: true,
+				onProgress: (progress: number) => {
+					compressionProgress = Math.round(progress * 100);
+				}
+			};
+			
+			const compressedFile = await imageCompression(file, options);
+			imagePreview = URL.createObjectURL(compressedFile);
+			pendingAvatarFile = compressedFile;
+			isImageAvatar = true;
+		} catch (error) {
+			console.error('Erreur compression:', error);
+			imagePreview = URL.createObjectURL(file);
+			pendingAvatarFile = file;
+			isImageAvatar = true;
+		} finally {
+			isCompressing = false;
+			compressionProgress = 0;
+		}
+	}
+	
+	async function handleImageSelect(e: Event) {
+		e.preventDefault();
+		e.stopPropagation();
+		const input = e.target as HTMLInputElement;
+		if (input.files && input.files[0]) {
+			await processImageFile(input.files[0]);
+		}
+	}
+	
+	async function uploadImage(file: File): Promise<string | null> {
+		const formData = new FormData();
+		formData.append('image', file);
+		
+		try {
+			const res = await fetch('/api/avatar', {
+				method: 'POST',
+				body: formData
+			});
+			
+			if (res.ok) {
+				const result = await res.json();
+				if (result.filename) {
+					savedImageFilename = result.filename;
+					return result.filename;
+				}
+			}
+		} catch (error) {
+			console.error('Erreur upload:', error);
+		}
+		return null;
+	}
+	
+	async function restoreImage() {
+		if (savedImageFilename) {
+			try {
+				// Mettre à jour l'avatar avec l'image sauvegardée
+				const res = await fetch('/api/avatar/restore', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ filename: savedImageFilename })
+				});
+				
+				if (res.ok) {
+					isImageAvatar = true;
+					selectedEmoji = '';
+					// Recharger la page pour afficher la nouvelle image
+					window.location.reload();
+				}
+			} catch (error) {
+				console.error('Erreur restauration image:', error);
+			}
+		}
+	}
+	
+	async function selectEmoji(emoji: string) {
+		// On ne supprime PAS l'image, on garde la possibilité de revenir dessus
+		selectedEmoji = emoji;
+		isImageAvatar = false;
+		imagePreview = null;
+	}
+	
+	function getAvatarDisplay() {
+		if (isImageAvatar && data.user?.avatar) {
+			return { type: 'image', value: data.user.avatar };
+		}
+		return { type: 'emoji', value: selectedEmoji || data.user?.avatar || '☕' };
+	}
+</script>
+
+<div class="container">
+	<h1>Paramètres</h1>
+
+	{#if showSuccessModal}
+		<div class="modal-overlay" use:scrollLock={showSuccessModal} onclick={closeSuccessModal}>
+			<div class="modal" onclick={(e) => e.stopPropagation()}>
+				<h2>Succès !</h2>
+				<button class="close-btn" onclick={closeSuccessModal}>✕</button>
+				<p class="success-message">Paramètres sauvegardés avec succès !</p>
+			</div>
+		</div>
+	{/if}
+
+	<!-- Affichage avatar actuel en haut -->
+	<div class="current-avatar-display">
+		{#if getAvatarDisplay().type === 'image'}
+			<img src="/uploads/avatars/{getAvatarDisplay().value}" alt="Avatar" class="avatar-image" />
+		{:else}
+			<span class="avatar-emoji">{getAvatarDisplay().value}</span>
+		{/if}
+	</div>
+
+	<form method="POST" use:enhance={() => {
+		// Réinitialiser les erreurs avant soumission
+		serverError = null;
+		hourError = null;
+		
+		return async ({ result, update }) => {
+			// Upload pending image first if exists
+			if (pendingAvatarFile) {
+				await uploadImage(pendingAvatarFile);
+				pendingAvatarFile = null;
+			}
+			await update();
+			if (result.type === 'success') {
+				showSuccessModal = true;
+				password = '';
+				confirmPassword = '';
+			} else if (result.type === 'failure') {
+				if ((result.data as any)?.error) {
+					serverError = (result.data as any).error;
+					window.scrollTo(0, 0);
+				}
+				if ((result.data as any)?.hourError) {
+					hourError = (result.data as any).hourError;
+					// Scroll vers le champ heure
+					const hourInput = document.querySelector('.hour-input');
+					if (hourInput) {
+						hourInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+					}
+				}
+			}
+		};
+		}}>
+		
+		<input type="hidden" name="avatarImage" value={savedImageFilename || ''} />
+		<input type="hidden" name="csrf_token" value={data?.csrfToken} />
+		
+		<!-- Bloc 1: Nom d'utilisateur -->
+		<section>
+			<h2>Nom d'utilisateur</h2>
+			<input 
+				type="text" 
+				name="pseudo" 
+				value={pseudo}
+				oninput={(e) => { pseudo = e.currentTarget.value; serverError = null; }}
+				placeholder="Votre pseudo"
+				minlength="3"
+				maxlength="22"
+				required
+			/>
+			{#if pseudoError}
+				<p class="pseudo-feedback error">{pseudoError}</p>
+			{/if}
+			{#if serverError}
+				<p class="pseudo-feedback error">{serverError}</p>
+			{/if}
+		</section>
+
+		<!-- Bloc 2: Avatar -->
+		<section>
+			<h2>Avatar</h2>
+			
+			<!-- Upload image -->
+			<div 
+				class="avatar-upload-section"
+				class:dragging={isDragging}
+				ondragover={handleDragOver}
+				ondragleave={handleDragLeave}
+				ondrop={handleDrop}
+			>
+				{#if imagePreview}
+					<div class="image-preview">
+						<img src={imagePreview} alt="Preview" />
+					</div>
+				{/if}
+				
+				{#if isImageAvatar}
+					<label class="upload-zone" class:disabled={isCompressing}>
+						<input type="file" accept="image/*" capture="environment" onchange={handleImageSelect} disabled={isCompressing} />
+						<span>🖼️ Changer la photo</span>
+					</label>
+				{:else}
+					<label class="upload-zone" class:disabled={isCompressing}>
+						<input type="file" accept="image/*" capture="environment" onchange={handleImageSelect} disabled={isCompressing} />
+						<span>📷 Prendre ou choisir une photo</span>
+					</label>
+				{/if}
+				
+				{#if isCompressing}
+					<div class="compression-progress">
+						<div class="progress-bar-container">
+							<div class="progress-bar-fill" style="width: {compressionProgress}%"></div>
+						</div>
+						<span class="progress-text">Compression... {compressionProgress}%</span>
+					</div>
+				{/if}
+			</div>
+			
+			<!-- Grille emojis -->
+			<p class="emoji-label">Ou choisissez un emoji :</p>
+			<div class="emoji-grid">
+				{#each emojis as emoji}
+					<label class="emoji-option" class:selected={!isImageAvatar && selectedEmoji === emoji}>
+						<input 
+							type="radio" 
+							name="avatar" 
+							value={emoji} 
+							checked={!isImageAvatar && selectedEmoji === emoji}
+							onclick={() => selectEmoji(emoji)}
+						/>
+						<span>{emoji}</span>
+					</label>
+				{/each}
+				
+				<!-- Option pour revenir à l'image précédente -->
+				{#if savedImageFilename}
+					<label class="emoji-option image-option" class:selected={isImageAvatar}>
+						<input 
+							type="radio" 
+							name="avatar" 
+							value={savedImageFilename}
+							checked={isImageAvatar}
+							onclick={() => restoreImage()}
+						/>
+						<img src="/uploads/avatars/{savedImageFilename}" alt="Mon avatar" class="saved-image-thumb" />
+					</label>
+				{/if}
+			</div>
+		</section>
+
+		<section>
+			<h2>Changer le mot de passe</h2>
+			<p class="description">Indiquez ici votre nouveau mot de passe et faites 'Sauvegarder'</p>
+			
+			<div class="password-section">
+				<input 
+					type="password" 
+					name="password" 
+					placeholder="Nouveau mot de passe"
+					bind:value={password}
+					minlength="10"
+				/>
+				<input 
+					type="password" 
+					name="confirmPassword" 
+					placeholder="Confirmez le mot de passe"
+					bind:value={confirmPassword}
+					minlength="10"
+				/>
+				{#if passwordValidation.message}
+					<p class="password-feedback" class:error={!passwordValidation.valid} class:success={passwordValidation.valid && password.length >= 10}>
+						{passwordValidation.message}
+					</p>
+				{/if}
+			</div>
+		</section>
+
+		<section>
+			<h2>Fuseau horaire</h2>
+			<p class="description">Utilisé pour afficher les dates et heures dans ton fuseau.</p>
+
+			<select name="timezone" bind:value={selectedTimezone}>
+				{#each data.timezones as tz}
+					<option value={tz.value}>{tz.label}</option>
+				{/each}
+			</select>
+		</section>
+
+		<section>
+			<h2>Heure de disponibilité</h2>
+			<p class="description">Les enregistrements de la veille seront disponibles à partir de cette heure (dans ton fuseau horaire).</p>
+
+			<div class="hour-input">
+				<input type="time" name="hour" bind:value={selectedHour} />
+			</div>
+			{#if hourError}
+				<p class="hour-feedback error">{hourError}</p>
+			{/if}
+		</section>
+
+		<button type="submit">Sauvegarder</button>
+	</form>
+
+	<a href="/logout" class="btn">Déconnexion</a>
+</div>
+
+<style>
+	/* Avatar affichage en haut */
+	.current-avatar-display {
+		display: flex;
+		justify-content: center;
+		margin-bottom: 1.5rem;
+	}
+
+	.avatar-image {
+		width: 128px;
+		height: 128px;
+		border-radius: 50%;
+		object-fit: cover;
+		border: 3px solid #e94560;
+	}
+
+	.avatar-emoji {
+		font-size: 6rem;
+		width: 128px;
+		height: 128px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: #1a1a2e;
+		border-radius: 50%;
+		border: 3px solid #e94560;
+	}
+
+	/* Pseudo validation */
+	.pseudo-feedback {
+		font-size: 0.875rem;
+		margin-top: 0.5rem;
+		color: #ff6b6b;
+	}
+
+	.hour-feedback {
+		font-size: 0.875rem;
+		margin-top: 0.5rem;
+		color: #ff6b6b;
+	}
+
+	/* Section Avatar */
+	.avatar-upload-section {
+		margin-bottom: 1.5rem;
+	}
+
+	.upload-zone {
+		display: block;
+		width: 100%;
+		padding: 1.5rem;
+		background: #1a1a2e;
+		border: 2px dashed #444;
+		border-radius: 12px;
+		text-align: center;
+		cursor: pointer;
+		transition: border-color 0.2s, border-width 0.2s, background 0.2s;
+		margin-bottom: 1rem;
+	}
+
+	.upload-zone:hover {
+		border-color: #e94560;
+	}
+
+	.avatar-upload-section:global(.dragging) {
+		background: rgba(74, 222, 128, 0.1);
+	}
+
+	.avatar-upload-section:global(.dragging) .upload-zone {
+		border: 4px solid #4ade80;
+		border-style: solid;
+		background: rgba(74, 222, 128, 0.15);
+	}
+
+	.upload-zone input {
+		display: none;
+	}
+
+	.upload-zone span {
+		color: #888;
+		font-size: 0.9rem;
+	}
+
+	.image-preview {
+		width: 100%;
+		aspect-ratio: 1;
+		max-width: 200px;
+		margin: 0 auto 1rem;
+		border-radius: 12px;
+		overflow: hidden;
+	}
+
+	.image-preview img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.emoji-label {
+		color: #888;
+		font-size: 0.875rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.emoji-grid {
+		display: grid;
+		grid-template-columns: repeat(5, 1fr);
+		gap: 0.5rem;
+	}
+
+	.emoji-option {
+		cursor: pointer;
+	}
+
+	.emoji-option input {
+		display: none;
+	}
+
+	.emoji-option span {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 1.5rem;
+		width: 44px;
+		height: 44px;
+		background: #1a1a2e;
+		border-radius: 8px;
+		transition: transform 0.1s, background 0.2s;
+	}
+
+	.emoji-option.selected span,
+	.emoji-option input:checked + span {
+		background: #e94560;
+		transform: scale(1.1);
+	}
+
+	/* Style pour l'option image (dernier élément de la grille) */
+	.emoji-option.image-option .saved-image-thumb {
+		width: 44px;
+		height: 44px;
+		border-radius: 50%;
+		object-fit: cover;
+		border: 2px dashed #e94560;
+		transition: transform 0.1s, border 0.2s;
+	}
+
+	.emoji-option.image-option.selected .saved-image-thumb {
+		border: 2px solid #e94560;
+		transform: scale(1.1);
+	}
+
+	.description {
+		color: #888;
+		font-size: 0.875rem;
+		margin-bottom: 1rem;
+	}
+
+	.hour-input {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		margin-bottom: 1rem;
+	}
+
+	.hour-input input {
+		width: 120px;
+		padding: 0.75rem;
+		font-size: 1.25rem;
+		text-align: center;
+		background: #2a2a4e;
+		color: #fff;
+		border: 1px solid #444;
+		border-radius: 8px;
+	}
+
+	.hour-input input:focus {
+		border-color: #e94560;
+		outline: none;
+	}
+
+	.password-section {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.password-feedback {
+		font-size: 0.875rem;
+		margin-top: 0.5rem;
+		min-height: 1.2rem;
+	}
+
+	.password-feedback.error {
+		color: #ff6b6b;
+	}
+
+	.password-feedback.success {
+		color: #4ade80;
+	}
+
+	select {
+		margin-bottom: 1rem;
+	}
+
+	button {
+		margin-top: 1.5rem;
+	}
+
+	.btn {
+		display: block;
+		width: 100%;
+		margin-top: 1.5rem;
+		margin-bottom: 3rem;
+		padding: 0.75rem 1.5rem;
+		font-size: 1rem;
+		background: #2a2a4e;
+		color: #888;
+		border: none;
+		border-radius: 8px;
+		cursor: pointer;
+		text-align: center;
+		text-decoration: none;
+		font-weight: 600;
+	}
+
+	/* Styles de la modale de succès */
+	.modal-overlay {
+		position: fixed;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: rgba(0, 0, 0, 0.8);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 1000;
+		padding: 1rem;
+	}
+
+	.modal {
+		background: #1a1a2e;
+		border-radius: 16px;
+		padding: 1.5rem;
+		max-width: 400px;
+		width: 100%;
+		text-align: center;
+		position: relative;
+	}
+
+	.modal h2 {
+		color: #4ade80;
+		margin-bottom: 1rem;
+		text-align: center;
+	}
+
+	.close-btn {
+		position: absolute;
+		top: 1rem;
+		right: 1rem;
+		width: 32px;
+		height: 32px;
+		border-radius: 50%;
+		background: #2a2a4e;
+		border: none;
+		color: #fff;
+		cursor: pointer;
+		font-size: 1rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin: 0;
+		padding: 0;
+	}
+
+	.close-btn:hover {
+		background: #e94560;
+	}
+
+	.success-message {
+		color: #4ade80;
+		font-size: 1.1rem;
+		font-weight: 500;
+		margin: 0;
+	}
+
+	/* Compression progress bar */
+	.compression-progress {
+		margin-top: 1rem;
+		width: 100%;
+	}
+
+	.progress-bar-container {
+		width: 100%;
+		height: 6px;
+		background: #2a2a4e;
+		border-radius: 3px;
+		overflow: hidden;
+		margin-bottom: 0.5rem;
+	}
+
+	.progress-bar-fill {
+		height: 100%;
+		background: linear-gradient(90deg, #4ade80, #22c55e);
+		border-radius: 3px;
+		transition: width 0.3s ease;
+	}
+
+	.progress-text {
+		font-size: 0.85rem;
+		color: #888;
+		text-align: center;
+		display: block;
+	}
+
+	.upload-zone.disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+		pointer-events: none;
+	}
+
+	.upload-zone.disabled input {
+		pointer-events: none;
+	}
+</style>
