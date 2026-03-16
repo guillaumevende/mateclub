@@ -102,29 +102,54 @@ Au premier lancement, si aucun administrateur n'existe, vous êtes redirigé ver
 
 ### Docker (recommandé)
 
-**Variables d'environnement :**
+**Prérequis :** Docker et Docker Compose installés sur votre serveur.
 
-Créez un fichier `.env` à la racine :
+#### Première installation
 
-```bash
-# .env
-PORT=3001
-# DATABASE_PATH=/app/data/mateclub.db
-```
+1. **Cloner le dépôt public :**
+   ```bash
+   git clone https://github.com/guillaumevende/mateclub.git
+   cd mateclub
+   ```
 
-**Note** : Aucun compte administrateur requis - vous serez redirigé vers `/setup` au premier lancement pour créer le premier admin.
+2. **Créer le fichier `.env` :**
+   ```bash
+   echo "PORT=3001" > .env
+   ```
 
-Puis lancez :
+3. **Créer les dossiers de données :**
+   ```bash
+   mkdir -p data uploads
+   ```
 
-```bash
-docker-compose up -d
-```
+4. **Lancer avec Docker Compose :**
+   ```bash
+   docker compose up -d
+   ```
 
 **Au premier lancement :**
 1. Allez sur http://localhost:3001
 2. Vous serez redirigé vers `/setup`
 3. Créez votre compte administrateur
 4. Après création, utilisez `/login` pour vous connecter
+
+#### Mise à jour
+
+Pour mettre à jour l'application avec la dernière version :
+
+```bash
+cd mateclub
+git pull origin main
+docker compose up -d --build
+```
+
+**Note :** Le flag `--build` force la reconstruction de l'image Docker si des changements de code sont détectés. Sans ce flag, Docker utiliserait l'ancienne image en cache.
+
+#### Configuration avancée
+
+Variables d'environnement disponibles dans `.env`:
+- `PORT` - Port serveur (défaut: 3001)
+- `DATABASE_PATH` - Chemin de la BDD (défaut: ./data/mateclub.db)
 
 ### Manuel
 
@@ -185,9 +210,7 @@ Variables d'environnement:
 - `PORT` - Port serveur (défaut: 3001, changeable si déjà utilisé)
 - `DATABASE_PATH` - Chemin de la BDD (défaut: ./data/mateclub.db)
 
-**Note** : Aucun compte administrateur à configurer - le premier admin est créé via `/setup` au premier lancement de l'application. 
-- `DATABASE_PATH` - Chemin de la BDD (défaut: ./data/mateclub.db)
-- `PORT` - Port serveur (défaut: 3000, changeable si déjà utilisé)
+**Note** : Aucun compte administrateur à configurer - le premier admin est créé via `/setup` au premier lancement de l'application.
 
 ## Règles d'accès
 
