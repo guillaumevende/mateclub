@@ -14,9 +14,12 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		}
 
 		// Construire le chemin du fichier
-		const filePath = join(uploadsDir, params.file.join('/'));
+		// params.file peut être un tableau (rest parameter) ou une chaîne
+		const filePath = Array.isArray(params.file) 
+			? join(uploadsDir, params.file.join('/'))
+			: join(uploadsDir, params.file);
 		console.log('[uploads] Chemin demandé:', filePath);
-		console.log('[uploads] params.file:', params.file);
+		console.log('[uploads] params.file:', params.file, '(type:', typeof params.file + ')');
 
 		// Vérifier l'existence du fichier
 		if (!existsSync(filePath)) {
