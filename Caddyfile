@@ -1,0 +1,15 @@
+alpha.mateclub.app {
+    reverse_proxy localhost:3001
+    
+    # Sécurité
+    header {
+        # Empêcher le clickjacking
+        X-Frame-Options "DENY"
+        # Protection XSS
+        X-XSS-Protection "1; mode=block"
+        # Empêcher le MIME sniffing
+        X-Content-Type-Options "nosniff"
+        # Referrer policy
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+}
