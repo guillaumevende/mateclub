@@ -17,21 +17,16 @@ export const handle: Handle = async ({ event, resolve }) => {
 	const csrfToken = generateCSRFToken(sessionId);
 	event.locals.csrfToken = csrfToken;
 	
-	// Validate CSRF token for POST requests
-	if (event.request.method === 'POST') {
-		const contentType = event.request.headers.get('content-type') || '';
-		
-		// Skip CSRF for API endpoints with JSON content (they use different auth)
-		if (!event.url.pathname.startsWith('/api') || !contentType.includes('application/json')) {
-			const formData = await event.request.clone().formData().catch(() => null);
-			if (formData) {
-				const token = formData.get('csrf_token')?.toString();
-				if (!token || !validateCSRFToken(token, sessionId)) {
-					return new Response(JSON.stringify({ error: 'Invalid CSRF token' }), {
-						status: 403,
-						headers: { 'Content-Type': 'application/json' }
-					});
-				}
+	// Validate CSRF token for POST requests (only for non-API routes)
+	if (event.request.method === 'POST' && !event.url.pathname.startsWith('/api')) {
+		const formData = await event.request.clone().formData().catch(() => null);
+		if (formData) {
+			const token = formData.get('csrf_token')?.toString();
+			if (!token || !validateCSRFToken(token, sessionId)) {
+				return new Response(JSON.stringify({ error: 'Invalid CSRF token' }), {
+					status: 403,
+					headers: { 'Content-Type': 'application/json' }
+				});
 			}
 		}
 	}
