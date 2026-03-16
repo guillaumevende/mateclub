@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { getRecordingsGroupedByDay, getUserById, getAllUsers, getUserTimezone, getUnreadCount } from '$lib/server/db';
+import { getRecordingsGroupedByDayWithHasMore, getUserById, getAllUsers, getUserTimezone, getUnreadCount } from '$lib/server/db';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) {
@@ -11,7 +11,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const limit = 7;
 
 	const timezone = getUserTimezone(locals.user.id);
-	const days = getRecordingsGroupedByDay(locals.user.id, limit, page, timezone);
+	const { days, hasMore } = getRecordingsGroupedByDayWithHasMore(locals.user.id, limit, page, timezone);
 	const user = getUserById(locals.user.id);
 	const allUsers = getAllUsers();
 	const unreadStats = getUnreadCount(locals.user.id);
@@ -23,6 +23,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	return {
 		days,
+		hasMore,
 		threshold,
 		user,
 		allUsers,

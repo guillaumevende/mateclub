@@ -369,6 +369,68 @@ export function getRecordingsGroupedByDay(userId: number, limit = 7, page = 1, t
 	return days.slice(0, limit);
 }
 
+export function getRecordingsGroupedByDayWithHasMore(
+	userId: number,
+	limit = 7,
+	page = 1,
+	timezone?: string
+): { days: DayRecordings[]; hasMore: boolean } {
+	const user = getUserById(userId);
+	if (!user) return { days: [], hasMore: false };
+
+	const userTimezone = timezone || user.timezone || 'Europe/Paris';
+	const threshold = user.daily_notification_hour;
+
+	const offset = (page - 1) * limit;
+
+	// Demander (limit + 1) * 3 enregistrements pour détecter s'il y a plus de données
+	const stmt = db.prepare(`
+		SELECT
+			r.id, r.user_id, r.filename, r.image_filename, r.url, r.duration_seconds, r.recorded_at,
+			u.pseudo, u.avatar,
+			CASE WHEN l.id IS NOT NULL THEN 1 ELSE 0 END as listened_by_user
+		FROM recordings r
+		JOIN users u ON r.user_id = u.id
+		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
+		ORDER BY r.recorded_at DESC
+		LIMIT ? OFFSET ?
+	`);
+	const results = stmt.all(userId, (limit + 1) * 3, offset) as Recording[];
+
+	const grouped: Record<string, Recording[]> = {};
+	for (const row of results) {
+		const date = getDateWithThreshold(row.recorded_at, threshold, userTimezone);
+		if (!grouped[date]) grouped[date] = [];
+		grouped[date].push(row);
+	}
+
+	const today = getCurrentDateInTimezone(userTimezone);
+
+	const days: DayRecordings[] = [];
+	for (const [date, recordings] of Object.entries(grouped)) {
+		const isAvailable = recordings.some(r =>
+			isDateAvailable(r.recorded_at, user.super_powers === 1, threshold, userTimezone)
+		);
+
+		days.push({
+			date,
+			recordings: recordings.sort((a, b) =>
+				new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
+			),
+			available: isAvailable
+		});
+	}
+
+	// Vérifier s'il y a plus de jours que la limite
+	const hasMore = days.length > limit;
+
+	// Retourner seulement 'limit' jours
+	return {
+		days: days.slice(0, limit),
+		hasMore
+	};
+}
+
 export function getUnreadCount(userId: number): { count: number; totalSeconds: number } {
 	const stmt = db.prepare(`
 		SELECT 

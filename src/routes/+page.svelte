@@ -54,7 +54,7 @@
 		hasRecordings: boolean;
 	};
 
-	let { data }: { data: PageData & { user?: User; allUsers: UserList[]; threshold: number; unreadStats?: { count: number; totalSeconds: number } } } = $props();
+	let { data }: { data: PageData & { user?: User; allUsers: UserList[]; threshold: number; unreadStats?: { count: number; totalSeconds: number }; hasMore?: boolean } } = $props();
 	let showTeam = $state(false);
 	let currentPage = $state(1);
 	let allDays = $state<DayRecordings[]>([]);
@@ -1019,7 +1019,7 @@
 				{/each}
 			</div>
 		</div>
-			{:else}
+			{:else if data.hasMore}
 				<button class="btn" onclick={loadMore}>Charger plus</button>
 			{/if}
 		</div>
