@@ -1,4 +1,5 @@
-alpha.mateclub.app {
+# Remplacez VOTRE_DOMAINE par votre domaine réel (ex: alpha.mateclub.app)
+VOTRE_DOMAINE {
     reverse_proxy localhost:3001
     
     # Sécurité

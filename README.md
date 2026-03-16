@@ -166,9 +166,22 @@ Pour déployer derrière Caddy avec HTTPS :
 
 **Caddyfile :**
 ```caddyfile
-your-domain.com {
+VOTRE_DOMAINE {
     reverse_proxy localhost:3001
 }
+```
+
+**Note importante** : Si Caddy est déjà installé dans un conteneur Docker séparé (pas dans le même docker-compose que MateClub), utilisez l'IP de l'hôte au lieu de `localhost` :
+
+```caddyfile
+VOTRE_DOMAINE {
+    reverse_proxy 10.0.0.74:3001  # Remplacez par l'IP de votre serveur
+}
+```
+
+Pour trouver l'IP de votre serveur sur le réseau local :
+```bash
+ip route | grep default | awk '{print $3}'
 ```
 
 **Avec Docker Compose et Caddy :**
