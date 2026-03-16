@@ -1,6 +1,18 @@
 # MateClub
 
-Votre podcast quotidien entre amis.
+![Status](https://img.shields.io/badge/Status-Alpha-orange?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-2.1.0-blue?style=for-the-badge)
+
+> **⚠️ En cours de développement**
+>
+> MateClub est actuellement en **phase alpha**. L'application est utilisée en production par un petit groupe de testeurs mais est encore en développement actif.
+>
+> - Des bugs peuvent survenir
+> - Des fonctionnalités peuvent changer
+> - La structure de la base de données peut évoluer
+>
+> **Ce projet est partagé pour transparence et inspiration.** L'utilisation en production nécessite une configuration attentive.
 
 ## Description
 
