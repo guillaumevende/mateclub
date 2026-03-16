@@ -90,17 +90,17 @@ Au premier lancement, si aucun administrateur n'existe, vous êtes redirigé ver
 
 ### Docker (recommandé)
 
-**Variables d'environnement requises :**
+**Variables d'environnement :**
 
 Créez un fichier `.env` à la racine :
 
 ```bash
 # .env
-ADMIN_PSEUDO=votre_pseudo
-ADMIN_PASSWORD=votre_mot_de_passe_securise
-DATABASE_PATH=/app/data/mateclub.db
-PORT=3000
+PORT=3001
+# DATABASE_PATH=/app/data/mateclub.db
 ```
+
+**Note** : Aucun compte administrateur requis - vous serez redirigé vers `/setup` au premier lancement pour créer le premier admin.
 
 Puis lancez :
 
@@ -109,7 +109,7 @@ docker-compose up -d
 ```
 
 **Au premier lancement :**
-1. Allez sur http://localhost:3000
+1. Allez sur http://localhost:3001
 2. Vous serez redirigé vers `/setup`
 3. Créez votre compte administrateur
 4. Après création, utilisez `/login` pour vous connecter
@@ -121,7 +121,7 @@ npm run build
 npm run start
 ```
 
-Aller sur http://localhost:3000
+Aller sur http://localhost:3001
 
 ### Reverse Proxy (Caddy)
 
@@ -130,7 +130,7 @@ Pour déployer derrière Caddy avec HTTPS :
 **Caddyfile :**
 ```caddyfile
 your-domain.com {
-    reverse_proxy localhost:3000
+    reverse_proxy localhost:3001
 }
 ```
 
@@ -142,7 +142,7 @@ services:
   mateclub:
     build: .
     ports:
-      - "3000:3000"
+      - "3001:3001"
     volumes:
       - ./data:/app/data
       - ./uploads:/app/uploads
@@ -170,8 +170,10 @@ volumes:
 ## Configuration
 
 Variables d'environnement:
-- `ADMIN_PSEUDO` - Pseudo de l'admin (requis, pas de défaut)
-- `ADMIN_PASSWORD` - Mot de passe admin (requis, pas de défaut) 
+- `PORT` - Port serveur (défaut: 3001, changeable si déjà utilisé)
+- `DATABASE_PATH` - Chemin de la BDD (défaut: ./data/mateclub.db)
+
+**Note** : Aucun compte administrateur à configurer - le premier admin est créé via `/setup` au premier lancement de l'application. 
 - `DATABASE_PATH` - Chemin de la BDD (défaut: ./data/mateclub.db)
 - `PORT` - Port serveur (défaut: 3000, changeable si déjà utilisé)
 
