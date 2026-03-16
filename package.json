@@ -1,0 +1,31 @@
+{
+  "name": "mateclub",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node build/index.js",
+    "init": "node scripts/init-admin.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@sveltejs/adapter-node": "^5.5.4",
+    "@sveltejs/kit": "^2.53.4",
+    "@sveltejs/vite-plugin-svelte": "^6.2.4",
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.6.2",
+    "browser-image-compression": "^2.0.2",
+    "svelte": "^5.53.9",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.1",
+    "web-haptics": "^0.0.6"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/better-sqlite3": "^7.6.13"
+  }
+}
