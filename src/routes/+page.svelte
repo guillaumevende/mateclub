@@ -735,7 +735,11 @@
 
 	{#if allDays.length === 0 && !todayDay}
 		<div class="empty">
-			<p>Chargement des capsules...</p>
+			{#if data.days}
+				<p>Pas encore de capsule à écouter. Créez vos utilisateurs et faites un premier enregistrement audio.</p>
+			{:else}
+				<p>Chargement des capsules...</p>
+			{/if}
 		</div>
 	{:else}
 		{#if todayDay}
