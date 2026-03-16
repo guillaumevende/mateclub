@@ -1,7 +1,9 @@
 # Données sensibles
 .env
-data/
-uploads/
+# data/ directory at root only (not in src/)
+/data/
+# uploads/ directory at root only (not in src/routes/)
+/uploads/
 # Node.js
 node_modules/
 build/
