@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { redirect, json } from '@sveltejs/kit';
-import { deleteUser, getUserById, toggleSuperPowers, toggleLogsEnabled, toggleJinglesEnabled, updateUserThreshold } from '$lib/server/db';
+import { deleteUser, getUserById, toggleSuperPowers, toggleLogsEnabled, toggleJinglesEnabled, updateUserHour } from '$lib/server/db';
 
 export const DELETE: RequestHandler = async ({ params, locals }) => {
 	if (!locals.user || !locals.user.is_admin) {
@@ -42,7 +42,7 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
 			toggleJinglesEnabled(userId, value);
 			break;
 		case 'threshold':
-			updateUserThreshold(userId, value);
+			updateUserHour(userId, value);
 			break;
 		default:
 			return json({ error: 'Action inconnue' }, { status: 400 });
