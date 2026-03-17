@@ -2,7 +2,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Alpha-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-2.1.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-2.2.0-blue?style=for-the-badge)
 
 > **⚠️ En cours de développement**
 >
@@ -323,6 +323,12 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 - `GET /api/recordings/by-date?date=YYYY-MM-DD` - Capsules d'un jour
 
 ## Journal des modifications
+
+### v2.2.0 (2026-03-17)
+- 📱 Fix iOS : accès à la bibliothèque photos (suppression attribut capture)
+- 🔧 Fix logout : correction suppression cookie avec bonnes options
+- 🔧 Fix logout : gestion d'erreurs pour éviter erreur 500
+- 🔧 Fix envoi : désactivation web workers compression image en PWA
 
 ### v2.1.0 (2026-03-16)
 - 🎵 Ajout jingle d'intro (activation via admin)
