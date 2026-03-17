@@ -2,7 +2,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Alpha-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-2.2.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-2.2.1-blue?style=for-the-badge)
 
 > **⚠️ En cours de développement**
 >
@@ -323,6 +323,12 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 - `GET /api/recordings/by-date?date=YYYY-MM-DD` - Capsules d'un jour
 
 ## Journal des modifications
+
+### v2.2.1 (2026-03-17)
+- 🔧 **Fix player audio : correction débordement curseur sur fichiers courts**
+  - Plafonnement de la progression à 100% maximum
+  - Ajout de `overflow: hidden` sur la barre de progression
+  - Calcul ajusté de la position du curseur pour rester dans les limites
 
 ### v2.2.0 (2026-03-17)
 - 📱 Fix iOS : accès à la bibliothèque photos (suppression attribut capture)
