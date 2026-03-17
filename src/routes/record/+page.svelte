@@ -233,15 +233,15 @@ function stopRecording() {
 			compressionProgress = 0;
 			
 			try {
-				const options = {
-					maxWidthOrHeight: 1200,
-					maxSizeMB: 1,
-					initialQuality: 0.8,
-					useWebWorker: true,
-					onProgress: (progress: number) => {
-						compressionProgress = Math.round(progress * 100);
-					}
-				};
+ 			const options = {
+ 				maxWidthOrHeight: 1200,
+ 				maxSizeMB: 1,
+ 				initialQuality: 0.8,
+ 				useWebWorker: false,
+ 				onProgress: (progress: number) => {
+ 					compressionProgress = Math.round(progress * 100);
+ 				}
+ 			};
 				
 				const compressedFile = await imageCompression(file, options);
 				imageBlob = compressedFile;
@@ -287,7 +287,7 @@ function stopRecording() {
  				maxWidthOrHeight: 1200,
  				maxSizeMB: 1,
  				initialQuality: 0.8,
- 				useWebWorker: true,
+ 			useWebWorker: false,
  				onProgress: (progress: number) => {
  					compressionProgress = Math.round(progress * 100);
  				}
