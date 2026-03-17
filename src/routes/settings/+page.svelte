@@ -418,7 +418,7 @@
 		<button type="submit">Sauvegarder</button>
 	</form>
 
-	<a href="/logout" class="btn">Déconnexion</a>
+	<a href="/logout" class="btn" data-sveltekit-reload>Déconnexion</a>
 </div>
 
 <style>
