@@ -165,10 +165,31 @@ Aller sur http://localhost:3001
 
 Pour déployer derrière Caddy avec HTTPS :
 
-**Caddyfile :**
+**Caddyfile avec headers de sécurité recommandés :**
 ```caddyfile
 VOTRE_DOMAINE {
     reverse_proxy localhost:3001
+
+    # Headers de sécurité
+    header {
+        # HSTS - 1 an, sous-domaines
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        
+        # Protection clickjacking
+        X-Frame-Options "DENY"
+        
+        # Anti-MIME sniffing
+        X-Content-Type-Options "nosniff"
+        
+        # Referrer Policy
+        Referrer-Policy "strict-origin-when-cross-origin"
+        
+        # Permissions
+        Permissions-Policy "interest-cohort=()"
+        
+        # CSP (optionnel - déjà géré par l'app)
+        # Content-Security-Policy "default-src 'self'; ..."
+    }
 }
 ```
 
@@ -177,6 +198,15 @@ VOTRE_DOMAINE {
 ```caddyfile
 VOTRE_DOMAINE {
     reverse_proxy 10.0.0.74:3001  # Remplacez par l'IP de votre serveur
+
+    # Headers de sécurité
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Frame-Options "DENY"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "interest-cohort=()"
+    }
 }
 ```
 
