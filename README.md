@@ -2,7 +2,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Alpha-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-2.2.1-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-2.2.2-blue?style=for-the-badge)
 
 > **⚠️ En cours de développement**
 >
@@ -56,6 +56,7 @@ MateClub est une application web PWA permettant à un groupe d'amis d'enregistre
 - **Jingle d'intro** - Activation/désactivation du jingle musical
 
 ### Sécurité & Technique
+- **Headers de sécurité** - CSP, HSTS, X-Content-Type-Options, COOP, CORP
 - **Validation des fichiers** - Vérification des magic numbers pour audio et images (évite les faux fichiers)
 - **Protection path traversal** - Validation stricte des chemins de fichiers
 - **Rate limiting** - 5 tentatives max par IP sur 15 minutes (protection brute-force)
@@ -323,6 +324,15 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 - `GET /api/recordings/by-date?date=YYYY-MM-DD` - Capsules d'un jour
 
 ## Journal des modifications
+
+### v2.2.2 (2026-03-17)
+- 🔒 **Security : ajout headers de sécurité**
+  - Content-Security-Policy (CSP)
+  - Strict-Transport-Security (HSTS)
+  - X-Content-Type-Options
+  - Cross-Origin-Opener-Policy (protection Spectre)
+  - Cross-Origin-Resource-Policy (protection Spectre)
+- 🔒 **Security : handler favicon avec Content-Type explicite**
 
 ### v2.2.1 (2026-03-17)
 - 🔧 **Fix player audio : correction débordement curseur sur fichiers courts**
