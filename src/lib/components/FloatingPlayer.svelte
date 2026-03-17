@@ -111,7 +111,7 @@
 	
 	// Always use duration_seconds from database (reliable for all files including opus codec)
 	let displayDuration = $derived(player.currentRecording?.duration_seconds || 0);
-	let progressPercent = $derived((displayDuration > 0) ? (player.progress / displayDuration) * 100 : 0);
+	let progressPercent = $derived((displayDuration > 0) ? Math.min(100, (player.progress / displayDuration) * 100) : 0);
 </script>
 
 {#if player.currentRecording}
@@ -173,7 +173,7 @@
 				aria-valuemax={displayDuration}
 			>
 				<div class="progress-fill" style="width: {progressPercent}%"></div>
-				<div class="progress-thumb" style="left: {progressPercent}%"></div>
+				<div class="progress-thumb" style="left: calc({progressPercent}% + 7px - {progressPercent * 0.14}px)"></div>
 			</div>
 			<span class="time duration">{formatTime(displayDuration)}</span>
 		</div>
@@ -307,6 +307,7 @@
 		align-items: center;
 		cursor: pointer;
 		position: relative;
+		overflow: hidden;
 	}
 
 	.progress-track::before {
