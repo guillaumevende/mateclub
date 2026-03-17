@@ -431,7 +431,7 @@ function stopRecording() {
  					ondragleave={handleDragLeave}
  					ondrop={handleDrop}
  				>
- 					<input type="file" accept="image/*" capture="environment" onchange={handleImageSelect} disabled={isCompressingImage} />
+ 				<input type="file" accept="image/*" onchange={handleImageSelect} disabled={isCompressingImage} />
  					<span>📷 Ajouter une photo</span>
  				</label>
 			{/if}
