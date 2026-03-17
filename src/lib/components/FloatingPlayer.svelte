@@ -103,7 +103,7 @@
 		if (secs === 0) {
 			return `${mins}min`;
 		}
-		return `${mins}min${secs}`;
+		return `${mins}min ${secs}`;
 	}
 
 	let hasPrevious = $derived(player.currentDayData && player.currentIndex > 0);
