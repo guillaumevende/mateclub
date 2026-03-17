@@ -11,7 +11,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "AGPL-3.0",
   "dependencies": {
     "@sveltejs/adapter-node": "^5.5.4",
     "@sveltejs/kit": "^2.53.4",
