@@ -330,6 +330,12 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 - 🔧 Fix logout : gestion d'erreurs pour éviter erreur 500
 - 🔧 Fix envoi : désactivation web workers compression image en PWA
 - 📜 **Changement de licence : MIT → AGPL-3.0**
+- ✅ **Admin : validation mot de passe 12+ caractères avec messages d'erreur contextuels**
+- ✅ **Admin : affichage des erreurs sous les champs correspondants (pseudo/password)**
+- ✅ **Admin : confirmation "Utilisateur créé avec succès" après création**
+- 🔧 **Fix avatars : correction décalage visuel sur les avatars chevauchés**
+- 🔧 **Avatar : suppression double bordure (composant + conteneur)**
+- 🔧 **UX : margin-left ajusté de -15px à -17px pour compenser les bordures**
 
 ### v2.1.0 (2026-03-16)
 - 🎵 Ajout jingle d'intro (activation via admin)

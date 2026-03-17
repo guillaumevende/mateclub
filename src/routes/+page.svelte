@@ -632,13 +632,13 @@
 									<div 
 										class="author-avatar-header" 
 										title={author.pseudo}
-										style="margin-left: {i === 0 ? 0 : -15}px; z-index: {i}"
+										style="margin-left: {i === 0 ? 0 : -17}px; z-index: {i}"
 									>
 										<Avatar avatar={author.avatar} size="small" />
 									</div>
 								{/each}
 								{#if hasMore}
-									<div class="author-avatar-header more-avatars" style="margin-left: -15px; z-index: 0">
+									<div class="author-avatar-header more-avatars" style="margin-left: -17px; z-index: 0">
 										<span>+{authors.length - 10}</span>
 									</div>
 								{/if}
@@ -767,13 +767,13 @@
 									<div 
 										class="author-avatar-header" 
 										title={author.pseudo}
-										style="margin-left: {i === 0 ? 0 : -15}px; z-index: {i}"
+										style="margin-left: {i === 0 ? 0 : -17}px; z-index: {i}"
 									>
 										<Avatar avatar={author.avatar} size="small" />
 									</div>
 								{/each}
 								{#if hasMore}
-									<div class="author-avatar-header more-avatars" style="margin-left: -15px; z-index: 0">
+									<div class="author-avatar-header more-avatars" style="margin-left: -17px; z-index: 0">
 										<span>+{authors.length - 10}</span>
 									</div>
 								{/if}
@@ -887,13 +887,13 @@
 									<div 
 										class="author-avatar-header" 
 										title={author.pseudo}
-										style="margin-left: {i === 0 ? 0 : -15}px; z-index: {i}"
+										style="margin-left: {i === 0 ? 0 : -17}px; z-index: {i}"
 									>
 										<Avatar avatar={author.avatar} size="small" />
 									</div>
 								{/each}
 								{#if hasMore}
-									<div class="author-avatar-header more-avatars" style="margin-left: -15px; z-index: 0">
+									<div class="author-avatar-header more-avatars" style="margin-left: -17px; z-index: 0">
 										<span>+{authors.length - 10}</span>
 									</div>
 							{/if}
@@ -1338,7 +1338,7 @@
 		border: 2px solid #2a2a4e;
 		transition: transform 0.2s ease;
 		position: relative;
-		margin-left: -15px;
+		margin-left: -17px;
 	}
 
 	.author-avatar-header:first-child {
@@ -1763,7 +1763,7 @@
 	}
 
 	.author-avatar {
-		margin-left: -15px;
+		margin-left: -17px;
 		border: 2px solid #1a1a2e;
 		border-radius: 50%;
 		transition: transform 0.2s;

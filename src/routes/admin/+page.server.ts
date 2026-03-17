@@ -28,13 +28,18 @@ export const actions: Actions = {
 			return fail(400, { error: 'Pseudo et mot de passe requis' });
 		}
 
+		// Validation du mot de passe : 12+ caractères minimum
+		if (password.length < 12) {
+			return fail(400, { error: 'Le mot de passe doit contenir au moins 12 caractères' });
+		}
+
 		if (!isPseudoAvailable(pseudo)) {
 			return fail(400, { error: 'Un autre utilisateur a déjà ce nom. Veuillez mettre un autre nom.' });
 		}
 
 		try {
 			createUser(pseudo, password, isAdmin, avatar);
-			return { success: true };
+			return { success: true, message: `Utilisateur "${pseudo}" créé avec succès` };
 		} catch (e) {
 			return fail(400, { error: 'Pseudo déjà utilisé' });
 		}

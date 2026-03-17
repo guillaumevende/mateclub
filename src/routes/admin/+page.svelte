@@ -24,6 +24,9 @@
 	
 	let selectedAvatar = $state('☕');
 	let createError = $state<string | null>(null);
+	let createSuccess = $state<string | null>(null);
+	let passwordError = $state<string | null>(null);
+	let pseudoError = $state<string | null>(null);
 
 	let adminCount = $derived(data.users.filter(u => u.is_admin).length);
 	
@@ -180,17 +183,63 @@
 		<h2>Créer un utilisateur</h2>
 		<form method="POST" action="?/create" use:enhance={() => {
 			return async ({ result }) => {
-				if (result.type === 'failure' && (result.data as any)?.error) {
-					createError = (result.data as any).error;
-				} else if (result.type === 'success') {
+			if (result.type === 'failure' && (result.data as any)?.error) {
+				const errorMsg = (result.data as any).error;
+				const lowerError = errorMsg.toLowerCase();
+				// Si c'est une erreur de mot de passe (12 caractères), l'afficher sous le champ password
+				if (lowerError.includes('12 caractères')) {
+					passwordError = errorMsg;
+					pseudoError = null;
 					createError = null;
-					selectedAvatar = '☕';
+				// Si c'est une erreur de pseudo déjà utilisé, l'afficher sous le champ pseudo
+				} else if (lowerError.includes('déjà') || lowerError.includes('utilisateur') || lowerError.includes('nom')) {
+					pseudoError = errorMsg;
+					passwordError = null;
+					createError = null;
+				} else {
+					createError = errorMsg;
+					passwordError = null;
+					pseudoError = null;
 				}
+				createSuccess = null;
+			} else if (result.type === 'success') {
+				createError = null;
+				passwordError = null;
+				pseudoError = null;
+				createSuccess = (result.data as any)?.message || 'Utilisateur créé avec succès';
+				selectedAvatar = '☕';
+				// Réinitialiser le formulaire
+				const form = document.querySelector('form[action="?/create"]') as HTMLFormElement;
+				if (form) form.reset();
+			}
 			};
 		}}>
 			<input type="hidden" name="csrf_token" value={data.csrfToken} />
-			<input type="text" name="pseudo" placeholder="Pseudo" required />
-			<input type="password" name="password" placeholder="Mot de passe" required />
+			<div class="pseudo-field">
+				<input type="text" name="pseudo" placeholder="Pseudo" required />
+				{#if pseudoError}
+					<p class="field-error">{pseudoError}</p>
+				{/if}
+			</div>
+			<div class="password-field">
+				<input 
+					type="password" 
+					name="password" 
+					placeholder="Mot de passe (12 caractères minimum)" 
+					required 
+					oninput={(e) => {
+						const value = (e.target as HTMLInputElement).value;
+						if (value.length > 0 && value.length < 12) {
+							passwordError = 'Le mot de passe doit contenir au moins 12 caractères';
+						} else {
+							passwordError = null;
+						}
+					}}
+				/>
+				{#if passwordError}
+					<p class="field-error">{passwordError}</p>
+				{/if}
+			</div>
 			<label class="checkbox">
 				<input type="checkbox" name="is_admin" />
 				Admin
@@ -212,6 +261,9 @@
 			</div>
 			{#if createError}
 				<p class="error-message">{createError}</p>
+			{/if}
+			{#if createSuccess}
+				<p class="success-message">{createSuccess}</p>
 			{/if}
 			<button type="submit">Créer</button>
 		</form>
@@ -488,5 +540,34 @@
 		color: #ff6b6b;
 		font-size: 0.875rem;
 		margin-bottom: 0.5rem;
+	}
+
+	.success-message {
+		color: #4caf50;
+		font-size: 0.875rem;
+		margin-bottom: 0.5rem;
+	}
+
+	.password-field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.password-field input::placeholder {
+		font-size: 0.85rem;
+	}
+
+	.field-error {
+		color: #ff6b6b;
+		font-size: 0.8rem;
+		margin: 0;
+		padding-left: 0.5rem;
+	}
+
+	.pseudo-field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
 	}
 </style>
