@@ -68,7 +68,7 @@ declare module "$app/types" {
 			"/uploads/[file]": { file: string };
 			"/uploads/[...file]": { file: string }
 		};
-		Pathname(): "/" | "/admin" | "/api/admin/users" | `/api/admin/users/${string}` & {} | "/api/auth/login" | "/api/auth/logout" | "/api/auth/me" | "/api/avatar" | "/api/avatar/restore" | "/api/debug" | "/api/recordings" | "/api/recordings/by-date" | "/api/recordings/dates" | "/api/recordings/mine" | `/api/recordings/${string}` & {} | `/api/recordings/${string}/listen` & {} | "/favicon.ico" | "/login" | "/logout" | "/record" | "/settings" | "/setup" | `/uploads/avatars${string}` & {} | `/uploads/${string}` & {};
+		Pathname(): "/" | "/admin" | "/api/admin/users" | `/api/admin/users/${string}` & {} | "/api/auth/login" | "/api/auth/logout" | "/api/auth/me" | "/api/avatar" | "/api/avatar/restore" | "/api/debug" | "/api/recordings" | "/api/recordings/" | "/api/recordings/by-date" | "/api/recordings/dates" | "/api/recordings/mine" | `/api/recordings/${string}` & {} | `/api/recordings/${string}/listen` & {} | "/favicon.ico" | "/login" | "/logout" | "/record" | "/settings" | "/setup" | `/uploads/avatars${string}` & {} | `/uploads/${string}` & {};
 		ResolvedPathname(): `${"" | `/${string}`}${ReturnType<AppTypes['Pathname']>}`;
 		Asset(): "/.DS_Store" | "/apple-touch-icon.png" | "/favicon-16x16.png" | "/favicon-32x32.png" | "/favicon.ico" | "/icon-192x192.png" | "/icon-512x512.png" | "/jingle-intro.mp3" | "/jingle-transition.mp3" | "/logo512px.png" | "/logoHD.png" | "/manifest.json" | "/silence.mp3" | "/sw.js" | string & {};
 	}

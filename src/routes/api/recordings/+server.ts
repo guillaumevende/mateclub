@@ -10,6 +10,12 @@ console.log('[RECORDINGS] Sharp loaded successfully:', typeof sharp);
 
 const DUPLICATE_THRESHOLD_SECONDS = 30;
 
+export const config = {
+	body: {
+		max: 20 * 1024 * 1024 // 20 MB - allows 3min audio + image
+	}
+};
+
 export const POST: RequestHandler = async ({ request, locals }) => {
 	console.log('[RECORDINGS] ============================================');
 	console.log('[RECORDINGS] POST request received');
