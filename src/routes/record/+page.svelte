@@ -33,6 +33,8 @@
 	let isCompressingImage = $state(false);
 	let compressionProgress = $state(0);
 	let error = $state<string | null>(null);
+	let urlError = $state<string | null>(null);
+	let imageWarning = $state<string | null>(null);
 	let success = $state(false);
 	let isDragging = $state(false);
 
@@ -91,7 +93,7 @@
 	}
 
 	async function loadMoreRecordings() {
-		recordingsOffset += RECORDINGS_LOAD_MORE;
+		recordingsOffset += RECORDINGS_LIMIT;
 		await loadRecordings();
 	}
 
@@ -228,29 +230,48 @@ function stopRecording() {
 		if (input.files && input.files[0]) {
 			const file = input.files[0];
 			
-			// Compression côté client (même approche que pour les avatars)
+			// Valider le type de fichier avant tout traitement
+			const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+			if (!validImageTypes.includes(file.type)) {
+				imageWarning = 'Format d\'image non valide. Votre capsule va être envoyée sans image ou sélectionnez une image valide.';
+				input.value = ''; // Reset input
+				return;
+			}
+			
+			// HEIC/HEIF: pas de compression côté client, le serveur convertira en JPEG
+			const isHeic = file.type === 'image/heic' || file.type === 'image/heif';
+			
+			imageWarning = null;
+			
+			if (isHeic) {
+				// Envoyer HEIC brut, le serveur convertira en JPEG
+				imageBlob = file;
+				imagePreview = URL.createObjectURL(file);
+				return;
+			}
+			
+			// Compression côté client pour les formats standards
 			isCompressingImage = true;
 			compressionProgress = 0;
 			
 			try {
- 			const options = {
- 				maxWidthOrHeight: 1200,
- 				maxSizeMB: 1,
- 				initialQuality: 0.8,
- 				useWebWorker: false,
- 				onProgress: (progress: number) => {
- 					compressionProgress = Math.round(progress * 100);
- 				}
- 			};
+  			const options = {
+  				maxWidthOrHeight: 1200,
+  				maxSizeMB: 1,
+  				initialQuality: 0.8,
+  				useWebWorker: false,
+				onProgress: (progress: number) => {
+					compressionProgress = Math.min(Math.round(progress * 100), 100);
+				}
+  			};
 				
 				const compressedFile = await imageCompression(file, options);
 				imageBlob = compressedFile;
 				imagePreview = URL.createObjectURL(compressedFile);
 			} catch (err) {
 				console.error('Erreur compression:', err);
-				// En cas d'erreur, utiliser l'image originale
-				imageBlob = file;
-				imagePreview = URL.createObjectURL(file);
+				error = 'Erreur lors du traitement de l\'image';
+				input.value = ''; // Reset input
 			} finally {
 				isCompressingImage = false;
 				compressionProgress = 0;
@@ -277,19 +298,36 @@ function stopRecording() {
  				handleImageFile(file);
  			}
  		}
- 	}
+  }
 
- 	async function handleImageFile(file: File) {
+  	async function handleImageFile(file: File) {
+		// Valider le type de fichier avant tout traitement
+		const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+		if (!validImageTypes.includes(file.type)) {
+			imageWarning = 'Format d\'image non valide. Votre capsule va être envoyée sans image ou sélectionnez une image valide.';
+			return;
+		}
+		
+		// HEIC/HEIF: pas de compression côté client, le serveur convertira en JPEG
+		const isHeic = file.type === 'image/heic' || file.type === 'image/heif';
+		
+		imageWarning = null;
+		
+		if (isHeic) {
+			imageBlob = file;
+			imagePreview = URL.createObjectURL(file);
+			return;
+		}
+		
  		isCompressingImage = true;
  		compressionProgress = 0;
  		try {
  			const options = {
  				maxWidthOrHeight: 1200,
  				maxSizeMB: 1,
- 				initialQuality: 0.8,
  			useWebWorker: false,
  				onProgress: (progress: number) => {
- 					compressionProgress = Math.round(progress * 100);
+ 					compressionProgress = Math.min(Math.round(progress * 100), 100);
  				}
  			};
  			const compressedFile = await imageCompression(file, options);
@@ -297,19 +335,45 @@ function stopRecording() {
  			imagePreview = URL.createObjectURL(compressedFile);
  		} catch (err) {
  			console.error('Erreur compression:', err);
- 			imageBlob = file;
- 			imagePreview = URL.createObjectURL(file);
+ 			error = 'Erreur lors du traitement de l\'image';
  		} finally {
  			isCompressingImage = false;
  			compressionProgress = 0;
  		}
- 	}
- 
- 	async function sendRecording() {
-		if (!recordedBlob) return;
+  	}
+  
+   async function sendRecording() {
+		if (!recordedBlob) {
+			console.error('[SEND] ERREUR: recordedBlob est null!');
+			return;
+		}
+		
+		console.log('[SEND] Début sendRecording - recordedBlob size:', recordedBlob.size, 'type:', recordedBlob.type, 'URL:', recordingUrl);
 		
 		isSending = true;
 		error = null;
+		urlError = null;
+		
+		// Validation URL côté client
+		if (recordingUrl.trim()) {
+			try {
+				const parsed = new URL(recordingUrl);
+				console.log('[SEND] URL parsée:', parsed.protocol, parsed.hostname);
+				if (parsed.protocol !== 'https:') {
+					urlError = 'L\'URL doit commencer par https://';
+					console.log('[SEND] Erreur URL: protocole non https');
+					isSending = false;
+					return;
+				}
+			} catch (err) {
+				urlError = 'URL invalide';
+				console.log('[SEND] Erreur URL:', err.message);
+				isSending = false;
+				return;
+			}
+		}
+		
+		console.log('[SEND] Validation OK, envoi de la requête...');
 		
 		try {
 			const formData = new FormData();
@@ -329,19 +393,55 @@ function stopRecording() {
 				body: formData
 			});
 
+			const data = await res.json();
+
+			if (data.duplicate) {
+				error = 'Enregistrement déjà existant (probablement identique dans les 30 dernières secondes)';
+				isSending = false;
+				return;
+			}
+
 			if (!res.ok) {
-				const data = await res.json();
+				// Envoyer l'erreur vers le serveur pour diagnostic
+				sendErrorToServer('SEND_RECORDING_FAILED', {
+					message: data.error || 'Erreur lors de l\'envoi',
+					audioSize: recordedBlob.size,
+					audioType: recordedBlob.type,
+					duration: timer,
+					url: window.location.href
+				});
 				throw new Error(data.error || 'Erreur lors de l\'envoi');
 			}
 
 			success = true;
-			setTimeout(() => {
-				window.location.href = '/';
-			}, 1500);
 		} catch (e: any) {
+			// Envoyer l'erreur vers le serveur pour diagnostic
+			sendErrorToServer('SEND_RECORDING_ERROR', {
+				message: e.message,
+				audioSize: recordedBlob?.size,
+				audioType: recordedBlob?.type,
+				duration: timer,
+				url: window.location.href
+			});
 			error = e.message;
 		} finally {
 			isSending = false;
+		}
+	}
+
+	async function sendErrorToServer(type: string, context: any) {
+		try {
+			await fetch('/api/debug', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					message: `${type}: ${context.message || 'Unknown error'}`,
+					stack: context.stack || '',
+					context
+				})
+			});
+		} catch (e) {
+			// Silencieux - on ne veut pas d'erreur sur l'erreur
 		}
 	}
 
@@ -352,8 +452,20 @@ function stopRecording() {
 		imagePreview = null;
 		timer = 0;
 		success = false;
-		// Automatically start recording again
-		startRecording();
+		showRecordingsList = true;
+		loadRecordings();
+	}
+
+	function stayOnPage() {
+		recordedBlob = null;
+		audioUrl = null;
+		imageBlob = null;
+		imagePreview = null;
+		timer = 0;
+		success = false;
+		error = null;
+		recordingUrl = '';
+		isSending = false;
 	}
 
 	function formatTime(seconds: number): string {
@@ -407,8 +519,14 @@ function stopRecording() {
 	<h1>Enregistrer</h1>
 
 	{#if success}
-		<div class="success">
-			<p>Enregistrement envoyé !</p>
+		<div class="success-container">
+			<div class="success-icon">✓</div>
+			<p class="success-title">Enregistrement envoyé !</p>
+			<p class="success-question">Vous avez tout dit ou vous voulez compléter par un autre message ?</p>
+			<div class="success-actions">
+				<button class="primary" onclick={stayOnPage}>Enregistrer un autre</button>
+				<button class="secondary" onclick={() => window.location.href = '/'}>Aller à l'accueil</button>
+			</div>
 		</div>
 	{:else if audioUrl}
 		<div class="preview">
@@ -427,21 +545,29 @@ function stopRecording() {
 					</div>
 				{/if}
 			<label class="image-upload" class:disabled={isCompressingImage} class:dragging={isDragging}
- 					ondragover={handleDragOver}
- 					ondragleave={handleDragLeave}
- 					ondrop={handleDrop}
- 				>
- 				<input type="file" accept="image/*" onchange={handleImageSelect} disabled={isCompressingImage} />
- 					<span>📷 Ajouter une photo</span>
- 				</label>
-			{/if}
-			
-			<input 
-				type="url" 
-				class="url-input" 
-				placeholder="Lien URL (https://...)" 
-				bind:value={recordingUrl}
-			/>
+  					ondragover={handleDragOver}
+  					ondragleave={handleDragLeave}
+  					ondrop={handleDrop}
+  				>
+  				<input type="file" accept="image/*" onchange={handleImageSelect} disabled={isCompressingImage} />
+  					<span>📷 Ajouter une photo</span>
+  				</label>
+  			{/if}
+  			
+  			{#if imageWarning}
+  				<p class="image-warning">⚠️ {imageWarning}</p>
+  			{/if}
+ 			
+ 			<input 
+ 				type="url" 
+ 				class="url-input" 
+ 				placeholder="Lien URL (https://...)" 
+ 				bind:value={recordingUrl}
+ 				onfocus={() => urlError = null}
+ 			/>
+ 			{#if urlError}
+ 				<p class="url-error">{urlError}</p>
+ 			{/if}
 			
 			<div class="audio-preview">
 			<audio controls preload="auto" src={audioUrl}></audio>
@@ -453,8 +579,8 @@ function stopRecording() {
 			{/if}
 
 			<div class="actions">
-				<button class="secondary" onclick={reset}>Recommencer</button>
-				<button onclick={sendRecording} disabled={isSending}>
+				<button class="secondary" onclick={reset} disabled={isSending || isCompressingImage}>Recommencer</button>
+				<button onclick={sendRecording} disabled={isSending || isCompressingImage || urlError !== null}>
 					{isSending ? 'Envoi...' : 'Envoyer'}
 				</button>
 			</div>
@@ -603,6 +729,21 @@ function stopRecording() {
 
 	.error {
 		color: #ff6b6b;
+		text-align: center;
+	}
+
+	.url-error {
+		color: #ff6b6b;
+		font-size: 0.85rem;
+		margin-top: -0.5rem;
+		margin-bottom: 0.5rem;
+	}
+
+	.image-warning {
+		color: #ff9500;
+		font-weight: bold;
+		text-align: center;
+		margin: 0.5rem 0;
 	}
 
 	button {
@@ -719,10 +860,70 @@ function stopRecording() {
 		background: #2a2a4e;
 	}
 
-	.success {
+	.actions button:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.success-container {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 1.5rem;
+		padding: 3rem 1rem;
 		text-align: center;
+		animation: fadeIn 0.3s ease-out;
+	}
+
+	@keyframes fadeIn {
+		from {
+			opacity: 0;
+			transform: translateY(-10px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
+	}
+
+	.success-icon {
+		width: 80px;
+		height: 80px;
+		border-radius: 50%;
+		background: linear-gradient(135deg, #4ade80, #22c55e);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		font-size: 2.5rem;
+		color: white;
+		box-shadow: 0 8px 32px rgba(74, 222, 128, 0.3);
+	}
+
+	.success-title {
 		color: #4ade80;
-		font-size: 1.25rem;
+		font-size: 1.75rem;
+		font-weight: 600;
+		margin: 0;
+	}
+
+	.success-question {
+		color: #a0a0c0;
+		font-size: 1.1rem;
+		margin: 0;
+		max-width: 400px;
+	}
+
+	.success-actions {
+		display: flex;
+		gap: 1rem;
+		flex-wrap: wrap;
+		justify-content: center;
+		margin-top: 1rem;
+	}
+
+	.success-actions button {
+		min-width: 200px;
 	}
 
 	/* Fix bouton suppression rond parfait */

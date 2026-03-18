@@ -2,7 +2,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Alpha-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-2.2.2-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-2.3.0-blue?style=for-the-badge)
 
 > **⚠️ En cours de développement**
 >
@@ -27,12 +27,15 @@ MateClub est une application web PWA permettant à un groupe d'amis d'enregistre
 - **Lecture arrière-plan** - Fonctionne smartphone verrouillé via technique "audio guardian"
 - **MediaSession API** - Contrôles lockscreen (play/pause/next/prev)
 - **Haptique** - Vibration au démarrage de la lecture
+- **Déduplication SHA-256** - Détection des doublons basée sur le hash audio (seuil 30s)
 
 ### Médias
 - **Miniatures** - Ajout d'images aux enregistrements (45x45px avec bordure)
 - **Compression automatique** - Images compressées avant upload (~100KB)
+- **Support HEIC/HEIF** - Conversion automatique des photos Apple (HEIC→JPEG)
 - **Visionneuse plein écran** - Affichage des images en grand
 - **Liens URL** - Possibilité d'ajouter un lien externe (https://)
+- **Validation URL** - Vérification du format avec messages d'erreur contextuels
 
 ### Interface & UX
 - **Authentification** - Login par pseudo/mot de passe (pas d'email requis)
@@ -42,6 +45,8 @@ MateClub est une application web PWA permettant à un groupe d'amis d'enregistre
 - **Navigation tactile** - Swipe horizontal pour changer de capsule
 - **Calendrier interactif** - Navigation par date avec code couleur
 - **Confirmation de suppression** - Modal avec countdown avant suppression
+- **UI de succès** - Choix de rester sur la page ou retourner à l'accueil après envoi
+- **Logs de debug** - Envoi automatique des erreurs côté client vers le serveur
 
 ### Système de seuils
 - **Système de seuils** - Chaque utilisateur définit son heure de publication quotidienne
@@ -327,6 +332,7 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 - **better-sqlite3** (^12.6.x) - Base SQLite
 - **bcrypt** (^6.0.x) - Hachage mots de passe
 - **browser-image-compression** (^2.0.x) - Compression images
+- **sharp** (^0.33.x) - Conversion d'images (HEIC→JPEG)
 - **web-haptics** (^0.0.6) - Retour haptique mobile
 - **vite** (^7.3.x) - Build tool
 - **typescript** (^5.9.x) - Typage
@@ -353,7 +359,21 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 - `GET /api/recordings/dates` - Dates avec capsules (calendrier)
 - `GET /api/recordings/by-date?date=YYYY-MM-DD` - Capsules d'un jour
 
+### Debug
+- `POST /api/debug` - Logging automatique des erreurs côté client
+
 ## Journal des modifications
+
+### v2.3.0 (2026-03-18)
+- 🔧 **Fix pagination : correction offset dans "Mes enregistrements"** (incrémenté de 10 au lieu de 5)
+- 🐛 **Fix déduplication : hash SHA-256 au lieu de durée** (évite les faux positifs sur audio court)
+- ✨ **Support HEIC/HEIF : conversion automatique via sharp** (photos Apple supportées)
+- ✅ **Validation images : vérification MIME type + magic numbers côté client et serveur**
+- ✅ **Validation URL : messages d'erreur contextuels** (aide l'utilisateur à corriger)
+- ✅ **États d'erreur séparés : urlError ( bloque) vs imageWarning (avertit)**
+- ✅ **UI de succès : boutons "Enregistrer un autre" et "Aller à l'accueil"** (plus de redirect automatique)
+- 🔒 **Debug endpoint : /api/debug** (logging automatique des erreurs côté client)
+- 📦 **Nouvelle dépendance : sharp** (conversion HEIC→JPEG côté serveur)
 
 ### v2.2.2 (2026-03-17)
 - 🔒 **Security : ajout headers de sécurité**

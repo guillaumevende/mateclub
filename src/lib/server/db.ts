@@ -96,6 +96,18 @@ try {
 }
 
 try {
+	db.exec('ALTER TABLE recordings ADD COLUMN audio_hash TEXT');
+} catch (e) {
+	// Colonne déjà existante
+}
+
+try {
+	db.exec('CREATE INDEX IF NOT EXISTS idx_audio_hash ON recordings(user_id, audio_hash)');
+} catch (e) {
+	// Index déjà existant
+}
+
+try {
 	db.exec('ALTER TABLE users ADD COLUMN logs_enabled INTEGER DEFAULT 0');
 } catch (e) {
 	// Colonne déjà existante
@@ -145,6 +157,7 @@ export type Recording = {
 	listened_by_user: number;
 	pseudo: string;
 	avatar: string;
+	audio_hash?: string | null;
 };
 
 export type DayRecordings = {
@@ -624,20 +637,25 @@ export function deleteSession(sessionId: string): void {
 	stmt.run(sessionId);
 }
 
-export function saveRecording(userId: number, audioData: Buffer, durationSeconds: number, imageData?: Buffer, url?: string | null): Recording {
+export function saveRecording(userId: number, audioData: Buffer, durationSeconds: number, imageData?: Buffer, url?: string | null, audioHash?: string): Recording {
+	console.log('[DB] saveRecording - audioData length:', audioData.length, 'bytes, imageData:', imageData?.length || 'none');
+	
 	const filename = `${Date.now()}-${crypto.randomUUID()}.m4a`;
 	const filepath = join(uploadsDir, filename);
+	console.log('[DB] Écriture fichier audio:', filepath);
 	writeFileSync(filepath, audioData);
 
 	let imageFilename: string | null = null;
 	if (imageData) {
 		imageFilename = `${Date.now()}-${crypto.randomUUID()}.jpg`;
 		const imagePath = join(uploadsDir, imageFilename);
+		console.log('[DB] Écriture fichier image:', imagePath);
 		writeFileSync(imagePath, imageData);
 	}
 
-	const stmt = db.prepare('INSERT INTO recordings (user_id, filename, image_filename, url, duration_seconds) VALUES (?, ?, ?, ?, ?)');
-	const result = stmt.run(userId, filename, imageFilename, url || null, durationSeconds);
+	const stmt = db.prepare('INSERT INTO recordings (user_id, filename, image_filename, url, duration_seconds, audio_hash) VALUES (?, ?, ?, ?, ?, ?)');
+	const result = stmt.run(userId, filename, imageFilename, url || null, durationSeconds, audioHash || null);
+	console.log('[DB] Enregistrement créé - id:', result.lastInsertRowid);
 
 	return getRecordingById(result.lastInsertRowid as number)!;
 }
@@ -664,6 +682,20 @@ export function getRecentRecordingByUser(userId: number, durationSeconds: number
 		LIMIT 1
 	`);
 	return stmt.get(userId, durationSeconds, secondsThreshold) as Recording | undefined;
+}
+
+export function getRecentRecordingByHash(userId: number, audioHash: string, secondsThreshold: number = 30): Recording | undefined {
+	const stmt = db.prepare(`
+		SELECT r.*, u.pseudo, u.avatar
+		FROM recordings r 
+		JOIN users u ON r.user_id = u.id 
+		WHERE r.user_id = ? 
+		AND r.audio_hash = ?
+		AND datetime(r.recorded_at) > datetime('now', '-' || ? || ' seconds')
+		ORDER BY r.recorded_at DESC
+		LIMIT 1
+	`);
+	return stmt.get(userId, audioHash, secondsThreshold) as Recording | undefined;
 }
 
 export function deleteRecording(recordingId: number): void {
