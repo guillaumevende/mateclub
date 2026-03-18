@@ -7,10 +7,10 @@ function __memo(fn) {
 return {
 	appDir: "_app",
 	appPath: "_app",
-	assets: new Set(["apple-touch-icon.png","favicon-16x16.png","favicon-32x32.png","favicon.ico","icon-192x192.png","icon-512x512.png","logo512px.png","logoHD.png","manifest.json","silence.mp3","sw.js"]),
-	mimeTypes: {".png":"image/png",".json":"application/json",".mp3":"audio/mpeg",".js":"text/javascript"},
+	assets: new Set([".DS_Store","apple-touch-icon.png","favicon-16x16.png","favicon-32x32.png","favicon.ico","icon-192x192.png","icon-512x512.png","jingle-intro.mp3","jingle-transition.mp3","logo512px.png","logoHD.png","manifest.json","silence.mp3","sw.js"]),
+	mimeTypes: {".png":"image/png",".mp3":"audio/mpeg",".json":"application/json",".js":"text/javascript"},
 	_: {
-		client: {start:"_app/immutable/entry/start.C2is8YIu.js",app:"_app/immutable/entry/app.Bi8TfeuG.js",imports:["_app/immutable/entry/start.C2is8YIu.js","_app/immutable/chunks/DvgFkYBv.js","_app/immutable/chunks/x3vsgxFd.js","_app/immutable/chunks/CZxRZpgK.js","_app/immutable/chunks/Bauhmg--.js","_app/immutable/entry/app.Bi8TfeuG.js","_app/immutable/chunks/CZxRZpgK.js","_app/immutable/chunks/DsnmJJEf.js","_app/immutable/chunks/x3vsgxFd.js","_app/immutable/chunks/BbIEIe4D.js","_app/immutable/chunks/DHdrjZc8.js","_app/immutable/chunks/8Qby7n89.js"],stylesheets:[],fonts:[],uses_env_dynamic_public:false},
+		client: {start:"_app/immutable/entry/start.Bj_QgWLx.js",app:"_app/immutable/entry/app.22J5voVh.js",imports:["_app/immutable/entry/start.Bj_QgWLx.js","_app/immutable/chunks/BtGKlgia.js","_app/immutable/chunks/DfIw3lH-.js","_app/immutable/chunks/ColMeKsp.js","_app/immutable/entry/app.22J5voVh.js","_app/immutable/chunks/ColMeKsp.js","_app/immutable/chunks/BSwoSVdI.js","_app/immutable/chunks/DfIw3lH-.js","_app/immutable/chunks/0_VOOkFC.js","_app/immutable/chunks/kx5WZEdS.js"],stylesheets:[],fonts:[],uses_env_dynamic_public:false},
 		nodes: [
 			__memo(() => import('./nodes/0.js')),
 			__memo(() => import('./nodes/1.js')),
@@ -19,7 +19,8 @@ return {
 			__memo(() => import('./nodes/4.js')),
 			__memo(() => import('./nodes/5.js')),
 			__memo(() => import('./nodes/6.js')),
-			__memo(() => import('./nodes/7.js'))
+			__memo(() => import('./nodes/7.js')),
+			__memo(() => import('./nodes/8.js'))
 		],
 		remotes: {
 			
@@ -89,6 +90,13 @@ return {
 				endpoint: __memo(() => import('./entries/endpoints/api/avatar/restore/_server.ts.js'))
 			},
 			{
+				id: "/api/debug",
+				pattern: /^\/api\/debug\/?$/,
+				params: [],
+				page: null,
+				endpoint: __memo(() => import('./entries/endpoints/api/debug/_server.ts.js'))
+			},
+			{
 				id: "/api/recordings",
 				pattern: /^\/api\/recordings\/?$/,
 				params: [],
@@ -131,6 +139,13 @@ return {
 				endpoint: __memo(() => import('./entries/endpoints/api/recordings/_id_/listen/_server.ts.js'))
 			},
 			{
+				id: "/favicon.ico",
+				pattern: /^\/favicon\.ico\/?$/,
+				params: [],
+				page: null,
+				endpoint: __memo(() => import('./entries/endpoints/favicon.ico/_server.ts.js'))
+			},
+			{
 				id: "/login",
 				pattern: /^\/login\/?$/,
 				params: [],
@@ -159,6 +174,13 @@ return {
 				endpoint: null
 			},
 			{
+				id: "/setup",
+				pattern: /^\/setup\/?$/,
+				params: [],
+				page: { layouts: [0,], errors: [1,], leaf: 8 },
+				endpoint: null
+			},
+			{
 				id: "/uploads/avatars/[[path]]",
 				pattern: /^\/uploads\/avatars(?:\/([^/]+))?\/?$/,
 				params: [{"name":"path","optional":true,"rest":false,"chained":true}],
@@ -171,6 +193,13 @@ return {
 				params: [{"name":"file","optional":false,"rest":false,"chained":false}],
 				page: null,
 				endpoint: __memo(() => import('./entries/endpoints/uploads/_file_/_server.ts.js'))
+			},
+			{
+				id: "/uploads/[...file]",
+				pattern: /^\/uploads(?:\/([^]*))?\/?$/,
+				params: [{"name":"file","optional":false,"rest":true,"chained":true}],
+				page: null,
+				endpoint: __memo(() => import('./entries/endpoints/uploads/_...file_/_server.ts.js'))
 			}
 		],
 		prerendered_routes: new Set([]),

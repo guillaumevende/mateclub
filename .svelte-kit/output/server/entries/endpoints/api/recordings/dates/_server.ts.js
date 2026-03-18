@@ -1,5 +1,5 @@
 import { json } from "@sveltejs/kit";
-import { j as getUserTimezone, a as getUserById } from "../../../../../chunks/db.js";
+import { o as getUserTimezone, a as getUserById } from "../../../../../chunks/db.js";
 import Database from "better-sqlite3";
 const projectRoot = process.cwd();
 const dbPath = process.env.DATABASE_PATH || `${projectRoot}/data/mateclub.db`;
@@ -10,7 +10,10 @@ const GET = async ({ locals }) => {
   }
   const timezone = getUserTimezone(locals.user.id);
   const user = getUserById(locals.user.id);
-  const threshold = user?.daily_notification_hour || 7;
+  const thresholdMinutes = user?.daily_notification_hour ?? 420;
+  const hours = Math.floor(thresholdMinutes / 60);
+  const mins = thresholdMinutes % 60;
+  mins === 0 ? `${hours}h` : `${hours}h${mins.toString().padStart(2, "0")}`;
   const oneYearAgo = /* @__PURE__ */ new Date();
   oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
   try {
@@ -30,22 +33,36 @@ const GET = async ({ locals }) => {
       month: "2-digit",
       day: "2-digit"
     });
-    const hourFormatter = new Intl.DateTimeFormat("en-GB", {
+    const hourMinFormatter = new Intl.DateTimeFormat("en-GB", {
       timeZone: timezone,
       hour: "2-digit",
-      hour12: false
+      hour12: false,
+      minute: "2-digit"
     });
     const today = dateFormatter.format(/* @__PURE__ */ new Date());
     const grouped = {};
     for (const row of results) {
-      const localDate = dateFormatter.format(new Date(row.recorded_at));
-      const recordedHour = parseInt(hourFormatter.format(new Date(row.recorded_at)), 10);
-      if (!grouped[localDate]) {
-        grouped[localDate] = { total_count: 0, listened_count: 0, has_available: false };
+      const parts = hourMinFormatter.formatToParts(new Date(row.recorded_at));
+      const hourRecorded = parseInt(parts.find((p) => p.type === "hour")?.value || "0", 10);
+      const minuteRecorded = parseInt(parts.find((p) => p.type === "minute")?.value || "0", 10);
+      const recordedMinutes = hourRecorded * 60 + minuteRecorded;
+      let effectiveDate = dateFormatter.format(new Date(row.recorded_at));
+      if (recordedMinutes < thresholdMinutes) {
+        const recordedDate = new Date(row.recorded_at);
+        recordedDate.setDate(recordedDate.getDate() - 1);
+        effectiveDate = dateFormatter.format(recordedDate);
       }
-      grouped[localDate].total_count += 1;
-      if (row.listened_id) grouped[localDate].listened_count += 1;
-      const isAvailable = localDate < today || localDate === today && recordedHour < threshold;
+      if (!grouped[effectiveDate]) {
+        grouped[effectiveDate] = { total_count: 0, listened_count: 0, has_available: false };
+      }
+      grouped[effectiveDate].total_count += 1;
+      if (row.listened_id) grouped[effectiveDate].listened_count += 1;
+      const yesterday = /* @__PURE__ */ new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = dateFormatter.format(yesterday);
+      const nowParts = hourMinFormatter.formatToParts(/* @__PURE__ */ new Date());
+      const currentMinutes = parseInt(nowParts.find((p) => p.type === "hour")?.value || "0", 10) * 60 + parseInt(nowParts.find((p) => p.type === "minute")?.value || "0", 10);
+      const isAvailable = effectiveDate < yesterdayStr || effectiveDate === yesterdayStr && currentMinutes >= thresholdMinutes || effectiveDate === today && recordedMinutes < thresholdMinutes;
       if (isAvailable) {
         grouped[localDate].has_available = true;
       }
@@ -62,7 +79,7 @@ const GET = async ({ locals }) => {
     return json({
       dates: datesInfo,
       timezone,
-      threshold: user?.daily_notification_hour || 7,
+      threshold: user?.daily_notification_hour || 420,
       superPowers: user?.super_powers === 1
     });
   } catch (error) {

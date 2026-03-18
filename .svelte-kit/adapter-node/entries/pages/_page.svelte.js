@@ -1,5 +1,5 @@
-import { e as ensure_array_like, a as attr, b as attr_style, c as stringify, f as attr_class } from "../../chunks/index2.js";
-import { e as escape_html } from "../../chunks/escaping.js";
+import { e as ensure_array_like, a as attr_style, c as attr_class, d as derived, b as stringify } from "../../chunks/index2.js";
+import { e as escape_html, a as attr } from "../../chunks/attributes.js";
 import "@sveltejs/kit/internal";
 import "../../chunks/exports.js";
 import "../../chunks/utils.js";
@@ -7,6 +7,8 @@ import "@sveltejs/kit/internal/server";
 import "../../chunks/root.js";
 import "../../chunks/state.svelte.js";
 import { A as Avatar } from "../../chunks/Avatar.js";
+import { I as ImageViewer } from "../../chunks/ImageViewer.js";
+/* empty css                   */
 function _page($$renderer, $$props) {
   $$renderer.component(($$renderer2) => {
     let { data } = $$props;
@@ -15,7 +17,20 @@ function _page($$renderer, $$props) {
       isPlaying: false,
       currentRecording: null
     };
+    let selectedImageUrl = null;
     let listenedRecordings = /* @__PURE__ */ new Set();
+    let unreadStats = derived(() => {
+      if (data.unreadStats) {
+        return data.unreadStats;
+      }
+      const allRecordings = [
+        ...[],
+        ...allDays.flatMap((d) => d.recordings)
+      ];
+      const unread = allRecordings.filter((r) => !listenedRecordings.has(r.id) && r.listened_by_user !== 1);
+      const totalSeconds = unread.reduce((sum, r) => sum + r.duration_seconds, 0);
+      return { count: unread.length, totalSeconds };
+    });
     function isCurrentPlaying(recordingId) {
       return player.currentRecording?.id === recordingId && player.isPlaying;
     }
@@ -89,7 +104,7 @@ function _page($$renderer, $$props) {
     function formatTime(dateStr) {
       const date = new Date(dateStr);
       const timezone = data.user?.timezone || "Europe/Paris";
-      const formatter = new Intl.DateTimeFormat("fr-FR", { hour: "numeric", minute: "2-digit", timeZone: timezone });
+      const formatter = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: timezone });
       return formatter.format(date).replace(":", "h");
     }
     function formatDuration(seconds) {
@@ -103,7 +118,25 @@ function _page($$renderer, $$props) {
     {
       $$renderer2.push("<!--[-1-->");
     }
-    $$renderer2.push(`<!--]--> <div class="container svelte-1uha8ag"><header class="svelte-1uha8ag"><img src="/logo512px.png" alt="MateClub" class="logo svelte-1uha8ag"/> <p class="date svelte-1uha8ag">${escape_html(getTodayDate())}</p> <p class="welcome svelte-1uha8ag">Bienvenue, ${escape_html(data.user?.pseudo)} !</p> <button class="team-button svelte-1uha8ag">👥</button></header> `);
+    $$renderer2.push(`<!--]--> <div class="container svelte-1uha8ag"><header class="svelte-1uha8ag"><img src="/logo512px.png" alt="MateClub" class="logo svelte-1uha8ag"/> <p class="date svelte-1uha8ag">${escape_html(getTodayDate())}</p> <p class="welcome svelte-1uha8ag">Bienvenue, ${escape_html(data.user?.pseudo)} !</p> `);
+    if (unreadStats().count > 0) {
+      $$renderer2.push("<!--[0-->");
+      const hours = Math.floor(unreadStats().totalSeconds / 3600);
+      const mins = Math.floor(unreadStats().totalSeconds % 3600 / 60);
+      const secs = unreadStats().totalSeconds % 60;
+      $$renderer2.push(`<p class="unread-stats svelte-1uha8ag">${escape_html(unreadStats().count)} capsule${escape_html(unreadStats().count !== 1 ? "s" : "")} audio non lue${escape_html(unreadStats().count !== 1 ? "s" : "")}<br class="svelte-1uha8ag"/> (`);
+      if (hours > 0) {
+        $$renderer2.push("<!--[0-->");
+        $$renderer2.push(`${escape_html(hours)} heure${escape_html(hours !== 1 ? "s" : "")} et ${escape_html(mins)} minute${escape_html(mins !== 1 ? "s" : "")}`);
+      } else {
+        $$renderer2.push("<!--[-1-->");
+        $$renderer2.push(`${escape_html(mins)} minute${escape_html(mins !== 1 ? "s" : "")} et ${escape_html(secs)} seconde${escape_html(secs !== 1 ? "s" : "")}`);
+      }
+      $$renderer2.push(`<!--]-->)</p>`);
+    } else {
+      $$renderer2.push("<!--[-1-->");
+    }
+    $$renderer2.push(`<!--]--> <button class="team-button svelte-1uha8ag">👥</button></header> `);
     {
       $$renderer2.push("<!--[-1-->");
     }
@@ -114,7 +147,15 @@ function _page($$renderer, $$props) {
     $$renderer2.push(`<!--]--> `);
     if (allDays.length === 0 && true) {
       $$renderer2.push("<!--[0-->");
-      $$renderer2.push(`<div class="empty svelte-1uha8ag"><p class="svelte-1uha8ag">Chargement des capsules...</p></div>`);
+      $$renderer2.push(`<div class="empty svelte-1uha8ag">`);
+      if (data.days) {
+        $$renderer2.push("<!--[0-->");
+        $$renderer2.push(`<p class="svelte-1uha8ag">Pas encore de capsule à écouter. Créez vos utilisateurs et faites un premier enregistrement audio.</p>`);
+      } else {
+        $$renderer2.push("<!--[-1-->");
+        $$renderer2.push(`<p class="svelte-1uha8ag">Chargement des capsules...</p>`);
+      }
+      $$renderer2.push(`<!--]--></div>`);
     } else {
       $$renderer2.push("<!--[-1-->");
       {
@@ -137,22 +178,29 @@ function _page($$renderer, $$props) {
           const authors = getDayAuthors(day.recordings);
           const displayAuthors = authors.slice(0, 10);
           const hasMore = authors.length > 10;
-          $$renderer2.push(`<div class="day-authors-header svelte-1uha8ag"><!--[-->`);
-          const each_array_6 = ensure_array_like(displayAuthors);
-          for (let i = 0, $$length2 = each_array_6.length; i < $$length2; i++) {
-            let author = each_array_6[i];
-            $$renderer2.push(`<div class="author-avatar-header svelte-1uha8ag"${attr("title", author.pseudo)}${attr_style(`margin-left: ${stringify(i === 0 ? 0 : -15)}px; z-index: ${stringify(displayAuthors.length - i)}`)}>`);
-            Avatar($$renderer2, { avatar: author.avatar, size: "small" });
-            $$renderer2.push(`<!----></div>`);
-          }
-          $$renderer2.push(`<!--]--> `);
-          if (hasMore) {
+          const showAuthors = authors.length >= 2;
+          if (showAuthors) {
             $$renderer2.push("<!--[0-->");
-            $$renderer2.push(`<div class="author-avatar-header more-avatars svelte-1uha8ag" style="margin-left: -15px; z-index: 0"><span class="svelte-1uha8ag">+${escape_html(authors.length - 10)}</span></div>`);
+            $$renderer2.push(`<div class="day-authors-header svelte-1uha8ag"><!--[-->`);
+            const each_array_6 = ensure_array_like(displayAuthors);
+            for (let i = 0, $$length2 = each_array_6.length; i < $$length2; i++) {
+              let author = each_array_6[i];
+              $$renderer2.push(`<div class="author-avatar-header svelte-1uha8ag"${attr("title", author.pseudo)}${attr_style(`margin-left: ${stringify(i === 0 ? 0 : -17)}px; z-index: ${stringify(i)}`)}>`);
+              Avatar($$renderer2, { avatar: author.avatar, size: "small" });
+              $$renderer2.push(`<!----></div>`);
+            }
+            $$renderer2.push(`<!--]--> `);
+            if (hasMore) {
+              $$renderer2.push("<!--[0-->");
+              $$renderer2.push(`<div class="author-avatar-header more-avatars svelte-1uha8ag" style="margin-left: -17px; z-index: 0"><span class="svelte-1uha8ag">+${escape_html(authors.length - 10)}</span></div>`);
+            } else {
+              $$renderer2.push("<!--[-1-->");
+            }
+            $$renderer2.push(`<!--]--></div>`);
           } else {
             $$renderer2.push("<!--[-1-->");
           }
-          $$renderer2.push(`<!--]--></div>`);
+          $$renderer2.push(`<!--]-->`);
         } else {
           $$renderer2.push("<!--[-1-->");
         }
@@ -178,27 +226,49 @@ function _page($$renderer, $$props) {
               $$renderer2.push("<!--[-1-->");
               $$renderer2.push(`<span class="duration svelte-1uha8ag">${escape_html(formatDuration(recording.duration_seconds))}</span>`);
             }
-            $$renderer2.push(`<!--]--></div> <div class="card-bottom-player svelte-1uha8ag">`);
+            $$renderer2.push(`<!--]--> `);
             {
+              $$renderer2.push("<!--[-1-->");
+            }
+            $$renderer2.push(`<!--]--></div> `);
+            if (recording.url) {
+              $$renderer2.push("<!--[0-->");
+              $$renderer2.push(`<div class="url-link-container svelte-1uha8ag"><a${attr("href", recording.url)} target="_blank" rel="noopener noreferrer" class="url-link svelte-1uha8ag">Ouvrir le lien</a></div>`);
+            } else {
+              $$renderer2.push("<!--[-1-->");
+            }
+            $$renderer2.push(`<!--]--> <div class="card-bottom-player svelte-1uha8ag">`);
+            if (hasImage) {
+              $$renderer2.push("<!--[0-->");
+              $$renderer2.push(`<button class="card-thumbnail svelte-1uha8ag" aria-label="Voir l'image"><img${attr("src", `/uploads/${stringify(hasImage)}`)} alt="" class="svelte-1uha8ag"/></button>`);
+            } else {
               $$renderer2.push("<!--[-1-->");
             }
             $$renderer2.push(`<!--]--></div>`);
           } else {
             $$renderer2.push("<!--[-1-->");
-            $$renderer2.push(`<div class="card-center-locked svelte-1uha8ag"><span class="lock-icon svelte-1uha8ag">🔒</span> <span class="locked-text svelte-1uha8ag">Revenez demain à ${escape_html(data.threshold)}h</span></div>`);
+            $$renderer2.push(`<div class="card-center-locked svelte-1uha8ag"><span class="lock-icon svelte-1uha8ag">🔒</span> <span class="locked-text svelte-1uha8ag">Reviens demain à ${escape_html(data.threshold)}</span></div>`);
           }
           $$renderer2.push(`<!--]--></div>`);
         }
         $$renderer2.push(`<!--]--></div></div></section>`);
       }
       $$renderer2.push(`<!--]--> <div class="load-more svelte-1uha8ag">`);
-      {
-        $$renderer2.push("<!--[-1-->");
+      if (data.hasMore) {
+        $$renderer2.push("<!--[2-->");
         $$renderer2.push(`<button class="btn svelte-1uha8ag">Charger plus</button>`);
+      } else {
+        $$renderer2.push("<!--[-1-->");
       }
       $$renderer2.push(`<!--]--></div>`);
     }
-    $$renderer2.push(`<!--]--></div>`);
+    $$renderer2.push(`<!--]--></div> `);
+    ImageViewer($$renderer2, {
+      imageUrl: selectedImageUrl,
+      isOpen: selectedImageUrl !== null,
+      onClose: () => selectedImageUrl = null
+    });
+    $$renderer2.push(`<!---->`);
   });
 }
 export {

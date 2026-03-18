@@ -1,5 +1,5 @@
 import { json } from "@sveltejs/kit";
-import { a as getUserById, i as getRecordingsByDate } from "../../../../../chunks/db.js";
+import { a as getUserById, n as getRecordingsByDate } from "../../../../../chunks/db.js";
 const GET = async ({ locals, url }) => {
   if (!locals.user) {
     return json({ error: "Unauthorized" }, { status: 401 });
@@ -10,10 +10,14 @@ const GET = async ({ locals, url }) => {
   }
   const user = getUserById(locals.user.id);
   const dayRecordings = getRecordingsByDate(locals.user.id, date);
+  const thresholdMinutes = user?.daily_notification_hour ?? 420;
+  const hours = Math.floor(thresholdMinutes / 60);
+  const mins = thresholdMinutes % 60;
+  const threshold = mins === 0 ? `${hours}h` : `${hours}h${mins.toString().padStart(2, "0")}`;
   return json({
     date,
     day: dayRecordings,
-    threshold: user?.daily_notification_hour || 7,
+    threshold,
     timezone: user?.timezone || "Europe/Paris"
   });
 };

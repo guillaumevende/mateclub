@@ -29,6 +29,9 @@
 	"/api/avatar/restore": [
 		"src/routes/api/avatar/restore/+server.ts"
 	],
+	"/api/debug": [
+		"src/routes/api/debug/+server.ts"
+	],
 	"/api/recordings": [
 		"src/routes/api/recordings/+server.ts"
 	],
@@ -46,6 +49,9 @@
 	],
 	"/api/recordings/[id]/listen": [
 		"src/routes/api/recordings/[id]/listen/+server.ts"
+	],
+	"/favicon.ico": [
+		"src/routes/favicon.ico/+server.ts"
 	],
 	"/login": [
 		"src/routes/login/+page.server.ts",
@@ -72,5 +78,8 @@
 	],
 	"/uploads/[file]": [
 		"src/routes/uploads/[file]/+server.ts"
+	],
+	"/uploads/[...file]": [
+		"src/routes/uploads/[...file]/+server.ts"
 	]
 }

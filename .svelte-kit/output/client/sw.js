@@ -72,7 +72,8 @@ async function cacheFirstWithExpiry(request, cacheName) {
 	// Sinon, fetch depuis le réseau
 	try {
 		const networkResponse = await fetch(request);
-		if (networkResponse.ok) {
+		// Only cache full responses (status 200), not partial responses (206)
+		if (networkResponse.status === 200 && networkResponse.ok) {
 			// Ajouter la date de cache et stocker
 			const responseToCache = addCacheDateHeader(networkResponse.clone());
 			cache.put(request, responseToCache);

@@ -1,7 +1,8 @@
 import { redirect, json } from "@sveltejs/kit";
-import { f as getUserAvatar, u as updateUserAvatarImage } from "../../../../chunks/db.js";
+import { k as getUserAvatar, l as updateUserAvatarImage } from "../../../../chunks/db.js";
 import { existsSync, unlinkSync, mkdirSync, readdirSync, writeFileSync } from "fs";
 import { join } from "path";
+import { i as isValidImageBuffer } from "../../../../chunks/fileValidation.js";
 const uploadsDir = join(process.cwd(), "uploads", "avatars");
 const POST = async ({ request, locals }) => {
   if (!locals.user) {
@@ -21,6 +22,10 @@ const POST = async ({ request, locals }) => {
     if (image.size > maxSize) {
       return json({ error: "Taille maximale: 10 Mo" }, { status: 400 });
     }
+    const imageBuffer = Buffer.from(await image.arrayBuffer());
+    if (!isValidImageBuffer(imageBuffer)) {
+      return json({ error: "Le fichier ne semble pas être une image valide" }, { status: 400 });
+    }
     const userDir = join(uploadsDir, locals.user.id.toString());
     if (!existsSync(userDir)) {
       mkdirSync(userDir, { recursive: true });
@@ -37,9 +42,7 @@ const POST = async ({ request, locals }) => {
     const timestamp = Date.now();
     const filename = `avatar_${timestamp}_${crypto.randomUUID()}.jpg`;
     const filepath = join(userDir, filename);
-    const arrayBuffer = await image.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    writeFileSync(filepath, buffer);
+    writeFileSync(filepath, imageBuffer);
     const dbPath = `${locals.user.id}/${filename}`;
     updateUserAvatarImage(locals.user.id, dbPath);
     return json({ success: true, filename: dbPath });

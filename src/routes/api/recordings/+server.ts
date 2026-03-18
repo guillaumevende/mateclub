@@ -3,7 +3,10 @@ import { redirect, json } from '@sveltejs/kit';
 import { saveRecording, getRecentRecordingByHash } from '$lib/server/db';
 import { isValidAudioBuffer, isValidImageBuffer } from '$lib/server/fileValidation';
 import crypto from 'crypto';
+
+console.log('[RECORDINGS] Module loaded, attempting sharp import...');
 import sharp from 'sharp';
+console.log('[RECORDINGS] Sharp loaded successfully:', typeof sharp);
 
 const DUPLICATE_THRESHOLD_SECONDS = 30;
 
@@ -62,6 +65,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	const audioBuffer = Buffer.from(await audio.arrayBuffer());
 	console.log('[RECORDINGS] après lecture audio buffer, taille:', audioBuffer.length);
+	
+	const firstBytes = audioBuffer.slice(0, 24).toString('hex');
+	console.log('[RECORDINGS] Audio first 24 bytes hex:', firstBytes);
+	
 	const isValid = isValidAudioBuffer(audioBuffer);
 	console.log('[RECORDINGS] isValidAudioBuffer:', isValid);
 

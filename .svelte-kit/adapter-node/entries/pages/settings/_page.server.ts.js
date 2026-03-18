@@ -1,6 +1,6 @@
 import { fail, redirect } from "@sveltejs/kit";
 import { hashSync } from "bcrypt";
-import { x as updateUserPseudo, y as updateUserPassword, z as updateUserAvatar, w as updateUserHour, A as updateUserTimezone, a as getUserById } from "../../../chunks/db.js";
+import { D as isPseudoAvailable, E as updateUserPseudo, F as updateUserPassword, G as updateUserAvatar, u as updateUserHour, H as updateUserTimezone, a as getUserById } from "../../../chunks/db.js";
 import { existsSync, readdirSync } from "fs";
 import { join } from "path";
 const PSEUDO_REGEX = /^[a-zA-Z0-9\s\-._àáâãäåæçèéêëìíîïñòóôõöùúûüýÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝŸ]{3,22}$/;
@@ -43,17 +43,29 @@ const load = async ({ locals }) => {
   }
   return {
     user,
-    hour: user?.daily_notification_hour || 7,
+    hour: user?.daily_notification_hour || 420,
     timezones,
-    savedImage
+    savedImage,
+    csrfToken: locals.csrfToken
   };
 };
 const actions = {
   default: async ({ request, locals }) => {
     const data = await request.formData();
     const avatar = data.get("avatar")?.toString() || "☕";
-    const hour = parseInt(data.get("hour")?.toString() || "7", 10);
-    const timezone = data.get("timezone")?.toString() || "Europe/Paris";
+    const avatarImage = data.get("avatarImage")?.toString();
+    const hourValue = data.get("hour")?.toString();
+    if (!hourValue || hourValue.trim() === "") {
+      return fail(400, {
+        success: false,
+        hourError: "Veuillez sélectionner une heure de disponibilité"
+      });
+    }
+    const [hourStr, minuteStr] = hourValue.split(":");
+    const hour = parseInt(hourStr || "7", 10);
+    const minute = parseInt(minuteStr || "0", 10);
+    const minutesFromMidnight = hour * 60 + minute;
+    const timezone = data.get("timezone")?.toString();
     const password = data.get("password")?.toString();
     const confirmPassword = data.get("confirmPassword")?.toString();
     const pseudo = data.get("pseudo")?.toString();
@@ -77,13 +89,19 @@ const actions = {
             error: "Le pseudo contient des caractères non autorisés"
           });
         }
+        if (!isPseudoAvailable(pseudo, locals.user.id)) {
+          return fail(400, {
+            success: false,
+            error: "Un autre utilisateur a déjà ce nom. Veuillez mettre un autre nom."
+          });
+        }
         updateUserPseudo(locals.user.id, pseudo);
       }
       if (password && password.length > 0) {
-        if (password.length < 10) {
+        if (password.length < 12) {
           return fail(400, {
             success: false,
-            passwordError: "Le mot de passe doit contenir au moins 10 caractères"
+            passwordError: "Le mot de passe doit contenir au moins 12 caractères"
           });
         }
         if (password !== confirmPassword) {
@@ -98,10 +116,15 @@ const actions = {
       if (!avatar.includes("/") && !avatar.startsWith("avatar_")) {
         updateUserAvatar(locals.user.id, avatar);
       }
-      if (hour >= 0 && hour <= 23) {
-        updateUserHour(locals.user.id, hour);
+      if (avatarImage && avatarImage.length > 0) {
+        updateUserAvatar(locals.user.id, avatarImage);
       }
-      updateUserTimezone(locals.user.id, timezone);
+      if (minutesFromMidnight >= 0 && minutesFromMidnight <= 1439) {
+        updateUserHour(locals.user.id, minutesFromMidnight);
+      }
+      if (timezone && timezone.length > 0) {
+        updateUserTimezone(locals.user.id, timezone);
+      }
     }
     return { success: true };
   }

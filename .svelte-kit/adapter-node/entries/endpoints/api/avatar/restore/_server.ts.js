@@ -1,5 +1,5 @@
 import { redirect, json } from "@sveltejs/kit";
-import { u as updateUserAvatarImage } from "../../../../../chunks/db.js";
+import { l as updateUserAvatarImage } from "../../../../../chunks/db.js";
 import { existsSync } from "fs";
 import { join } from "path";
 const uploadsDir = join(process.cwd(), "uploads", "avatars");

@@ -3,13 +3,13 @@ import type { PageServerLoad, Actions } from './$types';
 import { redirect, fail } from '@sveltejs/kit';
 import { hasAdmin, createUser, isPseudoAvailable } from '$lib/server/db';
 
-export const load = async () => {
+export const load = async ({ locals }: Parameters<PageServerLoad>[0]) => {
 	// If admin already exists, redirect to home
 	if (hasAdmin()) {
 		throw redirect(303, '/');
 	}
 	// Otherwise, allow access to setup page
-	return {};
+	return { csrfToken: locals.csrfToken };
 };
 
 export const actions = {
@@ -49,4 +49,4 @@ export const actions = {
 		}
 	}
 };
-;null as any as PageServerLoad;;null as any as Actions;
+;null as any as Actions;

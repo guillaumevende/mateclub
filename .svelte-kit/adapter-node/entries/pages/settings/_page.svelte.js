@@ -1,5 +1,5 @@
-import { a as attr, c as stringify, f as attr_class, e as ensure_array_like, d as derived } from "../../../chunks/index2.js";
-import { e as escape_html } from "../../../chunks/escaping.js";
+import { b as stringify, c as attr_class, e as ensure_array_like, d as derived } from "../../../chunks/index2.js";
+import { a as attr, e as escape_html } from "../../../chunks/attributes.js";
 import "@sveltejs/kit/internal";
 import "../../../chunks/exports.js";
 import "../../../chunks/utils.js";
@@ -40,6 +40,9 @@ function _page($$renderer, $$props) {
     let selectedEmoji = data.user?.avatar?.includes("avatar_") ? "" : data.user?.avatar || "☕";
     let savedImageFilename = data.savedImage;
     let isCompressing = false;
+    let isDragging = false;
+    let selectedHour = "";
+    let selectedTimezone = "Europe/Paris";
     let pseudoError = derived(() => {
       if (pseudo.length === 0) return "";
       if (pseudo.length < 3) return "Le pseudo doit contenir au moins 3 caractères";
@@ -71,23 +74,28 @@ function _page($$renderer, $$props) {
       $$renderer2.push("<!--[-1-->");
       $$renderer2.push(`<span class="avatar-emoji svelte-1i19ct2">${escape_html(getAvatarDisplay().value)}</span>`);
     }
-    $$renderer2.push(`<!--]--></div> <form method="POST"><section><h2>Nom d'utilisateur</h2> <input type="text" name="pseudo"${attr("value", pseudo)} placeholder="Votre pseudo" minlength="3" maxlength="22" required=""/> `);
+    $$renderer2.push(`<!--]--></div> <form method="POST"><input type="hidden" name="avatarImage"${attr("value", savedImageFilename || "")}/> <input type="hidden" name="csrf_token"${attr("value", data?.csrfToken)}/> <section><h2>Nom d'utilisateur</h2> <input type="text" name="pseudo"${attr("value", pseudo)} placeholder="Votre pseudo" minlength="3" maxlength="22" required=""/> `);
     if (pseudoError()) {
       $$renderer2.push("<!--[0-->");
       $$renderer2.push(`<p class="pseudo-feedback error svelte-1i19ct2">${escape_html(pseudoError())}</p>`);
     } else {
       $$renderer2.push("<!--[-1-->");
     }
-    $$renderer2.push(`<!--]--></section> <section><h2>Avatar</h2> <div class="avatar-upload-section svelte-1i19ct2">`);
+    $$renderer2.push(`<!--]--> `);
+    {
+      $$renderer2.push("<!--[-1-->");
+    }
+    $$renderer2.push(`<!--]--></section> <section><h2>Avatar</h2> <div${attr_class("avatar-upload-section svelte-1i19ct2", void 0, { "dragging": isDragging })}>`);
+    {
+      $$renderer2.push("<!--[-1-->");
+    }
+    $$renderer2.push(`<!--]--> `);
     if (isImageAvatar) {
       $$renderer2.push("<!--[0-->");
       $$renderer2.push(`<label${attr_class("upload-zone svelte-1i19ct2", void 0, { "disabled": isCompressing })}><input type="file" accept="image/*" capture="environment"${attr("disabled", isCompressing, true)} class="svelte-1i19ct2"/> <span class="svelte-1i19ct2">🖼️ Changer la photo</span></label>`);
     } else {
       $$renderer2.push("<!--[-1-->");
-      {
-        $$renderer2.push("<!--[-1-->");
-      }
-      $$renderer2.push(`<!--]--> <label${attr_class("upload-zone svelte-1i19ct2", void 0, { "disabled": isCompressing })}><input type="file" accept="image/*" capture="environment"${attr("disabled", isCompressing, true)} class="svelte-1i19ct2"/> <span class="svelte-1i19ct2">📷 Prendre ou choisir une photo</span></label>`);
+      $$renderer2.push(`<label${attr_class("upload-zone svelte-1i19ct2", void 0, { "disabled": isCompressing })}><input type="file" accept="image/*" capture="environment"${attr("disabled", isCompressing, true)} class="svelte-1i19ct2"/> <span class="svelte-1i19ct2">📷 Prendre ou choisir une photo</span></label>`);
     }
     $$renderer2.push(`<!--]--> `);
     {
@@ -118,11 +126,7 @@ function _page($$renderer, $$props) {
     }
     $$renderer2.push(`<!--]--></div></section> <section><h2>Fuseau horaire</h2> <p class="description svelte-1i19ct2">Utilisé pour afficher les dates et heures dans ton fuseau.</p> `);
     $$renderer2.select(
-      {
-        name: "timezone",
-        value: data.user?.timezone || "Europe/Paris",
-        class: ""
-      },
+      { name: "timezone", value: selectedTimezone, class: "" },
       ($$renderer3) => {
         $$renderer3.push(`<!--[-->`);
         const each_array_1 = ensure_array_like(data.timezones);
@@ -136,7 +140,11 @@ function _page($$renderer, $$props) {
       },
       "svelte-1i19ct2"
     );
-    $$renderer2.push(`</section> <section><h2>Heure de disponibilité</h2> <p class="description svelte-1i19ct2">Les enregistrements de la veille seront disponibles à partir de cette heure (dans ton fuseau horaire).</p> <div class="hour-input svelte-1i19ct2"><input type="number" name="hour" min="0" max="23"${attr("value", data.user?.daily_notification_hour || 7)} class="svelte-1i19ct2"/> <span>h</span></div></section> <button type="submit" class="svelte-1i19ct2">Sauvegarder</button></form> <a href="/logout" class="logout-btn svelte-1i19ct2">Déconnexion</a></div>`);
+    $$renderer2.push(`</section> <section><h2>Heure de disponibilité</h2> <p class="description svelte-1i19ct2">Les enregistrements de la veille seront disponibles à partir de cette heure (dans ton fuseau horaire).</p> <div class="hour-input svelte-1i19ct2"><input type="time" name="hour"${attr("value", selectedHour)} class="svelte-1i19ct2"/></div> `);
+    {
+      $$renderer2.push("<!--[-1-->");
+    }
+    $$renderer2.push(`<!--]--></section> <button type="submit" class="svelte-1i19ct2">Sauvegarder</button></form> <a href="/logout" class="btn svelte-1i19ct2" data-sveltekit-reload="">Déconnexion</a></div>`);
   });
 }
 export {

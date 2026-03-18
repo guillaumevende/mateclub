@@ -1,5 +1,5 @@
 import { redirect } from "@sveltejs/kit";
-import { j as getUserTimezone, q as getRecordingsGroupedByDay, a as getUserById, r as getAllUsers } from "../../chunks/db.js";
+import { o as getUserTimezone, A as getRecordingsGroupedByDayWithHasMore, a as getUserById, B as getAllUsers, C as getUnreadCount } from "../../chunks/db.js";
 const load = async ({ locals, url }) => {
   if (!locals.user) {
     throw redirect(303, "/login");
@@ -7,15 +7,22 @@ const load = async ({ locals, url }) => {
   const page = parseInt(url.searchParams.get("page") || "1", 10);
   const limit = 7;
   const timezone = getUserTimezone(locals.user.id);
-  const days = getRecordingsGroupedByDay(locals.user.id, limit, page, timezone);
+  const { days, hasMore } = getRecordingsGroupedByDayWithHasMore(locals.user.id, limit, page, timezone);
   const user = getUserById(locals.user.id);
   const allUsers = getAllUsers();
+  const unreadStats = getUnreadCount(locals.user.id);
+  const thresholdMinutes = user?.daily_notification_hour ?? 420;
+  const hours = Math.floor(thresholdMinutes / 60);
+  const mins = thresholdMinutes % 60;
+  const threshold = mins === 0 ? `${hours}h` : `${hours}h${mins.toString().padStart(2, "0")}`;
   return {
     days,
-    threshold: user?.daily_notification_hour || 7,
+    hasMore,
+    threshold,
     user,
     allUsers,
-    page
+    page,
+    unreadStats
   };
 };
 export {

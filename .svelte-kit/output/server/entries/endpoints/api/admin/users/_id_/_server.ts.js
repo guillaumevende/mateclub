@@ -1,5 +1,5 @@
 import { json } from "@sveltejs/kit";
-import { a as getUserById, d as deleteUser } from "../../../../../../chunks/db.js";
+import { a as getUserById, d as deleteUser, u as updateUserHour, t as toggleJinglesEnabled, b as toggleLogsEnabled, e as toggleSuperPowers } from "../../../../../../chunks/db.js";
 const DELETE = async ({ params, locals }) => {
   if (!locals.user || !locals.user.is_admin) {
     return json({ error: "Accès refusé" }, { status: 403 });
@@ -15,6 +15,32 @@ const DELETE = async ({ params, locals }) => {
   deleteUser(userId);
   return json({ success: true });
 };
+const PATCH = async ({ params, request, locals }) => {
+  if (!locals.user || !locals.user.is_admin) {
+    return json({ error: "Accès refusé" }, { status: 403 });
+  }
+  const userId = parseInt(params.id);
+  const data = await request.json();
+  const { action, value } = data;
+  switch (action) {
+    case "super_powers":
+      toggleSuperPowers(userId, value);
+      break;
+    case "logs_enabled":
+      toggleLogsEnabled(userId, value);
+      break;
+    case "jingles_enabled":
+      toggleJinglesEnabled(userId, value);
+      break;
+    case "threshold":
+      updateUserHour(userId, value);
+      break;
+    default:
+      return json({ error: "Action inconnue" }, { status: 400 });
+  }
+  return json({ success: true });
+};
 export {
-  DELETE
+  DELETE,
+  PATCH
 };
