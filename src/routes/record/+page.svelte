@@ -55,6 +55,10 @@
 	// Image viewer state
 	let selectedImageUrl = $state<string | null>(null);
 
+	// Mic permission state
+	let micPermissionState = $state<'prompt' | 'granted' | 'denied' | 'unknown'>('prompt');
+	let showMicPrompt = $state(false);
+
 	$effect(() => {
 		const unsubscribe = playerStore.subscribe(state => {
 			player = state;
@@ -69,7 +73,39 @@
 	// Load recordings on mount
 	onMount(() => {
 		loadRecordings();
+		checkMicPermission();
 	});
+
+	async function checkMicPermission() {
+		if (!navigator.permissions || !navigator.permissions.query) {
+			micPermissionState = 'unknown';
+			return;
+		}
+		
+		try {
+			const result = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+			micPermissionState = result.state;
+			showMicPrompt = result.state === 'prompt';
+			
+			result.addEventListener('change', () => {
+				micPermissionState = result.state;
+				showMicPrompt = result.state === 'prompt';
+			});
+		} catch {
+			micPermissionState = 'unknown';
+		}
+	}
+
+	async function requestMicAccess() {
+		try {
+			await navigator.mediaDevices.getUserMedia({ audio: true });
+			micPermissionState = 'granted';
+			showMicPrompt = false;
+		} catch (err) {
+			console.error('Mic access denied:', err);
+			micPermissionState = 'denied';
+		}
+	}
 
 	async function loadRecordings() {
 		if (isLoadingRecordings) return;
@@ -342,7 +378,7 @@ function stopRecording() {
  		}
   	}
   
-   async function sendRecording() {
+	async function sendRecording() {
 		if (!recordedBlob) {
 			console.error('[SEND] ERREUR: recordedBlob est null!');
 			return;
@@ -354,7 +390,6 @@ function stopRecording() {
 		error = null;
 		urlError = null;
 		
-		// Validation URL côté client
 		if (recordingUrl.trim()) {
 			try {
 				const parsed = new URL(recordingUrl);
@@ -388,10 +423,19 @@ function stopRecording() {
 				formData.append('url', recordingUrl.trim());
 			}
 
+			const controller = new AbortController();
+			const timeoutId = setTimeout(() => {
+				console.log('[SEND] Timeout déclenché après 60s');
+				controller.abort();
+			}, 60000);
+
 			const res = await fetch('/api/recordings', {
 				method: 'POST',
-				body: formData
+				body: formData,
+				signal: controller.signal
 			});
+			
+			clearTimeout(timeoutId);
 
 			const data = await res.json();
 
@@ -402,7 +446,6 @@ function stopRecording() {
 			}
 
 			if (!res.ok) {
-				// Envoyer l'erreur vers le serveur pour diagnostic
 				sendErrorToServer('SEND_RECORDING_FAILED', {
 					message: data.error || 'Erreur lors de l\'envoi',
 					audioSize: recordedBlob.size,
@@ -415,15 +458,20 @@ function stopRecording() {
 
 			success = true;
 		} catch (e: any) {
-			// Envoyer l'erreur vers le serveur pour diagnostic
+			const isAbort = e.name === 'AbortError';
+			const errorMessage = isAbort 
+				? 'La connexion a mis trop de temps. Vérifiez votre réseau et réessayez.'
+				: e.message;
+			
 			sendErrorToServer('SEND_RECORDING_ERROR', {
-				message: e.message,
+				message: errorMessage,
 				audioSize: recordedBlob?.size,
 				audioType: recordedBlob?.type,
 				duration: timer,
-				url: window.location.href
+				url: window.location.href,
+				isAbort
 			});
-			error = e.message;
+			error = errorMessage;
 		} finally {
 			isSending = false;
 		}
@@ -452,6 +500,7 @@ function stopRecording() {
 		imagePreview = null;
 		timer = 0;
 		success = false;
+		error = null;
 		showRecordingsList = true;
 		loadRecordings();
 	}
@@ -587,7 +636,19 @@ function stopRecording() {
 		</div>
 	{:else}
 		<div class="recorder">
-			<div class="timer {isRecording ? 'recording' : ''} {isRecording && timer >= 160 ? 'warning' : ''}">
+			{#if showMicPrompt && micPermissionState === 'prompt'}
+				<div class="mic-prompt">
+					<p class="mic-prompt-text">Pour enregistrer un message vocal, j'ai besoin d'accéder à votre microphone.</p>
+					<button class="primary" onclick={requestMicAccess}>
+						Autoriser le micro
+					</button>
+				</div>
+			{:else if micPermissionState === 'denied'}
+				<div class="mic-denied">
+					<p>Accès au microphone refusé. Veuillez l'activer dans les paramètres de votre navigateur pour utiliser cette fonctionnalité.</p>
+				</div>
+			{:else}
+				<div class="timer {isRecording ? 'recording' : ''} {isRecording && timer >= 160 ? 'warning' : ''}">
 					{formatTime(timer)} / 3:00
 				</div>
 
@@ -600,6 +661,7 @@ function stopRecording() {
 				{:else}
 					<button class="record" onclick={startRecording}>Commencer l'enregistrement</button>
 				{/if}
+			{/if}
 		</div>
 	{/if}
 </div>
@@ -858,6 +920,30 @@ function stopRecording() {
 
 	.secondary {
 		background: #2a2a4e;
+	}
+
+	.mic-prompt {
+		text-align: center;
+		padding: 2rem;
+	}
+
+	.mic-prompt-text {
+		color: #a0a0c0;
+		margin-bottom: 1.5rem;
+		font-size: 1.1rem;
+	}
+
+	.mic-denied {
+		text-align: center;
+		padding: 2rem;
+		background: rgba(233, 69, 96, 0.1);
+		border-radius: 12px;
+		margin: 1rem;
+	}
+
+	.mic-denied p {
+		color: #e94560;
+		font-size: 0.95rem;
 	}
 
 	.actions button:disabled {
