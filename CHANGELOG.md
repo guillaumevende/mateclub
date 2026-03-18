@@ -2,8 +2,34 @@
 
 ---
 
-## [CURRENT] v2.3.0 - Améliorations UX et Fiabilité
+## [CURRENT] v2.3.1 - iOS Safari reliability fixes
 **Date**: 2026-03-18
+
+### Corrections de bugs iOS Safari
+
+- [x] **Timeout fetch** : Ajout d'un AbortController avec timeout de 60 secondes
+  - Évite les requêtes infiniment bloquantes sur mobile
+  - Annulation propre via `controller.abort()`
+
+- [x] **Messages d'erreur améliorés** : Distinction entre erreur réseau et erreur serveur
+  - Timeout → "La connexion a mis trop de temps. Vérifiez votre réseau et réessayez."
+  - Erreur serveur → Message original du serveur
+
+- [x] **Fix reset()** : La fonction réinitialise maintenant l'état `error`
+  - Le message d'erreur ne persiste plus après "Recommencer"
+
+### Améliorations UX microphone
+
+- [x] **Demande proactive** : Message explicatif AVANT le prompt natif iOS
+  - "Pour enregistrer un message vocal, j'ai besoin d'accéder à votre microphone."
+  - Bouton "Autoriser le micro"
+
+- [x] **État denied** : Message d'aide si permission refusée
+  - Explique comment activer le micro dans les paramètres
+
+---
+
+## v2.3.0 (2026-03-18)
 
 ### Corrections de bugs
 

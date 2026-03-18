@@ -2,7 +2,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Alpha-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-2.3.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-2.3.1-blue?style=for-the-badge)
 
 > **⚠️ En cours de développement**
 >
@@ -363,6 +363,13 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 - `POST /api/debug` - Logging automatique des erreurs côté client
 
 ## Journal des modifications
+
+### v2.3.1 (2026-03-18)
+- 🔧 **Fix iOS Safari : timeout 60s avec AbortController** sur les requêtes fetch
+- 🔧 **Fix iOS Safari : messages d'erreur distincts** (timeout réseau vs erreur serveur)
+- 🔧 **Fix : reset() efface maintenant l'état d'erreur**
+- ✨ **UX : demande proactive du microphone** avec message explicatif avant le prompt iOS
+- ✨ **UX : message spécifique si microphone refusé**
 
 ### v2.3.0 (2026-03-18)
 - 🔧 **Fix pagination : correction offset dans "Mes enregistrements"** (incrémenté de 10 au lieu de 5)
