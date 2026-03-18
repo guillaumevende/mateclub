@@ -63,18 +63,14 @@ export function validateImageMimeType(buffer: Buffer, mimeType: string): boolean
 }
 
 export function isValidAudioBuffer(buffer: Buffer): boolean {
-	console.log('[VALIDATION] Checking audio buffer, size:', buffer.length, 'first 16 bytes:', buffer.slice(0, 16).toString('hex'));
-	
 	const knownFormats = Object.values(AUDIO_MIME_SIGNATURES);
 	
 	for (const signature of knownFormats) {
 		if (matchesSignature(buffer, signature)) {
-			console.log('[VALIDATION] Match found for signature');
 			return true;
 		}
 	}
 	
-	console.log('[VALIDATION] No match found, rejecting');
 	return false;
 }
 

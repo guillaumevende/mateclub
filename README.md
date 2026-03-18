@@ -121,6 +121,7 @@ Au premier lancement, si aucun administrateur n'existe, vous êtes redirigé ver
 2. **Créer le fichier `.env` :**
    ```bash
    echo "PORT=3001" > .env
+   echo "BODY_SIZE_LIMIT=20M" >> .env
    ```
 
 3. **Créer les dossiers de données :**
@@ -258,6 +259,23 @@ volumes:
 Variables d'environnement:
 - `PORT` - Port serveur (défaut: 3001, changeable si déjà utilisé)
 - `DATABASE_PATH` - Chemin de la BDD (défaut: ./data/mateclub.db)
+- `BODY_SIZE_LIMIT` - Taille max des requêtes HTTP en bytes (défaut: 512KB, recommandé: 20M pour audio 3min + image)
+
+### BODY_SIZE_LIMIT (important)
+
+Pour allow sending audio recordings up to 3 minutes with images, vous devez configurer cette variable:
+
+```yaml
+# docker-compose.yml
+environment:
+  - BODY_SIZE_LIMIT=20M
+```
+
+Formats supportés:
+- Bytes: `BODY_SIZE_LIMIT=20971520`
+- Suffixes: `BODY_SIZE_LIMIT=20M` (20 megabytes), `BODY_SIZE_LIMIT=1G`
+
+Sans cette configuration, les enregistrements de plus de ~60 secondes seront rejetés avec l'erreur "Payload Too Large".
 
 **Note** : Aucun compte administrateur à configurer - le premier admin est créé via `/setup` au premier lancement de l'application.
 
