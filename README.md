@@ -2,7 +2,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Alpha-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-2.4.1-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-2.4.2-blue?style=for-the-badge)
 
 > **⚠️ En cours de développement**
 >

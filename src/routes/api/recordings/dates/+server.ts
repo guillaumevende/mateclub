@@ -1,11 +1,6 @@
 import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
-import { getUserById, getUserTimezone } from '$lib/server/db';
-import Database from 'better-sqlite3';
-
-const projectRoot = process.cwd();
-const dbPath = process.env.DATABASE_PATH || `${projectRoot}/data/mateclub.db`;
-const db = new Database(dbPath);
+import { getUserById, getUserTimezone, db } from '$lib/server/db';
 
 export const GET: RequestHandler = async ({ locals }) => {
 	if (!locals.user) {
@@ -92,7 +87,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 				(effectiveDate === yesterdayStr && currentMinutes >= thresholdMinutes) ||
 				(effectiveDate === today && recordedMinutes < thresholdMinutes);
 			if (isAvailable) {
-				grouped[localDate].has_available = true;
+				grouped[effectiveDate].has_available = true;
 			}
 		}
 
@@ -116,6 +111,6 @@ export const GET: RequestHandler = async ({ locals }) => {
 		});
 	} catch (error) {
 		console.error('Error in /api/recordings/dates:', error);
-		return json({ error: 'Internal error', message: String(error) }, { status: 500 });
+		return json({ error: 'Erreur interne' }, { status: 500 });
 	}
 };

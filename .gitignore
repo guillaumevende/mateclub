@@ -4,6 +4,10 @@
 /data/
 # uploads/ directory at root only (not in src/routes/)
 /uploads/
+# Base de données SQLite (jamais commiter!)
+*.db
+data.db
+src/data/
 # Node.js
 node_modules/
 build/

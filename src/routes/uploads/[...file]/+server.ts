@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { readFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { join, normalize } from 'path';
 import { redirect } from '@sveltejs/kit';
 
 const uploadsDir = join(process.cwd(), 'uploads');
@@ -18,22 +18,30 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		const filePath = Array.isArray(params.file) 
 			? join(uploadsDir, params.file.join('/'))
 			: join(uploadsDir, params.file);
-		console.log('[uploads] Chemin demandé:', filePath);
+		
+		// Validation contre path traversal
+		const normalizedPath = normalize(filePath);
+		if (!normalizedPath.startsWith(uploadsDir)) {
+			console.log('[uploads] Path traversal détecté:', normalizedPath);
+			return new Response('Accès interdit', { status: 403 });
+		}
+		
+		console.log('[uploads] Chemin demandé:', normalizedPath);
 		console.log('[uploads] params.file:', params.file, '(type:', typeof params.file + ')');
 
 		// Vérifier l'existence du fichier
-		if (!existsSync(filePath)) {
-			console.log('[uploads] Fichier non trouvé:', filePath);
+		if (!existsSync(normalizedPath)) {
+			console.log('[uploads] Fichier non trouvé:', normalizedPath);
 			return new Response('Fichier non trouvé', { status: 404 });
 		}
 
 		// Lire le fichier
-		console.log('[uploads] Lecture du fichier:', filePath);
-		const buffer = readFileSync(filePath);
+		console.log('[uploads] Lecture du fichier:', normalizedPath);
+		const buffer = readFileSync(normalizedPath);
 		console.log('[uploads] Fichier lu, taille:', buffer.length, 'bytes');
 
 		// Déterminer le Content-Type
-		const ext = filePath.split('.').pop()?.toLowerCase();
+		const ext = normalizedPath.split('.').pop()?.toLowerCase();
 		let contentType = getContentType(ext);
 		
 		// Détection du format réel par magic numbers pour les images
@@ -69,11 +77,10 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 			throw error;
 		}
 		
-		// Sinon, retourner une erreur 500 avec détails
+		// Sinon, retourner une erreur 500 générique (pas de fuite d'information)
 		return new Response(
 			JSON.stringify({ 
-				error: 'Erreur lors de la lecture du fichier',
-				details: error.message 
+				error: 'Erreur interne lors de la lecture du fichier'
 			}), 
 			{ 
 				status: 500,

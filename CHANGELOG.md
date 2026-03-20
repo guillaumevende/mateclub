@@ -2,6 +2,25 @@
 
 ---
 
+## v2.4.2 (2026-03-20)
+
+### Corrections de sécurité
+
+#### Vulnérabilités critiques corrigées
+- [x] **C1 - Path Traversal avatars** : Ajout vérification auth + validation path sur `/uploads/avatars/[[path]]`
+- [x] **C2 - Path Traversal uploads** : Ajout validation `normalize()` + `startsWith()` sur `/uploads/[...file]`
+- [x] **C3 - Bug localDate undefined** : Correction typo → `effectiveDate` (le calendrier était cassé)
+
+#### Vulnérabilités hautes corrigées
+- [x] **H2 - Form actions admin** : Ajout vérification `is_admin` sur actions `delete` et `updateHour`
+- [x] **H3 - Connexion DB dupliquée** : Utilisation de l'instance DB centralisée
+
+#### Améliorations sécurité
+- [x] **M3 - Fuite d'information** : Messages d'erreur génériques (pas de stack trace)
+- [x] **M7 - .gitignore** : Exclusion des fichiers `*.db`, `data.db`, `src/data/`
+
+---
+
 ## v2.4.1 (2026-03-20)
 
 ### Corrections de bugs

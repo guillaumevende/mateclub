@@ -45,7 +45,11 @@ export const actions: Actions = {
 		}
 	},
 
-	delete: async ({ request }) => {
+	delete: async ({ request, locals }) => {
+		if (!locals.user?.is_admin) {
+			return fail(403, { error: 'Non autorisé' });
+		}
+		
 		const data = await request.formData();
 		const userId = data.get('user_id')?.toString();
 
@@ -55,7 +59,11 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	updateHour: async ({ request }) => {
+	updateHour: async ({ request, locals }) => {
+		if (!locals.user?.is_admin) {
+			return fail(403, { error: 'Non autorisé' });
+		}
+		
 		const data = await request.formData();
 		const userId = data.get('user_id')?.toString();
 		const hour = data.get('hour')?.toString();

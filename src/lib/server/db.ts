@@ -17,7 +17,7 @@ if (!existsSync(uploadsDir)) {
 	mkdirSync(uploadsDir, { recursive: true });
 }
 
-const db = new Database(dbPath);
+export const db = new Database(dbPath);
 
 // No automatic admin creation - first admin must be created via /setup page
 
