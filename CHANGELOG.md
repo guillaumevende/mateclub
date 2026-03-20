@@ -2,7 +2,24 @@
 
 ---
 
-## [CURRENT] v2.3.1 - iOS Safari reliability fixes
+## v2.4.0 (2026-03-20)
+
+### Nouvelles fonctionnalités
+
+#### Screen Wake Lock API
+- [x] **Anti-veille pendant l'enregistrement** : Empêche le smartphone de se verrouiller
+- [x] Badge orange "Laissez cet écran actif durant l'enregistrement"
+- [x] Support iOS Safari 16.4+ et navigateurs modernes
+- [x] Gestion gracieuse si l'API échoue (batterie faible, préférences utilisateur)
+- [x] Réacquisition automatique du lock après changement de visibilité
+
+### Notes techniques
+- API disponible uniquement en contexte sécurisé (HTTPS)
+- Fallback silencieux si non supporté (pas d'erreur pour l'utilisateur)
+
+---
+
+## v2.3.1 (2026-03-18)
 **Date**: 2026-03-18
 
 ### Corrections de bugs iOS Safari

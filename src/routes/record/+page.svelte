@@ -59,6 +59,11 @@
 	let micPermissionState = $state<'prompt' | 'granted' | 'denied' | 'unknown'>('prompt');
 	let showMicPrompt = $state(false);
 
+	// Wake Lock state
+	let wakeLock: WakeLockSentinel | null = $state(null);
+	let wakeLockSupported = $state(false);
+	let wakeLockFailed = $state(false);
+
 	$effect(() => {
 		const unsubscribe = playerStore.subscribe(state => {
 			player = state;
@@ -74,7 +79,47 @@
 	onMount(() => {
 		loadRecordings();
 		checkMicPermission();
+		checkWakeLockSupport();
 	});
+
+	function checkWakeLockSupport() {
+		wakeLockSupported = 'wakeLock' in navigator && navigator.wakeLock !== null;
+	}
+
+	async function acquireWakeLock() {
+		if (!wakeLockSupported || wakeLock) return;
+
+		try {
+			wakeLock = await navigator.wakeLock.request('screen');
+			wakeLockFailed = false;
+			console.log('[WakeLock] Acquis avec succès');
+
+			wakeLock.addEventListener('release', () => {
+				console.log('[WakeLock] Libéré par le système');
+				wakeLock = null;
+			});
+		} catch (err) {
+			console.error('[WakeLock] Échec:', err);
+			wakeLockFailed = true;
+			wakeLock = null;
+		}
+	}
+
+	async function releaseWakeLock() {
+		if (wakeLock) {
+			await wakeLock.release();
+			wakeLock = null;
+			console.log('[WakeLock] Libéré manuellement');
+		}
+	}
+
+	// Réacquérir le wake lock quand la page redevient visible
+	function handleVisibilityChange() {
+		if (document.visibilityState === 'visible' && isRecording && wakeLockSupported) {
+			console.log('[WakeLock] Réacquisition après visibility change');
+			acquireWakeLock();
+		}
+	}
 
 	async function checkMicPermission() {
 		if (!navigator.permissions || !navigator.permissions.query) {
@@ -178,6 +223,13 @@
 
 	async function startRecording() {
 		triggerHaptic('success');
+		
+		// Activer le wake lock pour empêcher la veille pendant l'enregistrement
+		acquireWakeLock();
+		
+		// Écouter les changements de visibilité pour réacquérir le wake lock
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+		
 		try {
 			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 			
@@ -239,6 +291,10 @@
 
 function stopRecording() {
 	console.log('stopRecording appelé - state:', mediaRecorder?.state, 'chunks:', chunks.length);
+	
+	// Libérer le wake lock
+	releaseWakeLock();
+	document.removeEventListener('visibilitychange', handleVisibilityChange);
 	
 	if (timerInterval) {
 		clearInterval(timerInterval);
@@ -402,7 +458,7 @@ function stopRecording() {
 				}
 			} catch (err) {
 				urlError = 'URL invalide';
-				console.log('[SEND] Erreur URL:', err.message);
+				console.log('[SEND] Erreur URL:', err instanceof Error ? err.message : err);
 				isSending = false;
 				return;
 			}
@@ -533,6 +589,7 @@ function stopRecording() {
 				user_id: recording.user_id,
 				filename: recording.filename,
 				image_filename: recording.image_filename,
+				url: recording.url || null,
 				duration_seconds: recording.duration_seconds,
 				recorded_at: recording.recorded_at,
 				listened_by_user: 0,
@@ -648,6 +705,12 @@ function stopRecording() {
 					<p>Accès au microphone refusé. Veuillez l'activer dans les paramètres de votre navigateur pour utiliser cette fonctionnalité.</p>
 				</div>
 			{:else}
+				{#if isRecording && (wakeLock || wakeLockFailed)}
+					<div class="wake-lock-badge">
+						Laissez cet écran actif durant l'enregistrement
+					</div>
+				{/if}
+				
 				<div class="timer {isRecording ? 'recording' : ''} {isRecording && timer >= 160 ? 'warning' : ''}">
 					{formatTime(timer)} / 3:00
 				</div>
@@ -1307,6 +1370,29 @@ function stopRecording() {
 	.confirm-delete-btn:disabled {
 		opacity: 0.6;
 		cursor: not-allowed;
+	}
+
+	.wake-lock-badge {
+		font-size: 0.875rem;
+		color: #f97316;
+		text-decoration: none;
+		padding: 0.35rem 0.75rem;
+		border-radius: 20px;
+		background: rgba(249, 115, 22, 0.2);
+		font-weight: 600;
+		text-align: center;
+		animation: fadeIn 0.3s ease-out;
+	}
+
+	@keyframes fadeIn {
+		from {
+			opacity: 0;
+			transform: translateY(-10px);
+		}
+		to {
+			opacity: 1;
+			transform: translateY(0);
+		}
 	}
 </style>
 

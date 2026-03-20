@@ -2,7 +2,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Alpha-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-2.3.1-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-2.4.0-blue?style=for-the-badge)
 
 > **⚠️ En cours de développement**
 >
@@ -22,6 +22,7 @@ MateClub est une application web PWA permettant à un groupe d'amis d'enregistre
 
 ### Audio & Lecture
 - **Enregistrement audio** - Durée max 3 minutes avec compression WebM
+- **Screen Wake Lock** - Anti-veille pendant l'enregistrement (empêche le smartphone de se verrouiller)
 - **Player séquentiel** - Lecture automatique d'une capsule à la suivante
 - **Jingle d'intro** - Jingle musical au début de la première capsule du jour (activable via admin)
 - **Lecture arrière-plan** - Fonctionne smartphone verrouillé via technique "audio guardian"
