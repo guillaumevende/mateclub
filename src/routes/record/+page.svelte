@@ -1,7 +1,7 @@
 <script lang="ts">
 	import imageCompression from 'browser-image-compression';
 	import { onMount } from 'svelte';
-	import { playerStore, getAudioElement, updateMediaSessionMetadata, type Recording, type DayRecordings } from '$lib/stores/player';
+	import { playerStore, getAudioElement, updateMediaSessionMetadata, closePlayer, type Recording, type DayRecordings } from '$lib/stores/player';
 	import ImageViewer from '$lib/components/ImageViewer.svelte';
 	import { scrollLock } from '$lib/actions/scrollLock';
 	import { triggerHaptic } from '$lib/utils/haptics';
@@ -63,6 +63,9 @@
 	let wakeLock: WakeLockSentinel | null = $state(null);
 	let wakeLockSupported = $state(false);
 	let wakeLockFailed = $state(false);
+
+	// Recording stop flag to prevent recursive calls
+	let isStopping = false;
 
 	$effect(() => {
 		const unsubscribe = playerStore.subscribe(state => {
@@ -224,6 +227,12 @@
 	async function startRecording() {
 		triggerHaptic('success');
 		
+		// Fermer le player s'il est ouvert
+		closePlayer();
+		
+		// Réinitialiser le flag d'arrêt
+		isStopping = false;
+		
 		// Activer le wake lock pour empêcher la veille pendant l'enregistrement
 		acquireWakeLock();
 		
@@ -255,7 +264,8 @@
 			
 			timerInterval = setInterval(() => {
 				timer++;
-				if (timer >= MAX_DURATION) {
+				if (timer >= MAX_DURATION && !isStopping) {
+					isStopping = true;
 					stopRecording();
 				}
 			}, 1000);
@@ -315,6 +325,9 @@ function stopRecording() {
 			}
 		}, 300);
 	}
+	
+	// Réinitialiser le flag
+	isStopping = false;
 }
 
 	async function handleImageSelect(e: Event) {

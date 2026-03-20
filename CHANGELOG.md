@@ -2,6 +2,15 @@
 
 ---
 
+## v2.4.1 (2026-03-20)
+
+### Corrections de bugs
+
+- [x] **Fermeture auto du player** : Le player modal se ferme automatiquement au démarrage de l'enregistrement
+- [x] **Fix timer 3 minutes** : Correction de l'arrêt automatique à 3 minutes avec flag anti-récursion
+
+---
+
 ## v2.4.0 (2026-03-20)
 
 ### Nouvelles fonctionnalités
@@ -14,7 +23,7 @@
 - [x] Réacquisition automatique du lock après changement de visibilité
 
 ### Notes techniques
-- API disponible uniquement en contexte sécurisé (HTTPS)
+- API Wake Lock disponible uniquement en contexte sécurisé (HTTPS)
 - Fallback silencieux si non supporté (pas d'erreur pour l'utilisateur)
 
 ---
