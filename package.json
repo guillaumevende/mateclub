@@ -9,7 +9,9 @@
     "start": "node build/index.js",
     "init": "node scripts/init-admin.mjs",
     "lint": "eslint src/",
-    "check": "svelte-check --tsconfig ./tsconfig.json"
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
