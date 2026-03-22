@@ -27,6 +27,11 @@
 	let createSuccess = $state<string | null>(null);
 	let passwordError = $state<string | null>(null);
 	let pseudoError = $state<string | null>(null);
+	
+	// État du formulaire de création
+	let isCreatingUser = $state(false);
+	let pseudo = $state('');
+	let password = $state('');
 
 	let adminCount = $derived(data.users.filter(u => u.is_admin).length);
 	
@@ -182,7 +187,12 @@
 	<section>
 		<h2>Créer un utilisateur</h2>
 		<form method="POST" action="?/create" use:enhance={() => {
+			// Désactiver le bouton pendant le traitement
+			isCreatingUser = true;
+			
 			return async ({ result }) => {
+				isCreatingUser = false;
+				
 			if (result.type === 'failure' && (result.data as any)?.error) {
 				const errorMsg = (result.data as any).error;
 				const lowerError = errorMsg.toLowerCase();
@@ -207,6 +217,18 @@
 				passwordError = null;
 				pseudoError = null;
 				createSuccess = (result.data as any)?.message || 'Utilisateur créé avec succès';
+				
+				// Réinitialiser le formulaire
+				pseudo = '';
+				password = '';
+				
+				// Forcer le rafraîchissement de la page pour voir le nouvel utilisateur
+				setTimeout(() => {
+					window.location.reload();
+				}, 1500);
+			}
+		};
+		}}>
 				selectedAvatar = '☕';
 				// Réinitialiser le formulaire
 				const form = document.querySelector('form[action="?/create"]') as HTMLFormElement;

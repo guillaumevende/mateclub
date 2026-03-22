@@ -4,6 +4,7 @@ import { updateUserAvatarImage, getUserAvatar } from '$lib/server/db';
 import { writeFileSync, existsSync, mkdirSync, unlinkSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { isValidImageBuffer } from '$lib/server/fileValidation';
+import sharp from 'sharp';
 
 const uploadsDir = join(process.cwd(), 'uploads', 'avatars');
 
@@ -20,10 +21,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Image requise' }, { status: 400 });
 		}
 
-		// Validation du type MIME
-		const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+		// Validation du type MIME (inclut HEIC/HEIF et image/jpg)
+		const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 		if (!validTypes.includes(image.type)) {
-			return json({ error: 'Format accepté: JPG, PNG, WEBP' }, { status: 400 });
+			return json({ error: 'Format accepté: JPG, PNG, WEBP, HEIC' }, { status: 400 });
 		}
 
 		// Validation de la taille (10 Mo max)
@@ -32,10 +33,27 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			return json({ error: 'Taille maximale: 10 Mo' }, { status: 400 });
 		}
 
+		// Récupération du buffer
+		let imageBuffer = Buffer.from(await image.arrayBuffer());
+
 		// Validation du contenu par magic numbers
-		const imageBuffer = Buffer.from(await image.arrayBuffer());
 		if (!isValidImageBuffer(imageBuffer)) {
 			return json({ error: 'Le fichier ne semble pas être une image valide' }, { status: 400 });
+		}
+
+		// Conversion HEIC/HEIF en JPEG si nécessaire
+		const isHeic = image.type === 'image/heic' || image.type === 'image/heif';
+		if (isHeic) {
+			try {
+				const convertedBuffer = await sharp(imageBuffer)
+					.rotate() // Respecte l'orientation EXIF
+					.jpeg({ quality: 90 })
+					.toBuffer();
+				imageBuffer = Buffer.from(convertedBuffer);
+			} catch (err) {
+				console.error('Erreur conversion HEIC:', err);
+				return json({ error: 'Erreur lors de la conversion de l\'image HEIC' }, { status: 400 });
+			}
 		}
 
 		// Dossier spécifique à l'utilisateur
@@ -61,7 +79,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		const filename = `avatar_${timestamp}_${crypto.randomUUID()}.jpg`;
 		const filepath = join(userDir, filename);
 
-		// Reuse the already-read buffer
+		// Écrire le fichier (converti ou original)
 		writeFileSync(filepath, imageBuffer);
 
 		// Mettre à jour la base de données avec le chemin complet relatif

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { getRecordingsByDate, createUser, getUserById } from './db';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { getRecordingsByDate, createUser, getUserById, deleteUser } from './db';
 
 describe('Logique métier - Enregistrements', () => {
 	let testUserId: number;
@@ -9,6 +9,13 @@ describe('Logique métier - Enregistrements', () => {
 		const pseudo = `test_recording_${Date.now()}`;
 		const user = createUser(pseudo, 'testpassword123', false);
 		testUserId = user.id;
+	});
+
+	afterEach(() => {
+		// Nettoyer : supprimer l'utilisateur de test
+		if (testUserId) {
+			deleteUser(testUserId);
+		}
 	});
 
 	it('devrait retourner null ou un objet pour une date donnée', () => {
