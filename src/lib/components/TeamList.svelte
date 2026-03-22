@@ -17,10 +17,6 @@
 	let { allUsers, showTeam = $bindable(false) }: Props = $props();
 </script>
 
-<button class="team-button" onclick={() => showTeam = true}>
-	👥
-</button>
-
 {#if showTeam}
 	<div class="modal-overlay" use:scrollLock={showTeam} onclick={() => showTeam = false}>
 		<div class="modal" onclick={(e) => e.stopPropagation()}>
@@ -42,29 +38,6 @@
 {/if}
 
 <style>
-	.team-button {
-		position: absolute;
-		top: 0.5rem;
-		right: 0;
-		width: 44px;
-		height: 44px;
-		border-radius: 50%;
-		background: #2a2a4e;
-		border: none;
-		font-size: 1.25rem;
-		cursor: pointer;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		line-height: 1;
-		margin-top: 1rem;
-		transition: transform 0.2s, background 0.2s;
-	}
-
-	.team-button:hover {
-		transform: scale(1.1);
-	}
-
 	.modal-overlay {
 		position: fixed;
 		top: 0;
