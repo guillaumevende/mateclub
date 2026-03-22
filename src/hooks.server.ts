@@ -70,7 +70,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	response.headers.set('Pragma', 'no-cache');
 	response.headers.set('Expires', '0');
 	
-	response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://*;");
+	response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self';");
 	response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 	response.headers.set('X-Content-Type-Options', 'nosniff');
 	response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
