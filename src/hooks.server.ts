@@ -31,6 +31,20 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
+	// Validate CSRF for API routes - block form-based CSRF attacks
+	// (fetch/XHR use application/json or multipart, forms use x-www-form-urlencoded)
+	if (event.request.method !== 'GET' && event.url.pathname.startsWith('/api')) {
+		const contentType = event.request.headers.get('content-type') || '';
+		// Block only classic form submissions (cannot send JSON or custom headers)
+		if (contentType.includes('application/x-www-form-urlencoded') || 
+			contentType.includes('text/plain')) {
+			return new Response(JSON.stringify({ error: 'CSRF rejected' }), {
+				status: 403,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		}
+	}
+
 	// Check if setup is needed - redirect to /setup if no admin exists
 	const isSetupPage = event.url.pathname === '/setup';
 	const isApi = event.url.pathname.startsWith('/api');
