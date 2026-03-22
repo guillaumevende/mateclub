@@ -6,6 +6,8 @@
 	import Avatar from '$lib/components/Avatar.svelte';
 	import ImageViewer from '$lib/components/ImageViewer.svelte';
 	import RecordingCard from '$lib/components/RecordingCard.svelte';
+	import TeamList from '$lib/components/TeamList.svelte';
+	import Calendar from '$lib/components/Calendar.svelte';
 	import { scrollLock } from '$lib/actions/scrollLock';
 	import { triggerHaptic } from '$lib/utils/haptics';
 	import { playerStore, lastListenedRecordingId, type Recording, type DayRecordings, type PlayerState, playRecording, togglePlayPause, closePlayer, playNext } from '$lib/stores/player';
@@ -335,23 +337,6 @@
 		selectedDayRecordings = null;
 	}
 
-	function handleCalendarClick(e: MouseEvent) {
-		const target = e.target as HTMLElement;
-		if (!target.classList.contains('cell-day') || !target.classList.contains('has-recordings')) return;
-		
-		const date = target.dataset.date;
-		if (date) loadDayRecordings(date);
-	}
-
-	function handleCalendarKeydown(e: KeyboardEvent) {
-		if (e.key !== 'Enter') return;
-		const target = e.target as HTMLElement;
-		if (!target.classList.contains('cell-day') || !target.classList.contains('has-recordings')) return;
-		
-		const date = target.dataset.date;
-		if (date) loadDayRecordings(date);
-	}
-
 	// Player helper functions
 	function isCurrentPlaying(recordingId: number): boolean {
 		return player.currentRecording?.id === recordingId && player.isPlaying;
@@ -515,11 +500,6 @@
 		return `${mins}:${secs.toString().padStart(2, '0')}`;
 	}
 
-	function getMonthName(month: number): string {
-		const date = new Date(2000, month, 1);
-		return date.toLocaleDateString('fr-FR', { month: 'long' });
-	}
-
 	function getDateKey(year: number, month: number, day: number): string {
 		return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 	}
@@ -576,28 +556,8 @@
 		<button class="team-button" onclick={() => showTeam = true}>
 			👥
 		</button>
+		<TeamList allUsers={data.allUsers} bind:showTeam />
 	</header>
-
-	{#if showTeam}
-		<div class="modal-overlay" use:scrollLock={showTeam} onclick={() => showTeam = false}>
-			<div class="modal" onclick={(e) => e.stopPropagation()}>
-				<!-- Croix de fermeture au-dessus de la modale -->
-				<button class="close-btn modal-close-outer" onclick={() => showTeam = false}>✕</button>
-				
-				<h2>La team</h2>
-				<ul class="team-list">
-					{#each data.allUsers as user}
-						{@const count = user.recording_count ?? 0}
-						<li>
-							<Avatar avatar={user.avatar} size="small" />
-							<span class="team-pseudo">{user.pseudo}</span>
-							<span class="team-count">({count} capsule{count !== 1 ? 's' : ''})</span>
-						</li>
-					{/each}
-				</ul>
-			</div>
-		</div>
-	{/if}
 
 	{#if selectedDayRecordings}
 		<div class="modal-overlay" use:scrollLock={selectedDayRecordings !== null} onclick={closeDayModal}>
@@ -886,39 +846,12 @@
 			{#if loadingMore}
 				<span class="loading">Chargement...</span>
 			{:else if showCalendar}
-		<!-- Calendrier avec couleurs et interactions -->
-		<div class="calendar-container">
-			<div class="calendar-scroll">
-				{#each calendarMonths || [] as monthData, monthIndex}
-				<div class="month-table">
-					<h3 class="month-title">{getMonthName(monthData.month)} {monthData.year}</h3>
-					<div class="month-grid" onclick={handleCalendarClick} role="grid">
-						<span class="cell-header">Lu</span>
-						<span class="cell-header">Ma</span>
-						<span class="cell-header">Me</span>
-						<span class="cell-header">Je</span>
-						<span class="cell-header">Ve</span>
-						<span class="cell-header">Sa</span>
-						<span class="cell-header">Di</span>
-						{#each calendarCells[monthIndex] || [] as cell}
-							{#if cell.day === -1}
-							<span class="cell-day cell-empty"></span>
-						{:else}
-							<span
-								class={cell.classes}
-								data-date={cell.key}
-								role={cell.hasRecordings ? 'button' : 'gridcell'}
-								tabindex={cell.hasRecordings ? 0 : -1}
-							>
-								{cell.day}
-							</span>
-						{/if}
-						{/each}
-					</div>
-				</div>
-				{/each}
-			</div>
-		</div>
+				<Calendar 
+					{calendarMonths} 
+					{calendarCells} 
+					{calendarDates}
+					onDateClick={loadDayRecordings}
+				/>
 			{:else if data.hasMore}
 				<button class="btn" onclick={loadMore}>Charger plus</button>
 			{/if}
@@ -964,29 +897,6 @@
 		max-width: 200px;
 		height: auto;
 		margin-bottom: 0.5rem;
-	}
-
-	.team-button {
-		position: absolute;
-		top: 0.5rem;
-		right: 0;
-		width: 44px;
-		height: 44px;
-		border-radius: 50%;
-		background: #2a2a4e;
-		border: none;
-		font-size: 1.25rem;
-		cursor: pointer;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		line-height: 1;
-		margin-top: 1rem;
-		transition: transform 0.2s, background 0.2s;
-	}
-
-	.team-button:hover {
-		transform: scale(1.1);
 	}
 
 	.modal-overlay {
@@ -1051,43 +961,6 @@
 	.close-btn:hover {
 		background: #e94560;
 		transform: scale(1.1);
-	}
-
-	.team-list {
-		list-style: none;
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-		max-height: 60vh;
-		overflow-y: auto;
-		padding-right: 0.5rem;
-	}
-
-	.team-list li {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.75rem;
-		background: #2a2a4e;
-		border-radius: 8px;
-	}
-
-	.team-pseudo {
-		flex: 1;
-		font-weight: 500;
-	}
-
-	.team-badge {
-		font-size: 0.75rem;
-		padding: 0.25rem 0.5rem;
-		background: #e94560;
-		border-radius: 4px;
-	}
-
-	.team-count {
-		font-size: 0.8rem;
-		color: #888;
-		margin-left: 0.5rem;
 	}
 
 	.welcome {
@@ -1275,126 +1148,6 @@
 	.recordings-row {
 		display: flex;
 		gap: 0.75rem;
-	}
-
-	.calendar-container {
-		width: 100%;
-		overflow-x: auto;
-		-webkit-overflow-scrolling: touch;
-		margin-top: 1rem;
-	}
-
-	.calendar-scroll {
-		display: flex;
-		gap: 1.5rem;
-		padding: 0.5rem;
-		min-width: max-content;
-	}
-
-	.month-table {
-		background: #2a2a4e;
-		border-radius: 12px;
-		padding: 0.5rem;
-		flex-shrink: 0;
-	}
-
-	.month-title {
-		text-align: center;
-		color: #e94560;
-		font-size: 0.85rem;
-		margin: 0 0 0.4rem;
-		font-weight: 500;
-	}
-
-	.month-grid {
-		display: grid;
-		grid-template-columns: repeat(7, 40px);
-		grid-auto-rows: 40px;
-		gap: 2px;
-		width: max-content;
-	}
-
-	.cell-header,
-	.cell-day {
-		width: 40px;
-		height: 40px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		box-sizing: border-box;
-		font-size: 14px;
-		border-radius: 50%;
-		line-height: 1;
-		cursor: default;
-		user-select: none;
-		-webkit-font-smoothing: antialiased;
-		-moz-osx-font-smoothing: grayscale;
-	}
-
-	.cell-header {
-		color: #888;
-		font-size: 12px;
-	}
-
-	.cell-day {
-		color: white;
-	}
-
-	.cell-header {
-		color: #888;
-		font-size: 0.75rem;
-	}
-
-	.cell-day {
-		color: white;
-		text-align: center;
-	}
-
-	.cell-header {
-		color: #888;
-		font-size: 0.75rem;
-	}
-
-	.cell-day {
-		color: white;
-	}
-
-	.cell-day.cell-empty {
-		opacity: 0;
-		pointer-events: none;
-	}
-
-	.cell-day.no-recordings {
-		color: white;
-		opacity: 0.4;
-		padding: 0;
-	}
-
-	.cell-day.has-recordings {
-		cursor: pointer;
-	}
-
-	.cell-day.has-recordings {
-		cursor: pointer;
-	}
-
-	.cell-day.has-recordings:hover {
-		background: #e94560;
-		color: white;
-	}
-
-	.cell-day.unread {
-		font-weight: bold;
-		color: #e94560;
-	}
-
-	.cell-day.unread:hover {
-		background: #e94560;
-		color: white;
-	}
-
-	.cell-day.today {
-		border: 4px solid #e94560;
 	}
 
 	.no-recordings {
