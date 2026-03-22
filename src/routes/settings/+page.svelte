@@ -270,7 +270,7 @@
 		}}>
 		
 		<input type="hidden" name="avatarImage" value={savedImageFilename || ''} />
-		<input type="hidden" name="csrf_token" value={data?.csrfToken} />
+		<input type="hidden" name="csrf_token" value={(data as any)?.csrfToken ?? ''} />
 		
 		<!-- Bloc 1: Nom d'utilisateur -->
 		<section>

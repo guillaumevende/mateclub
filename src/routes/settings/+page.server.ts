@@ -63,7 +63,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		hour: user?.daily_notification_hour || 420,
 		timezones,
 		savedImage,
-		csrfToken: locals.csrfToken
+		csrfToken: locals.csrfToken ?? ''
 	};
 };
 

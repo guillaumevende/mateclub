@@ -8,7 +8,7 @@ export function initHaptics() {
 	haptics = new WebHaptics();
 }
 
-export function triggerHaptic(pattern: string | number | number[] | object = 'nudge') {
+export function triggerHaptic(pattern: Parameters<WebHaptics['trigger']>[0] = 'nudge') {
 	if (!haptics || typeof window === 'undefined') return;
 	
 	try {

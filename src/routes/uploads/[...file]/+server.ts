@@ -67,13 +67,13 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 				'Cache-Control': 'private, max-age=3600'
 			}
 		});
-	} catch (error) {
+	} catch (error: unknown) {
 		console.error('[uploads] Erreur lors du traitement de la requête:', error);
-		console.error('[uploads] Type d\'erreur:', error.constructor.name);
-		console.error('[uploads] Message:', error.message);
+		console.error('[uploads] Type d\'erreur:', error && typeof error === 'object' && 'constructor' in error ? (error as any).constructor.name : 'unknown');
+		console.error('[uploads] Message:', error && typeof error === 'object' && 'message' in error ? (error as any).message : 'unknown');
 		
 		// Si c'est une redirection, la propager
-		if (error.status === 303 || error.location) {
+		if (typeof error === 'object' && error !== null && ('status' in error ? (error as any).status === 303 : 'location' in error)) {
 			throw error;
 		}
 		

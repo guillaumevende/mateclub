@@ -66,7 +66,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 };
 
 // Masquer les détails d'erreur en production
-export async function handleError({ error, status }) {
+export async function handleError({ status }: { status: number }) {
 	// En production, ne pas exposer les détails de l'erreur
 	return {
 		message: 'Une erreur est survenue',
