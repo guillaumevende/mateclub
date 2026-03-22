@@ -119,10 +119,14 @@ Au premier lancement, si aucun administrateur n'existe, vous êtes redirigé ver
    cd mateclub
    ```
 
+(modifier ORIGIN bien sur par le vrai domaine une fois en production)
+
 2. **Créer le fichier `.env` :**
    ```bash
    echo "PORT=3001" > .env
    echo "BODY_SIZE_LIMIT=20M" >> .env
+   echo "ORIGIN=http://localhost:3001" >> .env
+
    ```
 
 3. **Créer les dossiers de données :**
