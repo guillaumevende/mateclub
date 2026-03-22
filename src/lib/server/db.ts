@@ -434,8 +434,8 @@ export function getRecordingsGroupedByDayWithHasMore(
 		});
 	}
 
-	// Vérifier s'il y a plus de jours que la limite
-	const hasMore = days.length > limit;
+	// Vérifier s'il y a plus de données en vérifiant le nombre d'enregistrements retournés
+	const hasMore = results.length >= (limit + 1) * 3;
 
 	// Retourner seulement 'limit' jours
 	return {
