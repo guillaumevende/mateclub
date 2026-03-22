@@ -1,8 +1,8 @@
 <script lang="ts">
-	import imageCompression from 'browser-image-compression';
 	import { onMount } from 'svelte';
 	import { playerStore, getAudioElement, updateMediaSessionMetadata, closePlayer, type Recording, type DayRecordings } from '$lib/stores/player';
 	import ImageViewer from '$lib/components/ImageViewer.svelte';
+	import ImageUpload from '$lib/components/ImageUpload.svelte';
 	import { scrollLock } from '$lib/actions/scrollLock';
 	import { triggerHaptic } from '$lib/utils/haptics';
 	import { debug } from '$lib/debug';
@@ -31,13 +31,10 @@
 	let imagePreview: string | null = $state(null);
 	let recordingUrl: string = $state('');
 	let isSending = $state(false);
-	let isCompressingImage = $state(false);
-	let compressionProgress = $state(0);
 	let error = $state<string | null>(null);
 	let urlError = $state<string | null>(null);
 	let imageWarning = $state<string | null>(null);
 	let success = $state(false);
-	let isDragging = $state(false);
 
 	// Recordings list state
 	let userRecordings = $state<UserRecording[]>([]);
@@ -322,123 +319,36 @@
 	isStopping = false;
 }
 
-	async function handleImageSelect(e: Event) {
-		const input = e.target as HTMLInputElement;
-		if (input.files && input.files[0]) {
-			const file = input.files[0];
-			
-			// Valider le type de fichier avant tout traitement
-			const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
-			if (!validImageTypes.includes(file.type)) {
-				imageWarning = 'Format d\'image non valide. Votre capsule va être envoyée sans image ou sélectionnez une image valide.';
-				input.value = ''; // Reset input
-				return;
-			}
-			
-			// HEIC/HEIF: pas de compression côté client, le serveur convertira en JPEG
-			const isHeic = file.type === 'image/heic' || file.type === 'image/heif';
-			
-			imageWarning = null;
-			
-			if (isHeic) {
-				// Envoyer HEIC brut, le serveur convertira en JPEG
-				imageBlob = file;
-				imagePreview = URL.createObjectURL(file);
-				return;
-			}
-			
-			// Compression côté client pour les formats standards
-			isCompressingImage = true;
-			compressionProgress = 0;
-			
-			try {
-  			const options = {
-  				maxWidthOrHeight: 1200,
-  				maxSizeMB: 1,
-  				initialQuality: 0.8,
-  				useWebWorker: false,
-				onProgress: (progress: number) => {
-					compressionProgress = Math.min(Math.round(progress * 100), 100);
-				}
-  			};
-				
-				const compressedFile = await imageCompression(file, options);
-				imageBlob = compressedFile;
-				imagePreview = URL.createObjectURL(compressedFile);
-			} catch (err) {
-				console.error('Erreur compression:', err);
-				error = 'Erreur lors du traitement de l\'image';
-				input.value = ''; // Reset input
-			} finally {
-				isCompressingImage = false;
-				compressionProgress = 0;
-			}
- 		}
- 	}
+	function reset() {
+		audioUrl = null;
+		recordedBlob = null;
+		imageBlob = null;
+		imagePreview = null;
+		timer = 0;
+		success = false;
+		error = null;
+		showRecordingsList = true;
+		loadRecordings();
+	}
 
- 	function handleDragOver(e: DragEvent) {
- 		e.preventDefault();
- 		isDragging = true;
- 	}
+	function stayOnPage() {
+		recordedBlob = null;
+		audioUrl = null;
+		imageBlob = null;
+		imagePreview = null;
+		timer = 0;
+		success = false;
+		error = null;
+		recordingUrl = '';
+		isSending = false;
+	}
 
- 	function handleDragLeave(e: DragEvent) {
- 		e.preventDefault();
- 		isDragging = false;
- 	}
+	function formatTime(seconds: number): string {
+		const mins = Math.floor(seconds / 60);
+		const secs = seconds % 60;
+		return `${mins}:${secs.toString().padStart(2, '0')}`;
+	}
 
- 	function handleDrop(e: DragEvent) {
- 		e.preventDefault();
- 		isDragging = false;
- 		if (e.dataTransfer?.files && e.dataTransfer.files[0]) {
- 			const file = e.dataTransfer.files[0];
- 			if (file.type.startsWith('image/')) {
- 				handleImageFile(file);
- 			}
- 		}
-  }
-
-  	async function handleImageFile(file: File) {
-		// Valider le type de fichier avant tout traitement
-		const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
-		if (!validImageTypes.includes(file.type)) {
-			imageWarning = 'Format d\'image non valide. Votre capsule va être envoyée sans image ou sélectionnez une image valide.';
-			return;
-		}
-		
-		// HEIC/HEIF: pas de compression côté client, le serveur convertira en JPEG
-		const isHeic = file.type === 'image/heic' || file.type === 'image/heif';
-		
-		imageWarning = null;
-		
-		if (isHeic) {
-			imageBlob = file;
-			imagePreview = URL.createObjectURL(file);
-			return;
-		}
-		
- 		isCompressingImage = true;
- 		compressionProgress = 0;
- 		try {
- 			const options = {
- 				maxWidthOrHeight: 1200,
- 				maxSizeMB: 1,
- 			useWebWorker: false,
- 				onProgress: (progress: number) => {
- 					compressionProgress = Math.min(Math.round(progress * 100), 100);
- 				}
- 			};
- 			const compressedFile = await imageCompression(file, options);
- 			imageBlob = compressedFile;
- 			imagePreview = URL.createObjectURL(compressedFile);
- 		} catch (err) {
- 			console.error('Erreur compression:', err);
- 			error = 'Erreur lors du traitement de l\'image';
- 		} finally {
- 			isCompressingImage = false;
- 			compressionProgress = 0;
- 		}
-  	}
-  
 	async function sendRecording() {
 		if (!recordedBlob) {
 			debug.send.error('ERREUR: recordedBlob est null!');
@@ -507,22 +417,29 @@
 			}
 
 			if (!res.ok) {
-				sendErrorToServer('SEND_RECORDING_FAILED', {
-					message: data.error || 'Erreur lors de l\'envoi',
-					audioSize: recordedBlob.size,
-					audioType: recordedBlob.type,
+				const errorMessage = data.error || 'Erreur lors de l\'envoi';
+				debug.send.error('Erreur serveur:', errorMessage);
+				
+				isSending = false;
+				sendErrorToServer('SEND_RECORDING_ERROR', {
+					message: errorMessage,
+					audioSize: recordedBlob?.size,
+					audioType: recordedBlob?.type,
 					duration: timer,
 					url: window.location.href
 				});
-				throw new Error(data.error || 'Erreur lors de l\'envoi');
+				error = errorMessage;
+				return;
 			}
 
 			success = true;
-		} catch (e: any) {
-			const isAbort = e.name === 'AbortError';
+			triggerHaptic('success');
+		} catch (err: unknown) {
+			const isAbort = err instanceof Error && err.name === 'AbortError';
 			const errorMessage = isAbort 
-				? 'La connexion a mis trop de temps. Vérifiez votre réseau et réessayez.'
-				: e.message;
+				? 'Le serveur met trop de temps à répondre. Veuillez réessayer.' 
+				: 'Erreur lors de l\'envoi';
+			debug.send.error('Erreur envoi:', err);
 			
 			sendErrorToServer('SEND_RECORDING_ERROR', {
 				message: errorMessage,
@@ -552,36 +469,6 @@
 		} catch (e) {
 			// Silencieux - on ne veut pas d'erreur sur l'erreur
 		}
-	}
-
-	function reset() {
-		audioUrl = null;
-		recordedBlob = null;
-		imageBlob = null;
-		imagePreview = null;
-		timer = 0;
-		success = false;
-		error = null;
-		showRecordingsList = true;
-		loadRecordings();
-	}
-
-	function stayOnPage() {
-		recordedBlob = null;
-		audioUrl = null;
-		imageBlob = null;
-		imagePreview = null;
-		timer = 0;
-		success = false;
-		error = null;
-		recordingUrl = '';
-		isSending = false;
-	}
-
-	function formatTime(seconds: number): string {
-		const mins = Math.floor(seconds / 60);
-		const secs = seconds % 60;
-		return `${mins}:${secs.toString().padStart(2, '0')}`;
 	}
 
 	async function playRecording(recording: UserRecording) {
@@ -641,33 +528,10 @@
 		</div>
 	{:else if audioUrl}
 		<div class="preview">
-			{#if imagePreview}
-				<div class="image-preview">
-					<img src={imagePreview} alt="Preview" />
-					<button class="remove-image" onclick={() => { imageBlob = null; imagePreview = null; }} aria-label="Supprimer l'image">✕</button>
-				</div>
-			{:else}
-				{#if isCompressingImage}
-					<div class="compression-progress">
-						<div class="progress-bar-container">
-							<div class="progress-bar-fill" style="width: {compressionProgress}%"></div>
-						</div>
-						<span class="progress-text">Compression... {compressionProgress}%</span>
-					</div>
-				{/if}
-			<label class="image-upload" class:disabled={isCompressingImage} class:dragging={isDragging}
-  					ondragover={handleDragOver}
-  					ondragleave={handleDragLeave}
-  					ondrop={handleDrop}
-  				>
-  				<input type="file" accept="image/*" onchange={handleImageSelect} disabled={isCompressingImage} />
-  					<span>📷 Ajouter une photo</span>
-  				</label>
-  			{/if}
-  			
-  			{#if imageWarning}
-  				<p class="image-warning">⚠️ {imageWarning}</p>
-  			{/if}
+		<ImageUpload
+			onImageChange={(blob, preview) => { imageBlob = blob; imagePreview = preview; }}
+			onWarning={(warning) => imageWarning = warning}
+		/>
  			
  			<input 
  				type="url" 
@@ -690,8 +554,8 @@
 			{/if}
 
 			<div class="actions">
-				<button class="secondary" onclick={reset} disabled={isSending || isCompressingImage}>Recommencer</button>
-				<button onclick={sendRecording} disabled={isSending || isCompressingImage || urlError !== null}>
+				<button class="secondary" onclick={reset} disabled={isSending}>Recommencer</button>
+				<button onclick={sendRecording} disabled={isSending || urlError !== null}>
 					{isSending ? 'Envoi...' : 'Envoyer'}
 				</button>
 			</div>
