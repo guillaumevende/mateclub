@@ -556,8 +556,9 @@
 		<button class="team-button" onclick={() => showTeam = true}>
 			👥
 		</button>
-		<TeamList allUsers={data.allUsers} bind:showTeam />
 	</header>
+
+	<TeamList allUsers={data.allUsers} bind:showTeam />
 
 	{#if selectedDayRecordings}
 		<div class="modal-overlay" use:scrollLock={selectedDayRecordings !== null} onclick={closeDayModal}>
