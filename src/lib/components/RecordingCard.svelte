@@ -140,7 +140,7 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background: linear-gradient(135deg, rgba(42, 42, 78, 0.9), rgba(42, 42, 78, 0.7));
+		background: linear-gradient(135deg, rgba(42, 42, 78, 0.5), rgba(42, 42, 78, 0.3));
 		border-radius: 12px;
 		z-index: 0;
 	}
