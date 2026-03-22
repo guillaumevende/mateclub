@@ -76,6 +76,15 @@ MateClub est une application web PWA permettant à un groupe d'amis d'enregistre
 - **Service Worker** - Cache intelligent pour images et audio (3 mois)
 - **Anti-cache** - Headers pour éviter le cache sur pages et API
 
+### Tests
+- **Framework** : Vitest avec 63+ tests
+- **Couverture** : Auth, DB, validation fichiers, path traversal
+- **Commande** : `npm test` pour exécuter tous les tests
+
+### Architecture
+- **Composants extraits** : RecordingCard, ImageUpload, TeamList, Calendar (architecture modulaire < 300 lignes par fichier)
+- **Streaming** : Téléchargement des fichiers audio/images via streams (pas de chargement mémoire complet)
+
 ## Stack technique
 
 | Composant | Technologie |
@@ -86,6 +95,61 @@ MateClub est une application web PWA permettant à un groupe d'amis d'enregistre
 | UI | Svelte 5 + CSS personnalisé |
 | Build | Vite 7.x |
 | Runtime | Node.js |
+| Tests | Vitest 4.x |
+
+## Architecture des composants
+
+Le projet suit une architecture modulaire avec des composants Svelte de moins de 300 lignes pour faciliter la maintenance :
+
+### Composants extraits
+
+| Composant | Lignes | Description | Utilisé dans |
+|-----------|--------|-------------|--------------|
+| `RecordingCard.svelte` | 345 | Carte d'enregistrement (315×420px) avec styles encapsulés | Page d'accueil |
+| `ImageUpload.svelte` | 232 | Upload image avec compression HEIC/JPEG et drag & drop | Page enregistrer |
+| `TeamList.svelte` | 110 | Modal "La team" avec liste des utilisateurs | Page d'accueil |
+| `Calendar.svelte` | 220 | Calendrier interactif avec navigation mensuelle | Page d'accueil |
+
+### Bénéfices du refactoring
+
+- **Maintenabilité** : Aucun fichier > 1300 lignes
+- **Testabilité** : Composants isolés testables individuellement
+- **Réutilisabilité** : RecordingCard utilisé dans 2 contextes différents
+- **Aucune régression** : Styles 100% conservés
+
+## Tests
+
+Le projet utilise **Vitest** comme framework de test.
+
+### Exécuter les tests
+
+```bash
+npm test        # Exécuter tous les tests
+npm run test:watch  # Mode watch (re-exécute sur changements)
+```
+
+### Couverture actuelle
+
+- **63 tests** passent en ~2 secondes
+- **5 fichiers de test** couvrant :
+  - Authentification (sessions, rate limiting)
+  - Validation des entrées (fichiers, URL, durée)
+  - Protection path traversal
+  - Logique métier DB (utilisateurs, enregistrements)
+
+### Fichiers de test
+
+```
+src/
+├── lib/server/
+│   ├── db.test.ts              # Rate limiting
+│   ├── db.auth.test.ts         # Auth et sessions  
+│   ├── db.business.test.ts     # Logique métier
+│   ├── db.security.test.ts     # Validation sécurité
+│   └── api.validation.test.ts # Validation API
+└── routes/uploads/
+    └── uploads.test.ts         # Path traversal
+```
 
 ## Installation
 
@@ -386,6 +450,27 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 - `POST /api/debug` - Logging automatique des erreurs côté client
 
 ## Journal des modifications
+
+### v2.4.3 (2026-03-22) - Corrections de sécurité et refactoring
+
+#### 🔒 Sécurité (issues #9-#13)
+- **#9** : Suppression mot de passe admin par défaut (devient obligatoire)
+- **#10** : Validation mot de passe 12+ caractères sur API admin
+- **#11** : Masquage erreurs techniques dans réponses API
+- **#12** : Renforcement CSP (suppression `https://*` et `unsafe-eval`)
+- **#13** : Correction réinitialisation avatar en base après suppression
+
+#### ♻️ Refactoring (#19)
+- Extraction 4 composants Svelte : RecordingCard, ImageUpload, TeamList, Calendar
+- Réduction -707 lignes (+page.svelte : 1848→1277, record/+page.svelte : 1408→1272)
+
+#### 🧪 Tests (#17)
+- Ajout 60 tests (total 63) : auth, validation, path traversal
+
+#### 🧹 Hygiène (#16, #18, #20)
+- Suppression fichiers backup trackés
+- Debug utility pour logs conditionnels (0 log en prod)
+- Correction Docker : port uniformisé à 3001
 
 ### v2.3.1 (2026-03-18)
 - 🔧 **Fix iOS Safari : timeout 60s avec AbortController** sur les requêtes fetch
