@@ -12,6 +12,8 @@ const IMAGE_MIME_SIGNATURES: Record<string, (number | null)[]> = {
 	'image/jpeg': [0xFF, 0xD8, 0xFF],  // JPEG
 	'image/png': [0x89, 0x50, 0x4E, 0x47],  // PNG
 	'image/webp': [0x52, 0x49, 0x46, 0x46, null, null, null, null, 0x57, 0x45, 0x42, 0x50], // RIFF....WEBP
+	'image/heic': [0x00, 0x00, 0x00, null, 0x66, 0x74, 0x79, 0x70],  // HEIC (ftyp)
+	'image/heif': [0x00, 0x00, 0x00, null, 0x66, 0x74, 0x79, 0x70],  // HEIF (ftyp)
 };
 
 function getBufferSignature(buffer: Buffer, length = 12): number[] {
@@ -54,6 +56,11 @@ export function validateImageMimeType(buffer: Buffer, mimeType: string): boolean
 	
 	for (const validMime of validMimes) {
 		if (matchesSignature(buffer, IMAGE_MIME_SIGNATURES[validMime])) {
+			// HEIC et HEIF ont la même signature, accepter les deux
+			if ((validMime === 'image/heic' || validMime === 'image/heif') && 
+			    (mimeType === 'image/heic' || mimeType === 'image/heif')) {
+				return true;
+			}
 			return validMime === mimeType;
 		}
 	}

@@ -222,20 +222,13 @@
 				pseudo = '';
 				password = '';
 				
-				// Forcer le rafraîchissement de la page pour voir le nouvel utilisateur
+			// Forcer le rafraîchissement de la page pour voir le nouvel utilisateur
 				setTimeout(() => {
 					window.location.reload();
 				}, 1500);
 			}
 		};
-		}}>
-				selectedAvatar = '☕';
-				// Réinitialiser le formulaire
-				const form = document.querySelector('form[action="?/create"]') as HTMLFormElement;
-				if (form) form.reset();
-			}
-			};
-		}}>
+	}}>
 			<input type="hidden" name="csrf_token" value={data.csrfToken} />
 			<div class="pseudo-field">
 				<input type="text" name="pseudo" placeholder="Pseudo" required />
