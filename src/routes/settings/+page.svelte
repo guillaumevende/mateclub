@@ -31,6 +31,7 @@
 	let isCompressing = $state(false);
 	let isDragging = $state(false);
 	let pendingAvatarFile = $state<File | null>(null);
+	let hasPendingImage = $state(false);
 	let serverError = $state<string | null>(null);
 	let hourError = $state<string | null>(null);
 	
@@ -56,9 +57,11 @@
 		selectedTimezone = data.user?.timezone || 'Europe/Paris';
 	});
 	
-	// Synchroniser avec data quand la page recharge
+	// Synchroniser avec data quand la page recharge (mais pas si l'utilisateur a déjà modifié le pseudo)
+	let hasUserModifiedPseudo = $state(false);
+	
 	$effect(() => {
-		if (data.user) {
+		if (data.user && !hasUserModifiedPseudo) {
 			pseudo = data.user.pseudo;
 			const hasImage = data.user.avatar?.includes('avatar_') || false;
 			isImageAvatar = hasImage;
@@ -115,6 +118,14 @@
 		}
 	}
 
+	// Détecter Safari/iOS pour HEIC preview
+	function canDisplayHeic(): boolean {
+		const ua = navigator.userAgent;
+		const isSafari = ua.includes('Safari') && !ua.includes('Chrome') && !ua.includes('Edg');
+		const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+		return isSafari || isIOS;
+	}
+
 	async function processImageFile(file: File) {
 		isCompressing = true;
 		compressionProgress = 0;
@@ -134,11 +145,18 @@
 			imagePreview = URL.createObjectURL(compressedFile);
 			pendingAvatarFile = compressedFile;
 			isImageAvatar = true;
+			hasPendingImage = true;
 		} catch (error) {
-			console.error('Erreur compression:', error);
-			imagePreview = URL.createObjectURL(file);
+			// Si la compression échoue (ex: HEIC), créer preview seulement sur Safari/iOS
+			console.log('Compression non supportée, utilisation du fichier original');
+			if (canDisplayHeic()) {
+				imagePreview = URL.createObjectURL(file);
+			} else {
+				imagePreview = null; // Pas de preview sur Chrome/Edge/etc
+			}
 			pendingAvatarFile = file;
 			isImageAvatar = true;
+			hasPendingImage = true;
 		} finally {
 			isCompressing = false;
 			compressionProgress = 0;
@@ -199,6 +217,13 @@
 		}
 	}
 	
+	function cancelImageSelection() {
+		pendingAvatarFile = null;
+		imagePreview = null;
+		hasPendingImage = false;
+		isImageAvatar = data.user?.avatar?.includes('avatar_') || false;
+	}
+	
 	async function selectEmoji(emoji: string) {
 		// On ne supprime PAS l'image, on garde la possibilité de revenir dessus
 		selectedEmoji = emoji;
@@ -244,15 +269,23 @@
 		return async ({ result, update }) => {
 			// Upload pending image first if exists
 			if (pendingAvatarFile) {
-				await uploadImage(pendingAvatarFile);
-				pendingAvatarFile = null;
-			}
-			await update();
-			if (result.type === 'success') {
-				showSuccessModal = true;
-				password = '';
-				confirmPassword = '';
-			} else if (result.type === 'failure') {
+			await uploadImage(pendingAvatarFile);
+			pendingAvatarFile = null;
+			hasPendingImage = false;
+		}
+		await update();
+		if (result.type === 'success') {
+			showSuccessModal = true;
+			password = '';
+			confirmPassword = '';
+			hasPendingImage = false;
+			hasUserModifiedPseudo = false; // Reset pour permettre future sync
+			// Recharger la page et remonter en haut pour voir le nouvel avatar
+			setTimeout(() => {
+				window.scrollTo(0, 0);
+				window.location.reload();
+			}, 1500);
+		} else if (result.type === 'failure') {
 				if ((result.data as any)?.error) {
 					serverError = (result.data as any).error;
 					window.scrollTo(0, 0);
@@ -278,8 +311,8 @@
 			<input 
 				type="text" 
 				name="pseudo" 
-				value={pseudo}
-				oninput={(e) => { pseudo = e.currentTarget.value; serverError = null; }}
+				bind:value={pseudo}
+				oninput={() => { hasUserModifiedPseudo = true; serverError = null; }}
 				placeholder="Votre pseudo"
 				minlength="3"
 				maxlength="22"
@@ -305,11 +338,11 @@
 				ondragleave={handleDragLeave}
 				ondrop={handleDrop}
 			>
-				{#if imagePreview}
-					<div class="image-preview">
-						<img src={imagePreview} alt="Preview" />
-					</div>
-				{/if}
+		{#if imagePreview}
+			<div class="image-preview">
+				<img src={imagePreview} alt="Preview" />
+			</div>
+		{/if}
 				
 				{#if isImageAvatar}
 					<label class="upload-zone" class:disabled={isCompressing}>
@@ -329,6 +362,13 @@
 							<div class="progress-bar-fill" style="width: {compressionProgress}%"></div>
 						</div>
 						<span class="progress-text">Compression... {compressionProgress}%</span>
+					</div>
+				{/if}
+				
+				{#if hasPendingImage && !imagePreview}
+					<div class="image-confirmation">
+						<p class="confirmation-text">✓ Image sélectionnée - Sauvegardez pour valider</p>
+						<button type="button" class="cancel-btn" onclick={cancelImageSelection}>❌ Annuler</button>
 					</div>
 				{/if}
 			</div>
@@ -516,6 +556,63 @@
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+	}
+
+	.heic-placeholder {
+		width: 100%;
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		background: #2a2a4e;
+		border-radius: 12px;
+		padding: 1rem;
+		text-align: center;
+	}
+
+	.heic-placeholder span {
+		font-size: 3rem;
+		margin-bottom: 0.5rem;
+	}
+
+	.heic-note {
+		font-size: 0.75rem;
+		color: #888;
+		margin: 0;
+		line-height: 1.4;
+	}
+
+	.image-confirmation {
+		margin-top: 0.75rem;
+		padding: 0.75rem;
+		background: rgba(74, 222, 128, 0.1);
+		border: 1px solid rgba(74, 222, 128, 0.3);
+		border-radius: 8px;
+		text-align: center;
+	}
+
+	.confirmation-text {
+		color: #4ade80;
+		font-size: 0.875rem;
+		margin: 0 0 0.5rem 0;
+	}
+
+	.cancel-btn {
+		background: transparent;
+		border: 1px solid #ff6b6b;
+		color: #ff6b6b;
+		padding: 0.25rem 0.75rem;
+		font-size: 0.8rem;
+		border-radius: 4px;
+		cursor: pointer;
+		transition: all 0.2s;
+		margin: 0;
+	}
+
+	.cancel-btn:hover {
+		background: #ff6b6b;
+		color: #fff;
 	}
 
 	.emoji-label {

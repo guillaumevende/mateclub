@@ -880,14 +880,12 @@ export function validateCSRFToken(token: string, sessionId?: string): boolean {
 	`);
 	const result = stmt.get(token, sessionId || null);
 	
-	// Delete used token (one-time use)
-	if (result) {
-		const deleteStmt = db.prepare('DELETE FROM csrf_tokens WHERE token = ?');
-		deleteStmt.run(token);
-		return true;
-	}
-	
-	return false;
+	return !!result;
+}
+
+export function consumeCSRFToken(token: string): void {
+	const deleteStmt = db.prepare('DELETE FROM csrf_tokens WHERE token = ?');
+	deleteStmt.run(token);
 }
 
 export function cleanupExpiredCSRF(): void {

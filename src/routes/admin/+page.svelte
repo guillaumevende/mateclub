@@ -231,7 +231,13 @@
 	}}>
 			<input type="hidden" name="csrf_token" value={data.csrfToken} />
 			<div class="pseudo-field">
-				<input type="text" name="pseudo" placeholder="Pseudo" required />
+				<input 
+					type="text" 
+					name="pseudo" 
+					placeholder="Pseudo" 
+					required 
+					oninput={() => pseudoError = null}
+				/>
 				{#if pseudoError}
 					<p class="field-error">{pseudoError}</p>
 				{/if}
@@ -280,7 +286,13 @@
 			{#if createSuccess}
 				<p class="success-message">{createSuccess}</p>
 			{/if}
-			<button type="submit">Créer</button>
+			<button type="submit" disabled={isCreatingUser}>
+				{#if isCreatingUser}
+					Création...
+				{:else}
+					Créer
+				{/if}
+			</button>
 		</form>
 	</section>
 
@@ -389,6 +401,12 @@
 		margin-top: 1rem;
 		background: #e94560;
 		width: 100%;
+	}
+
+	button[type="submit"]:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+		background: #666;
 	}
 
 	.delete {

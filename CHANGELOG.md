@@ -2,6 +2,27 @@
 
 ---
 
+## v2.4.3 (2026-03-23)
+
+### Corrections de bugs
+
+#### Avatar & Upload HEIC
+- [x] **Fix upload HEIC** : Conversion automatique HEIC→JPEG via Sharp avec libvips
+- [x] **Preview HEIC adaptative** : Preview visible sur Safari/iOS, masquée sur Chrome/Edge (image cassée)
+- [x] **Message confirmation** : "✓ Image sélectionnée - Sauvegardez pour valider" quand pas de preview
+- [x] **Bouton annuler** : Permet d'annuler la sélection d'image avant sauvegarde
+- [x] **Rechargement page** : Scroll en haut + reload après sauvegarde réussie pour voir le nouvel avatar
+
+#### Formulaires
+- [x] **Fix champ pseudo** : Binding corrigé, le pseudo ne se vide plus quand on sélectionne une image
+- [x] **Fix bouton création admin** : Désactivation pendant le traitement + style visuel + texte "Création..."
+
+#### Sécurité & UX
+- [x] **Fix CSRF token** : Les tokens ne sont plus consommés après une erreur, permettant de corriger et resoumettre
+- [x] **Validation magic numbers HEIC** : Ajout des signatures HEIC/HEIF dans `fileValidation.ts`
+
+---
+
 ## v2.4.2 (2026-03-20)
 
 ### Corrections de sécurité
