@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { hashSync, compareSync } from 'bcrypt';
 import { writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
+import { debug } from '$lib/debug';
 
 const projectRoot = process.cwd();
 const dbPath = process.env.DATABASE_PATH || join(projectRoot, 'data/mateclub.db');
@@ -638,24 +639,24 @@ export function deleteSession(sessionId: string): void {
 }
 
 export function saveRecording(userId: number, audioData: Buffer, durationSeconds: number, imageData?: Buffer, url?: string | null, audioHash?: string): Recording {
-	console.log('[DB] saveRecording - audioData length:', audioData.length, 'bytes, imageData:', imageData?.length || 'none');
+	debug.db.log('saveRecording - audioData:', audioData.length, 'bytes, imageData:', imageData?.length || 'none');
 	
 	const filename = `${Date.now()}-${crypto.randomUUID()}.m4a`;
 	const filepath = join(uploadsDir, filename);
-	console.log('[DB] Écriture fichier audio:', filepath);
+	debug.db.log('Écriture fichier audio:', filename);
 	writeFileSync(filepath, audioData);
 
 	let imageFilename: string | null = null;
 	if (imageData) {
 		imageFilename = `${Date.now()}-${crypto.randomUUID()}.jpg`;
 		const imagePath = join(uploadsDir, imageFilename);
-		console.log('[DB] Écriture fichier image:', imagePath);
+		debug.db.log('Écriture fichier image:', imageFilename);
 		writeFileSync(imagePath, imageData);
 	}
 
 	const stmt = db.prepare('INSERT INTO recordings (user_id, filename, image_filename, url, duration_seconds, audio_hash) VALUES (?, ?, ?, ?, ?, ?)');
 	const result = stmt.run(userId, filename, imageFilename, url || null, durationSeconds, audioHash || null);
-	console.log('[DB] Enregistrement créé - id:', result.lastInsertRowid);
+	debug.db.log('Enregistrement créé - id:', result.lastInsertRowid);
 
 	return getRecordingById(result.lastInsertRowid as number)!;
 }

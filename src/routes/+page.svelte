@@ -8,6 +8,7 @@
 	import { scrollLock } from '$lib/actions/scrollLock';
 	import { triggerHaptic } from '$lib/utils/haptics';
 	import { playerStore, lastListenedRecordingId, type Recording, type DayRecordings, type PlayerState, playRecording, togglePlayPause, closePlayer, playNext } from '$lib/stores/player';
+	import { debug } from '$lib/debug';
 	import '$lib/shared.css';
 
 	// Pull to refresh state
@@ -143,18 +144,14 @@
 		return { count: unread.length, totalSeconds };
 	});
 
-	// Subscribe to player store
 	$effect(() => {
-		console.log('[EFFECT] playerStore subscription');
 		const unsubscribe = playerStore.subscribe(state => {
 			player = state;
 		});
 		return unsubscribe;
 	});
 
-	// Update listenedRecordings when a recording is marked as listened
 	$effect(() => {
-		console.log('[EFFECT] lastListenedRecordingId subscription');
 		const unsubscribe = lastListenedRecordingId.subscribe((recordingId: number | null) => {
 			if (recordingId !== null) {
 				listenedRecordings = new Set([...listenedRecordings, recordingId]);
@@ -163,17 +160,13 @@
 		return unsubscribe;
 	});
 
-	// Auto-scroll to current playing card
 	$effect(() => {
-		console.log('[EFFECT] auto-scroll, isPlaying:', player.isPlaying);
 		if (player.isPlaying && player.currentDay && player.currentRecording) {
 			scrollToCard(player.currentDay, player.currentIndex);
 		}
 	});
 
-	// Sync listened recordings from data
 	$effect(() => {
-		console.log('[EFFECT] sync listened recordings, todayDay records:', todayDay?.recordings?.length, 'allDays:', allDays.length);
 		const listened = new Set<number>();
 		const allRecordings = [...(todayDay?.recordings || []), ...allDays.flatMap(d => d.recordings)];
 		allRecordings.forEach(r => {
@@ -269,17 +262,14 @@
 	let prevPage = 0;
 	$effect(() => {
 		const page = data.page;
-		console.log('[EFFECT] sync data, page:', page, 'prevPage:', prevPage);
 		if (page && page !== prevPage) {
 			prevPage = page;
 			if (data.days && data.days.length > 0) {
 				const today = getUserToday();
 				
 				if (page === 1) {
-					// Reset on page 1
 					allDays = data.days.filter(d => d.date !== today);
 				} else {
-					// Add to existing on other pages
 					const existingDates = new Set(allDays.map(d => d.date));
 					const newDays = data.days.filter(d => d.date !== today && !existingDates.has(d.date));
 					if (newDays.length > 0) {

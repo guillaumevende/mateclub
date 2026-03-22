@@ -5,6 +5,7 @@
 	import ImageViewer from '$lib/components/ImageViewer.svelte';
 	import { scrollLock } from '$lib/actions/scrollLock';
 	import { triggerHaptic } from '$lib/utils/haptics';
+	import { debug } from '$lib/debug';
 	import '$lib/shared.css';
 	
 	type UserRecording = {
@@ -95,14 +96,14 @@
 		try {
 			wakeLock = await navigator.wakeLock.request('screen');
 			wakeLockFailed = false;
-			console.log('[WakeLock] Acquis avec succès');
+			debug.wakeLock.log('Acquis avec succès');
 
 			wakeLock.addEventListener('release', () => {
-				console.log('[WakeLock] Libéré par le système');
+				debug.wakeLock.log('Libéré par le système');
 				wakeLock = null;
 			});
 		} catch (err) {
-			console.error('[WakeLock] Échec:', err);
+			debug.wakeLock.error('Échec:', err);
 			wakeLockFailed = true;
 			wakeLock = null;
 		}
@@ -112,14 +113,11 @@
 		if (wakeLock) {
 			await wakeLock.release();
 			wakeLock = null;
-			console.log('[WakeLock] Libéré manuellement');
 		}
 	}
 
-	// Réacquérir le wake lock quand la page redevient visible
 	function handleVisibilityChange() {
 		if (document.visibilityState === 'visible' && isRecording && wakeLockSupported) {
-			console.log('[WakeLock] Réacquisition après visibility change');
 			acquireWakeLock();
 		}
 	}
@@ -254,7 +252,7 @@
 			chunks = [];
 
 			mediaRecorder.onstart = () => {
-				console.log('MediaRecorder démarré');
+				debug.recording.log('MediaRecorder démarré');
 			};
 
 			mediaRecorder.start(1000);
@@ -270,7 +268,6 @@
 				}
 			}, 1000);
 
-			// Collecter les chunks
 			mediaRecorder.ondataavailable = (e) => {
 				if (e.data.size > 0) {
 					chunks.push(e.data);
@@ -278,17 +275,15 @@
 			};
 
 			mediaRecorder.onstop = () => {
-				console.log('MediaRecorder stopped - chunks:', chunks.length);
+				debug.recording.log('MediaRecorder stopped - chunks:', chunks.length);
 				const isMp4 = mimeType.startsWith('audio/mp4') || mimeType.startsWith('audio/x-m4a');
 				const type = isMp4 ? 'audio/mp4' : 'audio/webm';
 				
 				if (chunks.length === 0) {
-					console.error('Aucun chunk audio collecté');
+					debug.recording.error('Aucun chunk audio collecté');
 					error = 'Erreur d\'enregistrement - veuillez réessayer';
 					return;
 				}
-				
-				console.log('Chunks collectés:', chunks.length, 'Taille totale:', chunks.reduce((acc, chunk) => acc + chunk.size, 0));
 				
 				recordedBlob = new Blob(chunks, { type });
 				audioUrl = URL.createObjectURL(recordedBlob);
@@ -299,12 +294,11 @@
 		}
 	}
 
-function stopRecording() {
-	console.log('stopRecording appelé - state:', mediaRecorder?.state, 'chunks:', chunks.length);
-	
-	// Libérer le wake lock
-	releaseWakeLock();
-	document.removeEventListener('visibilitychange', handleVisibilityChange);
+	function stopRecording() {
+		debug.recording.log('stopRecording appelé - state:', mediaRecorder?.state, 'chunks:', chunks.length);
+		
+		releaseWakeLock();
+		document.removeEventListener('visibilitychange', handleVisibilityChange);
 	
 	if (timerInterval) {
 		clearInterval(timerInterval);
@@ -314,19 +308,17 @@ function stopRecording() {
 	
 	if (mediaRecorder && mediaRecorder.state !== 'inactive') {
 		mediaRecorder.requestData();
-		console.log('requestData() appelé');
+		debug.recording.log('requestData() appelé');
 		
-		// Attendre que les données soient collectées puis arrêter
 		setTimeout(() => {
-			console.log('Timeout stop - state:', mediaRecorder?.state, 'chunks:', chunks.length);
+			debug.recording.log('Timeout stop - state:', mediaRecorder?.state, 'chunks:', chunks.length);
 			if (mediaRecorder && mediaRecorder.state !== 'inactive') {
 				mediaRecorder.stop();
-				console.log('stop() appelé');
+				debug.recording.log('stop() appelé');
 			}
 		}, 300);
 	}
 	
-	// Réinitialiser le flag
 	isStopping = false;
 }
 
@@ -449,11 +441,11 @@ function stopRecording() {
   
 	async function sendRecording() {
 		if (!recordedBlob) {
-			console.error('[SEND] ERREUR: recordedBlob est null!');
+			debug.send.error('ERREUR: recordedBlob est null!');
 			return;
 		}
 		
-		console.log('[SEND] Début sendRecording - recordedBlob size:', recordedBlob.size, 'type:', recordedBlob.type, 'URL:', recordingUrl);
+		debug.send.log('Début sendRecording - recordedBlob size:', recordedBlob.size, 'type:', recordedBlob.type, 'URL:', recordingUrl);
 		
 		isSending = true;
 		error = null;
@@ -462,22 +454,22 @@ function stopRecording() {
 		if (recordingUrl.trim()) {
 			try {
 				const parsed = new URL(recordingUrl);
-				console.log('[SEND] URL parsée:', parsed.protocol, parsed.hostname);
+				debug.send.log('URL parsée:', parsed.protocol, parsed.hostname);
 				if (parsed.protocol !== 'https:') {
 					urlError = 'L\'URL doit commencer par https://';
-					console.log('[SEND] Erreur URL: protocole non https');
+					debug.send.log('Erreur URL: protocole non https');
 					isSending = false;
 					return;
 				}
 			} catch (err) {
 				urlError = 'URL invalide';
-				console.log('[SEND] Erreur URL:', err instanceof Error ? err.message : err);
+				debug.send.log('Erreur URL:', err instanceof Error ? err.message : err);
 				isSending = false;
 				return;
 			}
 		}
 		
-		console.log('[SEND] Validation OK, envoi de la requête...');
+		debug.send.log('Validation OK, envoi de la requête...');
 		
 		try {
 			const formData = new FormData();
@@ -494,7 +486,7 @@ function stopRecording() {
 
 			const controller = new AbortController();
 			const timeoutId = setTimeout(() => {
-				console.log('[SEND] Timeout déclenché après 60s');
+				debug.send.log('Timeout déclenché après 60s');
 				controller.abort();
 			}, 60000);
 
