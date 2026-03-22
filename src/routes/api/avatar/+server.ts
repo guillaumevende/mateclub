@@ -91,6 +91,9 @@ export const DELETE: RequestHandler = async ({ locals }) => {
 			}
 		}
 
+		// Réinitialiser l'avatar en base de données
+		updateUserAvatarImage(locals.user.id, '☕');
+
 		return json({ success: true });
 	} catch (error) {
 		console.error('Erreur suppression avatar:', error);
