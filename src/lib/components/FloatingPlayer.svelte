@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { playerStore, playPrevious, playNext, togglePlayPause, seekTo, closePlayer } from '$lib/stores/player';
+	import { playerStore, playPrevious, playNext, togglePlayPause, seekTo, closePlayer, type PlayerState } from '$lib/stores/player';
 	import { page } from '$app/stores';
 
-	let player = $state({ ...$playerStore });
+	let player = $state<PlayerState>({ ...$playerStore });
 	
 	playerStore.subscribe(value => {
 		player = value;
@@ -112,6 +112,7 @@
 	// Always use duration_seconds from database (reliable for all files including opus codec)
 	let displayDuration = $derived(player.currentRecording?.duration_seconds || 0);
 	let progressPercent = $derived((displayDuration > 0) ? Math.min(100, (player.progress / displayDuration) * 100) : 0);
+	let bufferedPercent = $derived(player.bufferedPercent || 0);
 </script>
 
 {#if player.currentRecording}
@@ -172,6 +173,7 @@
 				aria-valuemin={0}
 				aria-valuemax={displayDuration}
 			>
+				<div class="progress-buffer" style="width: {bufferedPercent}%"></div>
 				<div class="progress-fill" style="width: {progressPercent}%"></div>
 				<div class="progress-thumb" style="left: calc({progressPercent}% + 7px - {progressPercent * 0.14}px)"></div>
 			</div>
@@ -317,6 +319,14 @@
 		right: 0;
 		height: 1px;
 		background: #2a2a4e;
+	}
+
+	.progress-buffer {
+		position: absolute;
+		left: 0;
+		height: 1px;
+		background: rgba(255, 255, 255, 0.3);
+		transition: width 0.3s linear;
 	}
 
 	.progress-fill {

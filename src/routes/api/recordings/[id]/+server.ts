@@ -1,7 +1,8 @@
 import type { RequestHandler } from './$types';
 import { redirect, json } from '@sveltejs/kit';
 import { getRecordingById, getRecordingFilePath, markAsListened, deleteRecording } from '$lib/server/db';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, createReadStream, statSync } from 'fs';
+import { Readable } from 'stream';
 
 export const GET: RequestHandler = async ({ params, locals }) => {
 	if (!locals.user) {
@@ -22,14 +23,14 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		return json({ error: 'Fichier non trouvé' }, { status: 404 });
 	}
 
-	const fileBuffer = readFileSync(filepath);
+	const stat = statSync(filepath);
 	const isM4A = recording.filename.endsWith('.m4a');
 	const contentType = isM4A ? 'audio/mp4' : 'audio/webm';
 
-	return new Response(fileBuffer, {
+	return new Response(Readable.toWeb(createReadStream(filepath)) as unknown as ReadableStream<Uint8Array>, {
 		headers: {
 			'Content-Type': contentType,
-			'Content-Length': fileBuffer.length.toString(),
+			'Content-Length': stat.size.toString(),
 			'Accept-Ranges': 'bytes',
 			'Cache-Control': 'no-cache'
 		}

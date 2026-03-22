@@ -30,6 +30,7 @@
 	let compressionProgress = $state(0);
 	let isCompressing = $state(false);
 	let isDragging = $state(false);
+	let isUploading = $state(false);
 	let pendingAvatarFile = $state<File | null>(null);
 	let serverError = $state<string | null>(null);
 	let hourError = $state<string | null>(null);
@@ -158,6 +159,7 @@
 		const formData = new FormData();
 		formData.append('image', file);
 		
+		isUploading = true;
 		try {
 			const res = await fetch('/api/avatar', {
 				method: 'POST',
@@ -173,6 +175,8 @@
 			}
 		} catch (error) {
 			console.error('Erreur upload:', error);
+		} finally {
+			isUploading = false;
 		}
 		return null;
 	}
@@ -233,6 +237,9 @@
 			<img src="/uploads/avatars/{getAvatarDisplay().value}" alt="Avatar" class="avatar-image" />
 		{:else}
 			<span class="avatar-emoji">{getAvatarDisplay().value}</span>
+		{/if}
+		{#if isUploading}
+			<div class="upload-indicator">Upload...</div>
 		{/if}
 	</div>
 
@@ -427,6 +434,7 @@
 		display: flex;
 		justify-content: center;
 		margin-bottom: 1.5rem;
+		position: relative;
 	}
 
 	.avatar-image {
@@ -743,5 +751,20 @@
 
 	.upload-zone.disabled input {
 		pointer-events: none;
+	}
+
+	.upload-indicator {
+		position: absolute;
+		bottom: -2rem;
+		left: 50%;
+		transform: translateX(-50%);
+		font-size: 0.85rem;
+		color: #e94560;
+		animation: pulse 1s ease-in-out infinite;
+	}
+
+	@keyframes pulse {
+		0%, 100% { opacity: 1; }
+		50% { opacity: 0.5; }
 	}
 </style>
