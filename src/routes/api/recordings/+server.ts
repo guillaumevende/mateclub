@@ -17,7 +17,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		formData = await request.formData();
 	} catch (err) {
 		console.error('[RECORDINGS] Error parsing formData:', err);
-		return json({ error: 'Erreur lors de la lecture des données: ' + (err as Error).message }, { status: 400 });
+		return json({ error: 'Erreur interne' }, { status: 400 });
 	}
 
 	const audio = formData.get('audio') as File;
@@ -106,7 +106,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 					.toBuffer();
 			} catch (err) {
 				console.error('[RECORDINGS] Error converting HEIC:', err);
-				return json({ error: 'Impossible de convertir l\'image HEIC. ' + (err as Error).message }, { status: 400 });
+				return json({ error: 'Erreur lors du traitement de l\'image' }, { status: 400 });
 			}
 		} else {
 			if (!isValidImageBuffer(imageBuffer)) {
@@ -127,7 +127,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		recording = saveRecording(locals.user.id, buffer, durationSeconds, imageBuffer, url || null, audioHash);
 	} catch (err) {
 		console.error('[RECORDINGS] Error saving recording:', err);
-		return json({ error: 'Erreur lors de l\'enregistrement en base de données: ' + (err as Error).message }, { status: 500 });
+		return json({ error: 'Erreur interne' }, { status: 500 });
 	}
 
 	return json({ id: recording.id });
