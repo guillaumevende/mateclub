@@ -24,7 +24,7 @@
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^12.8.0",
     "browser-image-compression": "^2.0.2",
-    "sharp": "^0.33.5",
+    "sharp": "^0.34.5",
     "svelte": "^5.54.1",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
