@@ -112,20 +112,42 @@
 
 <style>
 	.recording-card {
-		min-width: 120px;
-		max-width: 160px;
-		height: 100px;
-		background-color: #3a3a5e;
-		border-radius: 12px;
-		padding: 0.75rem;
-		cursor: pointer;
-		position: relative;
+		flex: 0 0 315px;
+		width: 315px;
+		min-height: 420px;
+		background: #1a1a2e;
 		background-size: cover;
 		background-position: center;
+		border-radius: 12px;
+		padding: 1rem;
 		display: flex;
 		flex-direction: column;
 		justify-content: space-between;
-		transition: transform 0.2s, box-shadow 0.2s;
+		position: relative;
+		cursor: pointer;
+		transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+		overflow: hidden;
+	}
+
+	.recording-card:hover {
+		transform: translateY(-2px);
+	}
+
+	.recording-card::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: linear-gradient(135deg, rgba(42, 42, 78, 0.9), rgba(42, 42, 78, 0.7));
+		border-radius: 12px;
+		z-index: 0;
+	}
+
+	.recording-card > * {
+		position: relative;
+		z-index: 1;
 	}
 
 	.recording-card:active {
@@ -137,115 +159,166 @@
 		cursor: default;
 	}
 
+	.recording-card.locked::before {
+		background: rgba(42, 42, 78, 0.95);
+	}
+
+	.recording-card.locked::after {
+		content: '🔒';
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		font-size: 3rem;
+		z-index: 2;
+	}
+
 	.recording-card.listened {
 		opacity: 0.7;
 	}
 
 	.recording-card.playing {
-		box-shadow: 0 0 0 2px #e94560;
+		box-shadow: 0 0 0 3px #e94560;
 	}
 
-	.recording-card::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		background: linear-gradient(135deg, rgba(42, 42, 78, 0.9), rgba(42, 42, 78, 0.7));
-		border-radius: 12px;
-		z-index: 0;
-	}
-
-	.recording-card > * {
-		position: relative;
-		z-index: 1;
+	.recording-card:not(.listened):not(.locked):not(.playing) {
+		border: 2px solid transparent;
 	}
 
 	.card-top {
 		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
+		justify-content: space-between;
+		align-items: flex-start;
 	}
 
 	.card-time {
-		font-size: 0.75rem;
-		color: #aaa;
+		font-size: 1.4rem;
+		font-weight: 600;
+		color: #e94560;
 	}
 
 	.card-author {
 		display: flex;
+		flex-direction: column;
 		align-items: center;
 		gap: 0.25rem;
 	}
 
 	.card-author :global(.avatar) {
-		width: 18px;
-		height: 18px;
-		font-size: 0.7rem;
+		width: 40px;
+		height: 40px;
+		font-size: 1.5rem;
 	}
 
 	.pseudo {
-		font-size: 0.7rem;
-		color: #ddd;
+		font-size: 0.75rem;
+		color: #e94560;
+		font-weight: 600;
+		white-space: nowrap;
 		overflow: hidden;
 		text-overflow: ellipsis;
-		white-space: nowrap;
-		max-width: 80px;
+		max-width: 60px;
 	}
 
 	.card-center-duration {
+		flex: 1;
 		display: flex;
 		flex-direction: column;
+		align-items: center;
+		justify-content: center;
 		gap: 0.25rem;
 	}
 
 	.duration {
-		font-size: 0.875rem;
-		color: #fff;
-		font-weight: 500;
+		font-size: 2rem;
+		font-weight: 600;
+		color: #e94560;
 	}
 
 	.duration.current-time {
-		color: #e94560;
+		color: #4ade80;
+		animation: pulse 1s ease-in-out infinite;
+	}
+
+	@keyframes pulse {
+		0%, 100% { opacity: 1; }
+		50% { opacity: 0.7; }
+	}
+
+	.card-center-locked {
+		flex: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+	}
+
+	.lock-icon {
+		font-size: 2.5rem;
+	}
+
+	.locked-text {
+		font-size: 0.9rem;
+		color: #fff;
+		text-align: center;
+		text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8), 0 0 8px rgba(0, 0, 0, 0.5);
+	}
+
+	.card-bottom-player {
+		margin-top: auto;
+		text-align: center;
 	}
 
 	.status-indicator {
-		font-size: 0.7rem;
-		color: #e94560;
+		font-size: 0.75rem;
+		font-weight: 600;
+		padding: 0.25rem 0.5rem;
+		border-radius: 20px;
+		animation: pulse 1s ease-in-out infinite;
+	}
+
+	.status-indicator.playing {
+		color: #4ade80;
+		background: rgba(74, 222, 128, 0.2);
 	}
 
 	.url-link-container {
-		margin-top: 0.25rem;
+		text-align: center;
+		margin-bottom: 0.75rem;
 	}
 
 	.url-link {
-		font-size: 0.65rem;
-		color: #4ade80;
+		font-size: 0.875rem;
+		color: #60a5fa;
 		text-decoration: none;
+		padding: 0.35rem 0.75rem;
+		border-radius: 20px;
+		background: rgba(96, 165, 250, 0.2);
+		font-weight: 600;
 	}
 
 	.url-link:hover {
 		text-decoration: underline;
 	}
 
-	.card-bottom-player {
-		display: flex;
-		justify-content: flex-end;
-		margin-top: auto;
-	}
-
 	.card-thumbnail {
-		width: 28px;
-		height: 28px;
-		border-radius: 4px;
+		width: 45px;
+		height: 45px;
+		border-radius: 8px;
 		overflow: hidden;
-		border: none;
+		border: 2px solid rgba(255, 255, 255, 0.5);
 		padding: 0;
 		cursor: pointer;
+		flex-shrink: 0;
+		background: #1a1a2e;
 	}
 
 	.card-thumbnail img {
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+		border-radius: 6px;
 	}
 
 	.card-center-locked {
