@@ -1,3 +1,6 @@
+# Build SvelteKit (généré automatiquement)
+.svelte-kit/
+
 # Données sensibles
 .env
 # data/ directory at root only (not in src/)
