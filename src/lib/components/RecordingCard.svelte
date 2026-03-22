@@ -140,9 +140,39 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background: linear-gradient(135deg, rgba(42, 42, 78, 0.5), rgba(42, 42, 78, 0.3));
+		background: rgba(0, 0, 0, 0.5);
 		border-radius: 12px;
 		z-index: 0;
+	}
+
+	.recording-card.locked {
+		position: relative;
+	}
+	
+	.recording-card.locked::before {
+		content: '';
+		position: absolute;
+		inset: 0;
+		background: inherit;
+		filter: blur(12px);
+		-webkit-filter: blur(12px);
+		z-index: 4;
+		border-radius: inherit;
+	}
+
+	.recording-card.locked::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		backdrop-filter: blur(8px);
+		-webkit-backdrop-filter: blur(8px);
+		background: rgba(0, 0, 0, 0.2);
+		z-index: 5;
+		border-radius: inherit;
+	}
+
+	.recording-card.locked {
+		opacity: 1 !important;
 	}
 
 	.recording-card > * {
@@ -150,39 +180,17 @@
 		z-index: 1;
 	}
 
-	.recording-card:active {
-		transform: scale(0.98);
-	}
-
-	.recording-card.locked {
-		opacity: 0.6;
-		cursor: default;
-	}
-
-	.recording-card.locked::before {
-		background: rgba(42, 42, 78, 0.95);
-	}
-
-	.recording-card.locked::after {
-		content: '🔒';
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		font-size: 3rem;
-		z-index: 2;
-	}
-
-	.recording-card.listened {
-		opacity: 0.7;
+	.recording-card.locked > * {
+		z-index: 6;
 	}
 
 	.recording-card.playing {
-		box-shadow: 0 0 0 3px #e94560;
+		border: 3px solid #4ade80;
+		box-shadow: 0 0 20px rgba(74, 222, 128, 0.4);
 	}
 
 	.recording-card:not(.listened):not(.locked):not(.playing) {
-		border: 2px solid transparent;
+		border: 2px solid white;
 	}
 
 	.card-top {
@@ -204,13 +212,7 @@
 		gap: 0.25rem;
 	}
 
-	.card-author :global(.avatar) {
-		width: 40px;
-		height: 40px;
-		font-size: 1.5rem;
-	}
-
-	.pseudo {
+	.card-author .pseudo {
 		font-size: 0.75rem;
 		color: #e94560;
 		font-weight: 600;
@@ -229,13 +231,13 @@
 		gap: 0.25rem;
 	}
 
-	.duration {
+	.card-center-duration .duration {
 		font-size: 2rem;
 		font-weight: 600;
 		color: #e94560;
 	}
 
-	.duration.current-time {
+	.card-center-duration .duration.current-time {
 		color: #4ade80;
 		animation: pulse 1s ease-in-out infinite;
 	}
@@ -254,11 +256,11 @@
 		gap: 0.5rem;
 	}
 
-	.lock-icon {
+	.card-center-locked .lock-icon {
 		font-size: 2.5rem;
 	}
 
-	.locked-text {
+	.card-center-locked .locked-text {
 		font-size: 0.9rem;
 		color: #fff;
 		text-align: center;
@@ -283,27 +285,19 @@
 		background: rgba(74, 222, 128, 0.2);
 	}
 
+	.url-link {
+		font-size: 0.875rem;
+		color: #60a5fa;
+		text-decoration: none;
+		padding: 0.35rem 0.75rem;
+		border-radius: 20px;
+		background: rgba(96, 165, 250, 0.2);
+		font-weight: 600;
+	}
+
 	.url-link-container {
 		text-align: center;
 		margin-bottom: 0.75rem;
-	}
-
-	.url-link {
-		font-size: 0.875rem;
-		color: #ffffff;
-		text-decoration: none;
-		padding: 0.5rem 1rem;
-		border-radius: 20px;
-		background: rgba(96, 165, 250, 0.6);
-		font-weight: 700;
-		border: 2px solid rgba(255, 255, 255, 0.3);
-		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-	}
-
-	.url-link:hover {
-		background: rgba(96, 165, 250, 0.8);
-		border-color: rgba(255, 255, 255, 0.5);
-		text-decoration: none;
 	}
 
 	.card-thumbnail {
@@ -323,23 +317,5 @@
 		height: 100%;
 		object-fit: cover;
 		border-radius: 6px;
-	}
-
-	.card-center-locked {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 0.25rem;
-	}
-
-	.lock-icon {
-		font-size: 1.25rem;
-	}
-
-	.locked-text {
-		font-size: 0.6rem;
-		color: #888;
-		text-align: center;
 	}
 </style>
