@@ -11,7 +11,8 @@
     "lint": "eslint src/",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepare": "husky"
   },
   "keywords": [],
   "author": "",
@@ -35,8 +36,13 @@
     "@types/better-sqlite3": "^7.6.13",
     "eslint": "^10.1.0",
     "eslint-plugin-svelte": "^3.16.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "svelte-check": "^4.4.5",
     "typescript-eslint": "^8.57.1",
     "vitest": "^4.1.0"
+  },
+  "lint-staged": {
+    "*.{ts,svelte}": ["eslint --fix"]
   }
 }
