@@ -1,5 +1,6 @@
 import type { RequestHandler } from './$types';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, createReadStream, statSync } from 'fs';
+import { Readable } from 'stream';
 import { join, normalize } from 'path';
 
 export const GET: RequestHandler = async ({ params, locals }) => {
@@ -23,15 +24,17 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		return new Response('Not found', { status: 404 });
 	}
 
-	const fileBuffer = readFileSync(normalizedPath);
+	const stat = statSync(normalizedPath);
 	const ext = filename.split('.').pop()?.toLowerCase();
 	const contentType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : 
 					   ext === 'png' ? 'image/png' : 
 					   ext === 'gif' ? 'image/gif' : 'image/jpeg';
 
-	return new Response(fileBuffer, {
+	return new Response(Readable.toWeb(createReadStream(normalizedPath)) as unknown as ReadableStream<Uint8Array>, {
 		headers: {
 			'Content-Type': contentType,
+			'Content-Length': stat.size.toString(),
+			'Accept-Ranges': 'bytes',
 			'Cache-Control': 'public, max-age=31536000'
 		}
 	});

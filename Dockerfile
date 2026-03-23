@@ -10,10 +10,10 @@ RUN npm run build
 
 RUN mkdir -p data uploads
 
-ENV PORT=3000
+ENV PORT=3001
 ENV HOST=0.0.0.0
 ENV DATABASE_PATH=/app/data/mateclub.db
 
-EXPOSE 3000
+EXPOSE 3001
 
 CMD ["npm", "run", "start"]

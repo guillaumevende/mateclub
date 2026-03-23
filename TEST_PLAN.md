@@ -1,11 +1,127 @@
-# Plan de Test - Envoi Audio sur iOS Safari
+# Plan de Test - MateClub
 
-## Objectif
-Identifier la cause des erreurs d'envoi "Erreur lors de l'envoi" intermittentes sur iOS Safari.
+## Vue d'ensemble
+
+Ce document couvre les plans de test pour :
+1. **Tests fonctionnels iOS Safari** (envoi audio)
+2. **Tests de sécurité** (vulnérabilités corrigées)
+3. **Tests des composants** (nouveau refactoring)
 
 ---
 
-## Scénarios de Test
+## 1. Tests de sécurité
+
+### Vulnérabilités critiques
+
+#### [#9] Mot de passe admin obligatoire
+```
+Test : Lancer init-admin sans ADMIN_PASSWORD
+Attendu : Message d'erreur explicite, exit code 1
+Vérifier : Pas de création avec mot de passe par défaut
+```
+
+#### [#10] Validation API admin
+```
+Test : POST /api/admin/users avec mot de passe < 12 caractères
+Attendu : 400 Bad Request, message "12 caractères minimum"
+```
+
+#### [#11] Fuite d'information API
+```
+Test : Provoquer une erreur serveur sur /api/recordings
+Attendu : Réponse {"error": "Erreur interne"} (pas de stack trace)
+Vérifier : Les détails sont loggés côté serveur uniquement
+```
+
+#### [#12] CSP renforcée
+```
+Test : Vérifier headers sur réponse HTTP
+Attendu : connect-src 'self' uniquement (pas de https://*)
+Attendu : Pas de unsafe-eval dans script-src
+```
+
+#### [#13] Réinitialisation avatar
+```
+Test : Supprimer avatar via API
+Attendu : Fichier supprimé du disque
+Attendu : Base de données mise à jour (retour à ☕)
+Vérifier : Pas de 404 sur prochaine requête avatar
+```
+
+---
+
+## 2. Tests des composants
+
+### Composants extraits (Issue #19)
+
+#### RecordingCard.svelte
+```
+Tests visuels :
+- ✅ Dimensions exactes : 315px × 420px min
+- ✅ Overlay sombre avec opacité correcte
+- ✅ Pastille URL bien visible (bleu, fond semi-transparent)
+- ✅ Bordure blanche pour non-écouté / verte pour lecture en cours
+- ✅ Affichage durée en grand (2rem)
+- ✅ Miniature image 45×45px avec bordure
+
+Tests fonctionnels :
+- ✅ Click lance la lecture
+- ✅ Swipe horizontal change de capsule
+- ✅ Image cliquable ouvre visionneuse
+- ✅ Lien URL cliquable (nouvel onglet)
+```
+
+#### ImageUpload.svelte
+```
+Tests fonctionnels :
+- ✅ Drag & drop fonctionnel
+- ✅ Compression automatique JPEG/PNG (< 1Mo)
+- ✅ Support HEIC/HEIF (conversion serveur)
+- ✅ Barre de progression de compression
+- ✅ Bouton suppression réinitialise l'upload
+
+Tests erreurs :
+- ✅ Format invalide affiche warning
+- ✅ Erreur compression affiche message
+```
+
+#### TeamList.svelte
+```
+Tests UI :
+- ✅ Bouton 👥 en haut à droite du header
+- ✅ Modal s'affiche au click
+- ✅ Liste défilable si > 10 utilisateurs
+- ✅ Croix fermeture fonctionnelle
+- ✅ Click overlay ferme la modal
+
+Tests données :
+- ✅ Affichage pseudo + compteur capsules
+- ✅ Avatar affiché correctement
+```
+
+#### Calendar.svelte
+```
+Tests affichage :
+- ✅ Grille 7 jours (Lu-Di)
+- ✅ Jours sans recordings grisés
+- ✅ Jours avec recordings cliquables
+- ✅ Jour courant avec bordure rouge
+- ✅ Jours non lus en rouge
+
+Tests navigation :
+- ✅ Click sur jour avec recordings charge les capsules
+- ✅ Défilement horizontal entre mois
+- ✅ Affichage nom mois + année
+```
+
+---
+
+## 3. Tests fonctionnels iOS Safari (Envoi Audio)
+
+### Objectif
+Identifier la cause des erreurs d'envoi "Erreur lors de l'envoi" intermittentes sur iOS Safari.
+
+### Scénarios de Test
 
 ### Groupe A : Tests sans image
 
@@ -51,7 +167,55 @@ Identifier la cause des erreurs d'envoi "Erreur lors de l'envoi" intermittentes 
 
 ---
 
-## Format de rapport
+## Commandes de test
+
+### Lancer tous les tests
+```bash
+npm test
+```
+
+### Mode watch (développement)
+```bash
+npm run test:watch
+```
+
+### Tests spécifiques
+```bash
+# Tests de sécurité uniquement
+npx vitest run src/lib/server/db.security.test.ts
+
+# Tests API validation
+npx vitest run src/lib/server/api.validation.test.ts
+
+# Tests path traversal
+npx vitest run src/routes/uploads/uploads.test.ts
+```
+
+---
+
+## Couverture des tests
+
+| Catégorie | Fichier | Nombre de tests |
+|-----------|---------|-----------------|
+| Sécurité - Auth | `db.auth.test.ts` | 6 |
+| Sécurité - Validation | `db.security.test.ts` | 15 |
+| Sécurité - Uploads | `uploads.test.ts` | 9 |
+| API - Validation | `api.validation.test.ts` | 25 |
+| Métier - DB | `db.business.test.ts` | 5 |
+| **Total** | | **63** |
+
+---
+
+## Checklist avant release
+
+- [ ] Tous les tests passent (`npm test`)
+- [ ] Tests de sécurité exécutés (9 + 15 tests)
+- [ ] Tests composants visuels validés (4 composants)
+- [ ] Tests iOS Safari complétés (si modifications audio)
+
+---
+
+## Format de rapport de test
 
 Pour chaque test, noter :
 

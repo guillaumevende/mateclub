@@ -5,9 +5,13 @@
 	import { generateCalendarMonths, type CalendarMonth } from '$lib/calendar';
 	import Avatar from '$lib/components/Avatar.svelte';
 	import ImageViewer from '$lib/components/ImageViewer.svelte';
+	import RecordingCard from '$lib/components/RecordingCard.svelte';
+	import TeamList from '$lib/components/TeamList.svelte';
+	import Calendar from '$lib/components/Calendar.svelte';
 	import { scrollLock } from '$lib/actions/scrollLock';
 	import { triggerHaptic } from '$lib/utils/haptics';
 	import { playerStore, lastListenedRecordingId, type Recording, type DayRecordings, type PlayerState, playRecording, togglePlayPause, closePlayer, playNext } from '$lib/stores/player';
+	import { debug } from '$lib/debug';
 	import '$lib/shared.css';
 
 	// Pull to refresh state
@@ -143,18 +147,14 @@
 		return { count: unread.length, totalSeconds };
 	});
 
-	// Subscribe to player store
 	$effect(() => {
-		console.log('[EFFECT] playerStore subscription');
 		const unsubscribe = playerStore.subscribe(state => {
 			player = state;
 		});
 		return unsubscribe;
 	});
 
-	// Update listenedRecordings when a recording is marked as listened
 	$effect(() => {
-		console.log('[EFFECT] lastListenedRecordingId subscription');
 		const unsubscribe = lastListenedRecordingId.subscribe((recordingId: number | null) => {
 			if (recordingId !== null) {
 				listenedRecordings = new Set([...listenedRecordings, recordingId]);
@@ -163,17 +163,13 @@
 		return unsubscribe;
 	});
 
-	// Auto-scroll to current playing card
 	$effect(() => {
-		console.log('[EFFECT] auto-scroll, isPlaying:', player.isPlaying);
 		if (player.isPlaying && player.currentDay && player.currentRecording) {
 			scrollToCard(player.currentDay, player.currentIndex);
 		}
 	});
 
-	// Sync listened recordings from data
 	$effect(() => {
-		console.log('[EFFECT] sync listened recordings, todayDay records:', todayDay?.recordings?.length, 'allDays:', allDays.length);
 		const listened = new Set<number>();
 		const allRecordings = [...(todayDay?.recordings || []), ...allDays.flatMap(d => d.recordings)];
 		allRecordings.forEach(r => {
@@ -269,17 +265,14 @@
 	let prevPage = 0;
 	$effect(() => {
 		const page = data.page;
-		console.log('[EFFECT] sync data, page:', page, 'prevPage:', prevPage);
 		if (page && page !== prevPage) {
 			prevPage = page;
 			if (data.days && data.days.length > 0) {
 				const today = getUserToday();
 				
 				if (page === 1) {
-					// Reset on page 1
 					allDays = data.days.filter(d => d.date !== today);
 				} else {
-					// Add to existing on other pages
 					const existingDates = new Set(allDays.map(d => d.date));
 					const newDays = data.days.filter(d => d.date !== today && !existingDates.has(d.date));
 					if (newDays.length > 0) {
@@ -353,23 +346,6 @@
 	function closeDayModal() {
 		selectedDate = null;
 		selectedDayRecordings = null;
-	}
-
-	function handleCalendarClick(e: MouseEvent) {
-		const target = e.target as HTMLElement;
-		if (!target.classList.contains('cell-day') || !target.classList.contains('has-recordings')) return;
-		
-		const date = target.dataset.date;
-		if (date) loadDayRecordings(date);
-	}
-
-	function handleCalendarKeydown(e: KeyboardEvent) {
-		if (e.key !== 'Enter') return;
-		const target = e.target as HTMLElement;
-		if (!target.classList.contains('cell-day') || !target.classList.contains('has-recordings')) return;
-		
-		const date = target.dataset.date;
-		if (date) loadDayRecordings(date);
 	}
 
 	// Player helper functions
@@ -535,11 +511,6 @@
 		return `${mins}:${secs.toString().padStart(2, '0')}`;
 	}
 
-	function getMonthName(month: number): string {
-		const date = new Date(2000, month, 1);
-		return date.toLocaleDateString('fr-FR', { month: 'long' });
-	}
-
 	function getDateKey(year: number, month: number, day: number): string {
 		return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 	}
@@ -598,26 +569,7 @@
 		</button>
 	</header>
 
-	{#if showTeam}
-		<div class="modal-overlay" use:scrollLock={showTeam} onclick={() => showTeam = false}>
-			<div class="modal" onclick={(e) => e.stopPropagation()}>
-				<!-- Croix de fermeture au-dessus de la modale -->
-				<button class="close-btn modal-close-outer" onclick={() => showTeam = false}>✕</button>
-				
-				<h2>La team</h2>
-				<ul class="team-list">
-					{#each data.allUsers as user}
-						{@const count = user.recording_count ?? 0}
-						<li>
-							<Avatar avatar={user.avatar} size="small" />
-							<span class="team-pseudo">{user.pseudo}</span>
-							<span class="team-count">({count} capsule{count !== 1 ? 's' : ''})</span>
-						</li>
-					{/each}
-				</ul>
-			</div>
-		</div>
-	{/if}
+	<TeamList allUsers={data.allUsers} bind:showTeam />
 
 	{#if selectedDayRecordings}
 		<div class="modal-overlay" use:scrollLock={selectedDayRecordings !== null} onclick={closeDayModal}>
@@ -674,73 +626,24 @@
 					<div class="recordings-scroller">
 						<div class="recordings-row">
 							{#each selectedDayRecordings.recordings as recording, index}
-								{@const hasImage = recording.image_filename}
-								{@const isListened = isRecordingListened(recording)}
-								{@const isPlaying = isCurrentPlaying(recording.id)}
-								{@const isCurrent = isCurrentRecording(recording.id)}
-								<div 
-									class="recording-card" 
-									class:locked={!selectedDayRecordings.available} 
-									class:listened={isListened}
-									class:playing={isCurrent && selectedDayRecordings.available}
-									class:with-bg={hasImage}
-									style:--bg-image={hasImage ? `url(/uploads/${hasImage})` : null}
-									onclick={() => { if (!cardSwiped) selectedDayRecordings && playFromRecording(selectedDayRecordings, index); }}
-									ontouchstart={(e) => handleCardTouchStart(e)}
+								<RecordingCard
+									{recording}
+									{index}
+									available={selectedDayRecordings.available}
+									{cardSwiped}
+									{player}
+									threshold={data.threshold}
+									{isRecordingListened}
+									{isCurrentPlaying}
+									{isCurrentRecording}
+									onplay={(i) => selectedDayRecordings && playFromRecording(selectedDayRecordings, i)}
+									ontouchstart={handleCardTouchStart}
 									ontouchend={(e) => selectedDayRecordings && handleCardTouchEnd(e, selectedDayRecordings, index)}
-									role="button"
-									tabindex="0"
-									onkeydown={(e) => e.key === 'Enter' && selectedDayRecordings && playFromRecording(selectedDayRecordings, index)}
-								>
-									<div class="card-top">
-										<div class="card-time">{formatTime(recording.recorded_at)}</div>
-										<div class="card-author">
-											<Avatar avatar={recording.avatar} size="small" />
-											<span class="pseudo">{recording.pseudo}</span>
-										</div>
-									</div>
-									{#if selectedDayRecordings.available}
-									<div class="card-center-duration">
-										{#if isCurrent && player.isPlaying}
-											<span class="duration current-time">{formatTimeSeconds(player.progress)}</span>
-										{:else}
-											<span class="duration">{formatDuration(recording.duration_seconds)}</span>
-										{/if}
-										{#if isPlaying}
-											<span class="status-indicator playing">▶ En cours</span>
-										{/if}
-									</div>
-									{#if recording.url}
-										<div class="url-link-container">
-											<a 
-												href={recording.url} 
-												target="_blank" 
-												rel="noopener noreferrer"
-												class="url-link"
-												onclick={(e) => e.stopPropagation()}
-											>
-												Ouvrir le lien
-											</a>
-										</div>
-									{/if}
-									<div class="card-bottom-player">
-										{#if hasImage}
-											<button 
-												class="card-thumbnail" 
-												onclick={(e) => { e.stopPropagation(); selectedImageUrl = `/uploads/${hasImage}`; }}
-												aria-label="Voir l'image"
-											>
-												<img src="/uploads/{hasImage}" alt="" />
-											</button>
-										{/if}
-									</div>
-								{:else}
-										<div class="card-center-locked">
-											<span class="lock-icon">🔒</span>
-											<span class="locked-text">Reviens demain à {data.threshold}</span>
-										</div>
-									{/if}
-								</div>
+									onimageclick={(url) => selectedImageUrl = url}
+									{formatTime}
+									{formatDuration}
+									{formatTimeSeconds}
+								/>
 							{/each}
 						</div>
 					</div>
@@ -928,73 +831,24 @@
 				<div class="recordings-scroller">
 					<div class="recordings-row">
 						{#each day.recordings as recording, index}
-							{@const hasImage = recording.image_filename}
-							{@const isListened = isRecordingListened(recording)}
-							{@const isPlaying = isCurrentPlaying(recording.id)}
-							{@const isCurrent = isCurrentRecording(recording.id)}
-							<div 
-								class="recording-card" 
-								class:locked={!day.available} 
-								class:listened={isListened}
-								class:playing={isCurrent && day.available}
-								class:with-bg={hasImage}
-								style:--bg-image={hasImage ? `url(/uploads/${hasImage})` : null}
-								onclick={() => { if (!cardSwiped) playFromRecording(day, index); }}
-								ontouchstart={(e) => handleCardTouchStart(e)}
+							<RecordingCard
+								{recording}
+								{index}
+								available={day.available}
+								{cardSwiped}
+								{player}
+								threshold={data.threshold}
+								{isRecordingListened}
+								{isCurrentPlaying}
+								{isCurrentRecording}
+								onplay={(i) => playFromRecording(day, i)}
+								ontouchstart={handleCardTouchStart}
 								ontouchend={(e) => handleCardTouchEnd(e, day, index)}
-								role="button"
-								tabindex="0"
-								onkeydown={(e) => e.key === 'Enter' && playFromRecording(day, index)}
-							>
-								<div class="card-top">
-									<div class="card-time">{formatTime(recording.recorded_at)}</div>
-									<div class="card-author">
-										<Avatar avatar={recording.avatar} size="small" />
-										<span class="pseudo">{recording.pseudo}</span>
-									</div>
-								</div>
-								{#if day.available}
-									<div class="card-center-duration">
-										{#if isCurrent && player.isPlaying}
-											<span class="duration current-time">{formatTimeSeconds(player.progress)}</span>
-										{:else}
-											<span class="duration">{formatDuration(recording.duration_seconds)}</span>
-										{/if}
-										{#if isPlaying}
-											<span class="status-indicator playing">▶ En cours</span>
-										{/if}
-									</div>
-									{#if recording.url}
-										<div class="url-link-container">
-											<a 
-												href={recording.url} 
-												target="_blank" 
-												rel="noopener noreferrer"
-												class="url-link"
-												onclick={(e) => e.stopPropagation()}
-											>
-												Ouvrir le lien
-											</a>
-										</div>
-									{/if}
-									<div class="card-bottom-player">
-										{#if hasImage}
-											<button 
-												class="card-thumbnail" 
-												onclick={(e) => { e.stopPropagation(); selectedImageUrl = `/uploads/${hasImage}`; }}
-												aria-label="Voir l'image"
-											>
-												<img src="/uploads/{hasImage}" alt="" />
-											</button>
-										{/if}
-									</div>
-								{:else}
-									<div class="card-center-locked">
-										<span class="lock-icon">🔒</span>
-										<span class="locked-text">Reviens demain à {data.threshold}</span>
-									</div>
-								{/if}
-							</div>
+								onimageclick={(url) => selectedImageUrl = url}
+								{formatTime}
+								{formatDuration}
+								{formatTimeSeconds}
+							/>
 						{/each}
 					</div>
 				</div>
@@ -1005,39 +859,12 @@
 			{#if loadingMore}
 				<span class="loading">Chargement...</span>
 			{:else if showCalendar}
-		<!-- Calendrier avec couleurs et interactions -->
-		<div class="calendar-container">
-			<div class="calendar-scroll">
-				{#each calendarMonths || [] as monthData, monthIndex}
-				<div class="month-table">
-					<h3 class="month-title">{getMonthName(monthData.month)} {monthData.year}</h3>
-					<div class="month-grid" onclick={handleCalendarClick} role="grid">
-						<span class="cell-header">Lu</span>
-						<span class="cell-header">Ma</span>
-						<span class="cell-header">Me</span>
-						<span class="cell-header">Je</span>
-						<span class="cell-header">Ve</span>
-						<span class="cell-header">Sa</span>
-						<span class="cell-header">Di</span>
-						{#each calendarCells[monthIndex] || [] as cell}
-							{#if cell.day === -1}
-							<span class="cell-day cell-empty"></span>
-						{:else}
-							<span
-								class={cell.classes}
-								data-date={cell.key}
-								role={cell.hasRecordings ? 'button' : 'gridcell'}
-								tabindex={cell.hasRecordings ? 0 : -1}
-							>
-								{cell.day}
-							</span>
-						{/if}
-						{/each}
-					</div>
-				</div>
-				{/each}
-			</div>
-		</div>
+				<Calendar 
+					{calendarMonths} 
+					{calendarCells} 
+					{calendarDates}
+					onDateClick={loadDayRecordings}
+				/>
 			{:else if data.hasMore}
 				<button class="btn" onclick={loadMore}>Charger plus</button>
 			{/if}
@@ -1170,43 +997,6 @@
 	.close-btn:hover {
 		background: #e94560;
 		transform: scale(1.1);
-	}
-
-	.team-list {
-		list-style: none;
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-		max-height: 60vh;
-		overflow-y: auto;
-		padding-right: 0.5rem;
-	}
-
-	.team-list li {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.75rem;
-		background: #2a2a4e;
-		border-radius: 8px;
-	}
-
-	.team-pseudo {
-		flex: 1;
-		font-weight: 500;
-	}
-
-	.team-badge {
-		font-size: 0.75rem;
-		padding: 0.25rem 0.5rem;
-		background: #e94560;
-		border-radius: 4px;
-	}
-
-	.team-count {
-		font-size: 0.8rem;
-		color: #888;
-		margin-left: 0.5rem;
 	}
 
 	.welcome {
@@ -1396,328 +1186,6 @@
 		gap: 0.75rem;
 	}
 
-	.recording-card {
-		flex: 0 0 315px;
-		width: 315px;
-		min-height: 420px;
-		background: #1a1a2e;
-		background-size: cover;
-		background-position: center;
-		border-radius: 12px;
-		padding: 1rem;
-		display: flex;
-		flex-direction: column;
-		justify-content: space-between;
-		position: relative;
-		cursor: pointer;
-		transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
-		overflow: hidden;
-	}
-
-	.recording-card.with-bg {
-		background-image: var(--bg-image);
-	}
-
-	.recording-card:hover {
-		transform: translateY(-2px);
-	}
-
-	.recording-card::before {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background: rgba(0, 0, 0, 0.5);
-		border-radius: 12px;
-		z-index: 0;
-	}
-
-	.recording-card.locked {
-		position: relative;
-	}
-	
-	.recording-card.locked::before {
-		content: '';
-		position: absolute;
-		inset: 0;
-		background: inherit;
-		filter: blur(12px);
-		-webkit-filter: blur(12px);
-		z-index: 4;
-		border-radius: inherit;
-	}
-
-	.recording-card.locked::after {
-		content: '';
-		position: absolute;
-		inset: 0;
-		backdrop-filter: blur(8px);
-		-webkit-backdrop-filter: blur(8px);
-		background: rgba(0, 0, 0, 0.2);
-		z-index: 5;
-		border-radius: inherit;
-	}
-
-	.recording-card.locked {
-		opacity: 1 !important;
-	}
-
-	.recording-card > * {
-		position: relative;
-		z-index: 1;
-	}
-
-	.recording-card.locked > * {
-		z-index: 6;
-	}
-
-	.recording-card.playing {
-		border: 3px solid #4ade80;
-		box-shadow: 0 0 20px rgba(74, 222, 128, 0.4);
-	}
-
-	.recording-card:not(.listened):not(.locked):not(.playing) {
-		border: 2px solid white;
-	}
-
-	.card-top {
-		display: flex;
-		justify-content: space-between;
-		align-items: flex-start;
-	}
-
-	.card-time {
-		font-size: 1.4rem;
-		font-weight: 600;
-		color: #e94560;
-	}
-
-	.card-author {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.25rem;
-	}
-
-	.card-author .pseudo {
-		font-size: 0.75rem;
-		color: #e94560;
-		font-weight: 600;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		max-width: 60px;
-	}
-
-	.card-center-duration {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 0.25rem;
-	}
-
-	.card-center-duration .duration {
-		font-size: 2rem;
-		font-weight: 600;
-		color: #e94560;
-	}
-
-	.card-center-duration .duration.current-time {
-		color: #4ade80;
-		animation: pulse 1s ease-in-out infinite;
-	}
-
-	@keyframes pulse {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.7; }
-	}
-
-	.card-center-locked {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
-	}
-
-	.card-center-locked .lock-icon {
-		font-size: 2.5rem;
-	}
-
-	.card-center-locked .locked-text {
-		font-size: 0.9rem;
-		color: #fff;
-		text-align: center;
-		text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8), 0 0 8px rgba(0, 0, 0, 0.5);
-	}
-
-	.card-bottom-player {
-		margin-top: auto;
-		text-align: center;
-	}
-
-	.status-indicator {
-		font-size: 0.75rem;
-		font-weight: 600;
-		padding: 0.25rem 0.5rem;
-		border-radius: 20px;
-		animation: pulse 1s ease-in-out infinite;
-	}
-
-	.status-indicator.playing {
-		color: #4ade80;
-		background: rgba(74, 222, 128, 0.2);
-	}
-
-	.url-link {
-		font-size: 0.875rem;
-		color: #60a5fa;
-		text-decoration: none;
-		padding: 0.35rem 0.75rem;
-		border-radius: 20px;
-		background: rgba(96, 165, 250, 0.2);
-		font-weight: 600;
-	}
-
-	.url-link-container {
-		text-align: center;
-		margin-bottom: 0.75rem;
-	}
-
-	.load-more {
-		text-align: center;
-		padding: 0.5rem 1rem;
-		padding-bottom: 1.5rem;
-	}
-
-	.load-more .loading {
-		color: #888;
-	}
-
-	.calendar-container {
-		width: 100%;
-		overflow-x: auto;
-		-webkit-overflow-scrolling: touch;
-		margin-top: 1rem;
-	}
-
-	.calendar-scroll {
-		display: flex;
-		gap: 1.5rem;
-		padding: 0.5rem;
-		min-width: max-content;
-	}
-
-	.month-table {
-		background: #2a2a4e;
-		border-radius: 12px;
-		padding: 0.5rem;
-		flex-shrink: 0;
-	}
-
-	.month-title {
-		text-align: center;
-		color: #e94560;
-		font-size: 0.85rem;
-		margin: 0 0 0.4rem;
-		font-weight: 500;
-	}
-
-	.month-grid {
-		display: grid;
-		grid-template-columns: repeat(7, 40px);
-		grid-auto-rows: 40px;
-		gap: 2px;
-		width: max-content;
-	}
-
-	.cell-header,
-	.cell-day {
-		width: 40px;
-		height: 40px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		box-sizing: border-box;
-		font-size: 14px;
-		border-radius: 50%;
-		line-height: 1;
-		cursor: default;
-		user-select: none;
-		-webkit-font-smoothing: antialiased;
-		-moz-osx-font-smoothing: grayscale;
-	}
-
-	.cell-header {
-		color: #888;
-		font-size: 12px;
-	}
-
-	.cell-day {
-		color: white;
-	}
-
-	.cell-header {
-		color: #888;
-		font-size: 0.75rem;
-	}
-
-	.cell-day {
-		color: white;
-		text-align: center;
-	}
-
-	.cell-header {
-		color: #888;
-		font-size: 0.75rem;
-	}
-
-	.cell-day {
-		color: white;
-	}
-
-	.cell-day.cell-empty {
-		opacity: 0;
-		pointer-events: none;
-	}
-
-	.cell-day.no-recordings {
-		color: white;
-		opacity: 0.4;
-		padding: 0;
-	}
-
-	.cell-day.has-recordings {
-		cursor: pointer;
-	}
-
-	.cell-day.has-recordings {
-		cursor: pointer;
-	}
-
-	.cell-day.has-recordings:hover {
-		background: #e94560;
-		color: white;
-	}
-
-	.cell-day.unread {
-		font-weight: bold;
-		color: #e94560;
-	}
-
-	.cell-day.unread:hover {
-		background: #e94560;
-		color: white;
-	}
-
-	.cell-day.today {
-		border: 4px solid #e94560;
-	}
 
 	.no-recordings {
 		text-align: center;
@@ -1836,36 +1304,6 @@
 		margin-top: 1.5rem;
 		position: sticky;
 		bottom: 0;
-	}
-
-	/* Thumbnail button on cards */
-	.card-thumbnail {
-		width: 45px;
-		height: 45px;
-		border-radius: 8px;
-		overflow: hidden;
-		border: 2px solid rgba(255, 255, 255, 0.5);
-		padding: 0;
-		cursor: pointer;
-		flex-shrink: 0;
-		background: #1a1a2e;
-	}
-
-	.card-thumbnail img {
-		border-radius: 6px;
-	}
-
-	.card-thumbnail img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-
-	.card-bottom-player {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		gap: 0.5rem;
 	}
 </style>
 

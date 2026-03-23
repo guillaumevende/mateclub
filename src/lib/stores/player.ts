@@ -31,6 +31,7 @@ export interface PlayerState {
   duration: number;
   volume: number;
   isMuted: boolean;
+  bufferedPercent: number;
 }
 
 const initialState: PlayerState = {
@@ -43,7 +44,8 @@ const initialState: PlayerState = {
   progress: 0,
   duration: 0,
   volume: 1,
-  isMuted: false
+  isMuted: false,
+  bufferedPercent: 0
 };
 
 export const playerStore = writable<PlayerState>(initialState);
@@ -329,6 +331,14 @@ function initAudioElement() {
   
   audio.addEventListener('canplay', () => {
     playerStore.update(s => ({ ...s, isLoading: false }));
+  });
+  
+  audio.addEventListener('progress', () => {
+    if (audio.buffered.length > 0 && isFinite(audio.duration) && audio.duration > 0) {
+      const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
+      const bufferedPercent = Math.min(100, (bufferedEnd / audio.duration) * 100);
+      playerStore.update(s => ({ ...s, bufferedPercent }));
+    }
   });
   
   isInitialized = true;

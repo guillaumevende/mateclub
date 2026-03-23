@@ -24,3 +24,6 @@ Thumbs.db
 .idea/
 # Logs
 *.log
+# Backup files
+*.backup
+*.pre-refactor

@@ -15,6 +15,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json({ error: 'Pseudo et mot de passe requis' }, { status: 400 });
 	}
 
+	if (password.length < 12) {
+		return json({ error: 'Le mot de passe doit contenir au moins 12 caractères' }, { status: 400 });
+	}
+
 	const existing = getUserByPseudo(pseudo);
 	if (existing) {
 		return json({ error: 'Ce pseudo est déjà utilisé' }, { status: 400 });

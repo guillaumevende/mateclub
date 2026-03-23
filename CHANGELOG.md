@@ -78,6 +78,138 @@
 #### Sécurité & UX
 - [x] **Fix CSRF token** : Les tokens ne sont plus consommés après une erreur, permettant de corriger et resoumettre
 - [x] **Validation magic numbers HEIC** : Ajout des signatures HEIC/HEIF dans `fileValidation.ts`
+>>>>>>> origin/main
+
+### 🔒 Corrections de sécurité majeures
+
+#### [CRITIQUE] Mot de passe admin par défaut (#9)
+- **Problème** : Le script `init-admin.mjs` utilisait un mot de passe par défaut `admin123` si `ADMIN_PASSWORD` non définie
+- **Impact** : Toute instance sans variable d'environnement exposée avec le même mot de passe
+- **Correction** : 
+  - `ADMIN_PASSWORD` devient obligatoire (pas de fallback)
+  - Validation longueur minimale (12 caractères)
+  - Suppression du log du mot de passe en clair
+- **Commit** : `9cf4dac`
+
+#### [HAUTE] Validation mot de passe API admin (#10)
+- **Problème** : L'API `POST /api/admin/users` ne validait pas la longueur du mot de passe (contrairement à la form action)
+- **Correction** : Ajout validation `password.length >= 12` avec message d'erreur explicite
+- **Commit** : `228626b`
+
+#### [HAUTE] CSP trop permissive (#12)
+- **Problème** : `connect-src 'self' https://*` permettait exfiltration de données vers n'importe quel domaine HTTPS
+- **Problème** : `unsafe-eval` dans `script-src` autorisait `eval()` et `Function()`
+- **Correction** :
+  - `connect-src 'self'` uniquement (connexions same-origin)
+  - Suppression de `unsafe-eval`
+- **Commit** : `08a6d79`
+
+#### [MOYENNE] Fuite d'information dans les réponses d'erreur (#11)
+- **Problème** : Les endpoints API exposaient `error.message` dans les réponses JSON (chemins, stack trace)
+- **Fichiers concernés** : `recordings/+server.ts`, `recordings/dates/+server.ts`
+- **Correction** : Messages génériques côté client (`"Erreur interne"`), détails loggés côté serveur
+- **Commit** : `4c2a75a`
+
+#### [MOYENNE] Avatar DELETE ne réinitialise pas la DB (#13)
+- **Problème** : Suppression du fichier image mais pas mise à jour de la base de données
+- **Impact** : Pointeur vers fichier inexistant (404 sur les avatars supprimés)
+- **Correction** : Appel `updateUserAvatarImage(userId, '☕')` après suppression du fichier
+- **Commit** : `9b7856e`
+
+### 🐛 Corrections de bugs
+
+#### [MOYENNE] Pagination - Bouton "Charger plus" manquant (#15 bis)
+- **Problème** : La logique `hasMore` vérifiait le nombre de jours groupés, pas le nombre d'enregistrements
+- **Correction** : `hasMore = results.length >= (limit + 1) * 3`
+- **Commit** : `083545c`
+
+### ♻️ Refactoring - God Components (#19)
+
+#### Extraction de composants Svelte
+Réduction de la taille des fichiers `+page.svelte` (1848 → 1277 lignes) et `record/+page.svelte` (1408 → 1272 lignes)
+
+| Composant | Lignes | Description | Utilisé dans |
+|-----------|--------|-------------|--------------|
+| `RecordingCard.svelte` | 345 | Carte d'enregistrement avec styles encapsulés | `+page.svelte` (×2) |
+| `ImageUpload.svelte` | 232 | Upload image avec compression HEIC/JPEG | `record/+page.svelte` |
+| `TeamList.svelte` | 110 | Modal "La team" avec liste utilisateurs | `+page.svelte` |
+| `Calendar.svelte` | 220 | Calendrier interactif mensuel | `+page.svelte` |
+
+**Bénéfices** :
+- Meilleure maintenabilité (< 300 lignes par composant)
+- Réutilisabilité (RecordingCard utilisé dans 2 contextes)
+- Testabilité améliorée
+- Aucune régression visuelle (styles 100% conservés)
+
+**Commits** : `3eac8f6`, `34a8be6`
+
+### 🧪 Tests - Framework et couverture (#17)
+
+#### Installation du framework de test
+- **Framework** : Vitest (déjà présent mais non configuré)
+- **Commande** : `npm test` (exécute 63 tests)
+
+#### Nouveaux tests ajoutés
+- `db.security.test.ts` (15 tests) : Validation mot de passe, pseudo, fonctions utilisateur
+- `api.validation.test.ts` (25 tests) : Validation buffer audio/image, URL, durée, mot de passe
+- `uploads.test.ts` (9 tests) : Protection path traversal
+- `db.auth.test.ts` (6 tests) : Sessions et rate limiting
+- `db.business.test.ts` (5 tests) : Logique métier recordings
+
+**Couverture totale** : 63 tests passent en ~2s
+
+**Commit** : `da9b192`
+
+### 🔧 Qualité - Console logs de debug (#18)
+
+#### Problème
+71 `console.log`/`console.error`/`console.warn` dans le code source, dont :
+- Logs verbeux de debug en production
+- Exposition potentielle de chemins internes
+
+#### Solution
+- Création de `src/lib/debug.ts` avec flag `isDev = process.env.NODE_ENV !== 'production'`
+- Remplacement des `console.log` par `debug.*` (silencieux en prod)
+- Conservation des `console.error` légitimes pour les vraies erreurs
+
+**Réduction** : 71 → 0 logs de debug en production
+
+**Commit** : `dda83e1`
+
+### 🧹 Hygiène - Fichiers de backup (#16)
+
+#### Suppression des fichiers de backup trackés
+- `src/routes/+page.svelte.pre-refactor` (957 lignes)
+
+#### Mise à jour .gitignore
+- Ajout `*.backup` et `*.pre-refactor`
+
+**Commit** : `1c66f96`
+
+### 🐳 Docker - Cohérence configuration (#20)
+
+#### Problèmes corrigés
+1. **Port incohérent** : Dockerfile exposait 3000, docker-compose mappait sur 3001
+2. **Version obsolète** : `version: '3.8'` ignoré depuis Docker Compose v2
+3. **Script dupliqué** : `scripts/init-admin.ts` (code mort, alias `$lib` non résolvable)
+
+#### Corrections
+- **Dockerfile** : Port uniformisé à 3001
+- **docker-compose.yml** : Suppression champ `version`
+- **Scripts** : Suppression `init-admin.ts`
+
+**Commit** : `118caca`
+
+### 📊 Statistiques du refactoring
+
+| Métrique | Avant | Après | Gain |
+|----------|-------|-------|------|
+| `+page.svelte` | 1848 lignes | 1277 lignes | -571 lignes |
+| `record/+page.svelte` | 1408 lignes | 1272 lignes | -136 lignes |
+| **Total lignes** | 3256 | 2549 | **-707 lignes** |
+| Tests | 3 | 63 | +60 tests |
+| Composants extraits | 0 | 4 | +4 composants |
+>>>>>>> origin/main
 
 ---
 

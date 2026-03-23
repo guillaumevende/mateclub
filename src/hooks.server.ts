@@ -31,6 +31,20 @@ export const handle: Handle = async ({ event, resolve }) => {
 		}
 	}
 
+	// Validate CSRF for API routes - block form-based CSRF attacks
+	// (fetch/XHR use application/json or multipart, forms use x-www-form-urlencoded)
+	if (event.request.method !== 'GET' && event.url.pathname.startsWith('/api')) {
+		const contentType = event.request.headers.get('content-type') || '';
+		// Block only classic form submissions (cannot send JSON or custom headers)
+		if (contentType.includes('application/x-www-form-urlencoded') || 
+			contentType.includes('text/plain')) {
+			return new Response(JSON.stringify({ error: 'CSRF rejected' }), {
+				status: 403,
+				headers: { 'Content-Type': 'application/json' }
+			});
+		}
+	}
+
 	// Check if setup is needed - redirect to /setup if no admin exists
 	const isSetupPage = event.url.pathname === '/setup';
 	const isApi = event.url.pathname.startsWith('/api');
@@ -56,7 +70,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 	response.headers.set('Pragma', 'no-cache');
 	response.headers.set('Expires', '0');
 	
-	response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://*;");
+	response.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self';");
 	response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 	response.headers.set('X-Content-Type-Options', 'nosniff');
 	response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
