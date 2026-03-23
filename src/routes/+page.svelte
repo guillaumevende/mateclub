@@ -672,7 +672,8 @@
 									class:locked={!selectedDayRecordings.available} 
 									class:listened={isListened}
 									class:playing={isCurrent && selectedDayRecordings.available}
-									style={hasImage ? `background-image: url(/uploads/${hasImage})` : ''}
+									class:with-bg={hasImage}
+									style:--bg-image={hasImage ? `url(/uploads/${hasImage})` : null}
 									onclick={() => { if (!cardSwiped) selectedDayRecordings && playFromRecording(selectedDayRecordings, index); }}
 									ontouchstart={(e) => handleCardTouchStart(e)}
 									ontouchend={(e) => selectedDayRecordings && handleCardTouchEnd(e, selectedDayRecordings, index)}
@@ -804,7 +805,8 @@
 								class:locked={!todayDay.available} 
 								class:listened={isListened}
 								class:playing={isCurrent && todayDay.available}
-								style={hasImage ? `background-image: url(/uploads/${hasImage})` : ''}
+								class:with-bg={hasImage}
+								style:--bg-image={hasImage ? `url(/uploads/${hasImage})` : null}
 								onclick={() => { if (!cardSwiped) todayDay && playFromRecording(todayDay, index); }}
 								ontouchstart={(e) => handleCardTouchStart(e)}
 								ontouchend={(e) => todayDay && handleCardTouchEnd(e, todayDay, index)}
@@ -924,7 +926,8 @@
 								class:locked={!day.available} 
 								class:listened={isListened}
 								class:playing={isCurrent && day.available}
-								style={hasImage ? `background-image: url(/uploads/${hasImage})` : ''}
+								class:with-bg={hasImage}
+								style:--bg-image={hasImage ? `url(/uploads/${hasImage})` : null}
 								onclick={() => { if (!cardSwiped) playFromRecording(day, index); }}
 								ontouchstart={(e) => handleCardTouchStart(e)}
 								ontouchend={(e) => handleCardTouchEnd(e, day, index)}
@@ -1398,6 +1401,10 @@
 		cursor: pointer;
 		transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
 		overflow: hidden;
+	}
+
+	.recording-card.with-bg {
+		background-image: var(--bg-image);
 	}
 
 	.recording-card:hover {

@@ -2,6 +2,18 @@
 
 ---
 
+## v2.4.5 (2026-03-23)
+
+### Corrections d'interface
+
+#### Vignettes verrouillées
+- [x] **Fix rendu vignettes verrouillées** : Correction du CSS pour l'affichage des capsules avant l'heure de déblocage
+- [x] **Fix effet blur** : L'image de fond est maintenant correctement floutée grâce à l'utilisation d'une variable CSS (--bg-image) au lieu du style inline
+- [x] **Fix dimensions** : La carte respecte à nouveau sa taille définie (315px × 420px minimum)
+- [x] **Refactoring CSS** : Déplacement du background-image dans une classe `.with-bg` pour une meilleure maintenabilité
+
+---
+
 ## v2.4.4 (2026-03-23)
 
 ### Infrastructure
