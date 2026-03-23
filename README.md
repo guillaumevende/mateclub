@@ -165,9 +165,22 @@ Variables d'environnement disponibles dans `.env`:
 
 ### Manuel
 
+**⚠️ Important :** Pour les installations sans Docker, vous devez définir `BODY_SIZE_LIMIT=20M` pour permettre l'upload des fichiers audio (3 min max) et images. Sans cela, les uploads > 1 Mo échoueront.
+
 ```bash
+# Définir la variable d'environnement (obligatoire)
+export BODY_SIZE_LIMIT=20M
+
+# Build et lancement
 npm run build
 npm run start
+```
+
+Ou créer un fichier `.env` :
+```bash
+echo "BODY_SIZE_LIMIT=20M" > .env
+echo "PORT=3001" >> .env
+echo "ORIGIN=http://localhost:3001" >> .env
 ```
 
 Aller sur http://localhost:3001

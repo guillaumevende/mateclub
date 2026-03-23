@@ -2,6 +2,14 @@
 
 ---
 
+## v2.4.4 (2026-03-23)
+
+### Infrastructure
+- [x] **Fix BODY_SIZE_LIMIT** : Retour de la limite à 20M dans `docker-compose.yml` pour les uploads audio/images
+- [x] **Documentation installation manuelle** : Ajout de la mention `BODY_SIZE_LIMIT=20M` obligatoire pour les installations sans Docker
+
+---
+
 ## v2.4.3 (2026-03-23)
 
 ### Corrections de bugs
