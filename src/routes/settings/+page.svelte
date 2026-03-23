@@ -849,7 +849,7 @@
 		text-align: center;
 		font-size: 0.75rem;
 		color: rgba(255, 255, 255, 0.3);
-		margin-top: 2rem;
+		margin-top: 0.5rem;
 		margin-bottom: 1rem;
 	}
 </style>

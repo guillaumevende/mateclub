@@ -8,7 +8,9 @@
 
 #### Interface - Paramètres
 - [x] **Affichage version** : Numéro de version de l'application affiché en bas de la page "Réglages" (texte discret blanc)
+- [x] **Affichage version login** : Numéro de version également visible sur la page d'identification
 - [x] **Automatisation** : Version synchronisée automatiquement depuis `package.json` sans intervention manuelle
+- [x] **Espacement réduit** : Moins d'espace entre le bouton Déconnexion et la version
 
 #### Interface - Calendrier
 - [x] **Fix calendrier page 2+** : Chargement automatique des données du calendrier quand on accède directement à une page >= 2

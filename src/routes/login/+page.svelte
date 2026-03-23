@@ -25,6 +25,8 @@
 
 		<button type="submit">Connexion</button>
 	</form>
+
+	<p class="app-version">v{data?.version || ''}</p>
 </div>
 
 <style>
@@ -73,5 +75,12 @@
 		color: #ff6b6b;
 		font-size: 0.875rem;
 		text-align: center;
+	}
+
+	.app-version {
+		text-align: center;
+		font-size: 0.75rem;
+		color: rgba(255, 255, 255, 0.3);
+		margin-top: 2rem;
 	}
 </style>
