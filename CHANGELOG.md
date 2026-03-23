@@ -2,7 +2,83 @@
 
 ---
 
-## v2.4.3 (2026-03-22)
+## v2.4.7 (2026-03-23)
+
+### Corrections et améliorations
+
+#### Interface - Enregistrement
+- [x] **Fix preview HEIC** : Correction de l'affichage des images HEIC sur la page "Enregistrer" (Chrome/Edge : pas de preview + message, Safari/iOS : preview fonctionnelle)
+
+#### Dépendances
+- [x] **Mises à jour Dependabot** : sharp 0.34.5, vite 8.0.1, @sveltejs/vite-plugin-svelte 7.0.0
+
+---
+
+## v2.4.6 (2026-03-23)
+
+### Corrections et améliorations
+
+#### Interface - Paramètres
+- [x] **Affichage version** : Numéro de version de l'application affiché en bas de la page "Réglages" (texte discret blanc)
+- [x] **Affichage version login** : Numéro de version également visible sur la page d'identification
+- [x] **Automatisation** : Version synchronisée automatiquement depuis `package.json` sans intervention manuelle
+- [x] **Espacement réduit** : Moins d'espace entre le bouton Déconnexion et la version
+
+#### Interface - Calendrier
+- [x] **Fix calendrier page 2+** : Chargement automatique des données du calendrier quand on accède directement à une page >= 2
+- [x] **Fix affichage calendrier** : Les cellules du calendrier s'affichent correctement avec les jours et les capsules
+
+#### Correction chemins de fichiers
+- [x] **Fix répertoire uploads** : Déplacement des fichiers audio de `uploads/recordings/` vers `uploads/` (correspondance avec les chemins en base)
+- [x] **Fix images 404** : Correction du chemin des images de test
+
+#### Données de test
+- [x] **Ajout capsules de test** : 3 capsules fonctionnelles pour les dates historiques :
+  - **28 janvier 2026** : Audio 8 secondes (bip) + image bleue
+  - **1er février 2026** : Audio 12 secondes (bip) + image verte  
+  - **27 février 2026** : Audio 15 secondes (bip) + image orange
+
+---
+
+## v2.4.5 (2026-03-23)
+
+### Corrections d'interface
+
+#### Vignettes verrouillées
+- [x] **Fix rendu vignettes verrouillées** : Correction du CSS pour l'affichage des capsules avant l'heure de déblocage
+- [x] **Fix effet blur** : L'image de fond est maintenant correctement floutée grâce à l'utilisation d'une variable CSS (--bg-image) au lieu du style inline
+- [x] **Fix dimensions** : La carte respecte à nouveau sa taille définie (315px × 420px minimum)
+- [x] **Refactoring CSS** : Déplacement du background-image dans une classe `.with-bg` pour une meilleure maintenabilité
+
+---
+
+## v2.4.4 (2026-03-23)
+
+### Infrastructure
+- [x] **Fix BODY_SIZE_LIMIT** : Retour de la limite à 20M dans `docker-compose.yml` pour les uploads audio/images
+- [x] **Documentation installation manuelle** : Ajout de la mention `BODY_SIZE_LIMIT=20M` obligatoire pour les installations sans Docker
+
+---
+
+## v2.4.3 (2026-03-23)
+
+### Corrections de bugs
+
+#### Avatar & Upload HEIC
+- [x] **Fix upload HEIC** : Conversion automatique HEIC→JPEG via Sharp avec libvips
+- [x] **Preview HEIC adaptative** : Preview visible sur Safari/iOS, masquée sur Chrome/Edge (image cassée)
+- [x] **Message confirmation** : "✓ Image sélectionnée - Sauvegardez pour valider" quand pas de preview
+- [x] **Bouton annuler** : Permet d'annuler la sélection d'image avant sauvegarde
+- [x] **Rechargement page** : Scroll en haut + reload après sauvegarde réussie pour voir le nouvel avatar
+
+#### Formulaires
+- [x] **Fix champ pseudo** : Binding corrigé, le pseudo ne se vide plus quand on sélectionne une image
+- [x] **Fix bouton création admin** : Désactivation pendant le traitement + style visuel + texte "Création..."
+
+#### Sécurité & UX
+- [x] **Fix CSRF token** : Les tokens ne sont plus consommés après une erreur, permettant de corriger et resoumettre
+- [x] **Validation magic numbers HEIC** : Ajout des signatures HEIC/HEIF dans `fileValidation.ts`
+>>>>>>> origin/main
 
 ### 🔒 Corrections de sécurité majeures
 
@@ -133,6 +209,7 @@ Réduction de la taille des fichiers `+page.svelte` (1848 → 1277 lignes) et `r
 | **Total lignes** | 3256 | 2549 | **-707 lignes** |
 | Tests | 3 | 63 | +60 tests |
 | Composants extraits | 0 | 4 | +4 composants |
+>>>>>>> origin/main
 
 ---
 

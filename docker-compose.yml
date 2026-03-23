@@ -5,6 +5,7 @@ services:
       - "${PORT:-3001}:3001"
     environment:
       - PORT=${PORT:-3001}
+      - BODY_SIZE_LIMIT=20M
     volumes:
       - ./data:/app/data
       - ./uploads:/app/uploads
@@ -16,7 +17,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
 networks:
   default:
     name: mateclub-network

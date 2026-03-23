@@ -1,13 +1,15 @@
 import type { PageServerLoad, Actions } from './$types';
 import { redirect, fail } from '@sveltejs/kit';
 import { getUserByPseudo, verifyPassword, createSession, canAttemptLogin, recordLoginAttempt, getRemainingLockoutTime } from '$lib/server/db';
+import { version } from '../../../package.json';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (locals.user) {
 		throw redirect(303, '/');
 	}
 	return {
-		csrfToken: locals.csrfToken
+		csrfToken: locals.csrfToken,
+		version
 	};
 };
 

@@ -1,6 +1,6 @@
 {
   "name": "mateclub",
-  "version": "2.4.2",
+  "version": "2.4.3",
   "type": "module",
   "scripts": {
     "dev": "vite dev --host",
@@ -11,23 +11,22 @@
     "lint": "eslint src/",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "prepare": "husky"
+    "test:watch": "vitest"
   },
   "keywords": [],
   "author": "",
   "license": "AGPL-3.0",
   "dependencies": {
     "@sveltejs/adapter-node": "^5.5.4",
-    "@sveltejs/kit": "^2.53.4",
-    "@sveltejs/vite-plugin-svelte": "^6.2.4",
+    "@sveltejs/kit": "^2.55.0",
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "bcrypt": "^6.0.0",
-    "better-sqlite3": "^12.8.0",
+    "better-sqlite3": "^12.6.2",
     "browser-image-compression": "^2.0.2",
-    "sharp": "^0.33.5",
-    "svelte": "^5.54.1",
+    "sharp": "^0.34.5",
+    "svelte": "^5.53.9",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1",
+    "vite": "^8.0.1",
     "web-haptics": "^0.0.6"
   },
   "devDependencies": {
@@ -36,13 +35,9 @@
     "@types/better-sqlite3": "^7.6.13",
     "eslint": "^10.1.0",
     "eslint-plugin-svelte": "^3.16.0",
-    "husky": "^9.1.7",
-    "lint-staged": "^16.4.0",
+    "node-gyp": "^12.2.0",
     "svelte-check": "^4.4.5",
     "typescript-eslint": "^8.57.1",
     "vitest": "^4.1.0"
-  },
-  "lint-staged": {
-    "*.{ts,svelte}": ["eslint --fix"]
   }
 }

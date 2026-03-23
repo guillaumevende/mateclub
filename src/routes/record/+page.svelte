@@ -119,6 +119,13 @@
 		}
 	}
 
+	function canDisplayHeic(): boolean {
+		const ua = navigator.userAgent;
+		const isSafari = ua.includes('Safari') && !ua.includes('Chrome') && !ua.includes('Edg');
+		const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+		return isSafari || isIOS;
+	}
+
 	async function checkMicPermission() {
 		if (!navigator.permissions || !navigator.permissions.query) {
 			micPermissionState = 'unknown';
@@ -318,6 +325,7 @@
 	
 	isStopping = false;
 }
+
 
 	function reset() {
 		audioUrl = null;

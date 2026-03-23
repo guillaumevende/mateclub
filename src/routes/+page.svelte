@@ -286,6 +286,17 @@
 			}
 		}
 	});
+	
+	// Charger le calendrier quand nécessaire
+	$effect(() => {
+		if (showCalendar && Object.keys(calendarDates).length === 0 && !loadingCalendar) {
+			loadingCalendar = true;
+			loadCalendarDates().then(() => {
+				computeCalendarCells();
+				loadingCalendar = false;
+			});
+		}
+	});
 
 	async function loadMore() {
 		if (loadingMore) return;
@@ -708,7 +719,8 @@
 								class:locked={!todayDay.available} 
 								class:listened={isListened}
 								class:playing={isCurrent && todayDay.available}
-								style={hasImage ? `background-image: url(/uploads/${hasImage})` : ''}
+								class:with-bg={hasImage}
+								style:--bg-image={hasImage ? `url(/uploads/${hasImage})` : null}
 								onclick={() => { if (!cardSwiped) todayDay && playFromRecording(todayDay, index); }}
 								ontouchstart={(e) => handleCardTouchStart(e)}
 								ontouchend={(e) => todayDay && handleCardTouchEnd(e, todayDay, index)}
@@ -1173,6 +1185,7 @@
 		display: flex;
 		gap: 0.75rem;
 	}
+
 
 	.no-recordings {
 		text-align: center;

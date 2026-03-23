@@ -27,6 +27,11 @@
 	let createSuccess = $state<string | null>(null);
 	let passwordError = $state<string | null>(null);
 	let pseudoError = $state<string | null>(null);
+	
+	// État du formulaire de création
+	let isCreatingUser = $state(false);
+	let pseudo = $state('');
+	let password = $state('');
 
 	let adminCount = $derived(data.users.filter(u => u.is_admin).length);
 	
@@ -182,7 +187,12 @@
 	<section>
 		<h2>Créer un utilisateur</h2>
 		<form method="POST" action="?/create" use:enhance={() => {
+			// Désactiver le bouton pendant le traitement
+			isCreatingUser = true;
+			
 			return async ({ result }) => {
+				isCreatingUser = false;
+				
 			if (result.type === 'failure' && (result.data as any)?.error) {
 				const errorMsg = (result.data as any).error;
 				const lowerError = errorMsg.toLowerCase();
@@ -207,16 +217,27 @@
 				passwordError = null;
 				pseudoError = null;
 				createSuccess = (result.data as any)?.message || 'Utilisateur créé avec succès';
-				selectedAvatar = '☕';
+				
 				// Réinitialiser le formulaire
-				const form = document.querySelector('form[action="?/create"]') as HTMLFormElement;
-				if (form) form.reset();
+				pseudo = '';
+				password = '';
+				
+			// Forcer le rafraîchissement de la page pour voir le nouvel utilisateur
+				setTimeout(() => {
+					window.location.reload();
+				}, 1500);
 			}
-			};
-		}}>
+		};
+	}}>
 			<input type="hidden" name="csrf_token" value={data.csrfToken} />
 			<div class="pseudo-field">
-				<input type="text" name="pseudo" placeholder="Pseudo" required />
+				<input 
+					type="text" 
+					name="pseudo" 
+					placeholder="Pseudo" 
+					required 
+					oninput={() => pseudoError = null}
+				/>
 				{#if pseudoError}
 					<p class="field-error">{pseudoError}</p>
 				{/if}
@@ -265,7 +286,13 @@
 			{#if createSuccess}
 				<p class="success-message">{createSuccess}</p>
 			{/if}
-			<button type="submit">Créer</button>
+			<button type="submit" disabled={isCreatingUser}>
+				{#if isCreatingUser}
+					Création...
+				{:else}
+					Créer
+				{/if}
+			</button>
 		</form>
 	</section>
 
@@ -374,6 +401,12 @@
 		margin-top: 1rem;
 		background: #e94560;
 		width: 100%;
+	}
+
+	button[type="submit"]:disabled {
+		opacity: 0.6;
+		cursor: not-allowed;
+		background: #666;
 	}
 
 	.delete {
