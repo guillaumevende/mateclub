@@ -27,3 +27,7 @@ Thumbs.db
 # Backup files
 *.backup
 *.pre-refactor
+
+# Documentation d'évolution (privée, non versionnée)
+EVOLUTION_*.md
+EVOLUTION.md
