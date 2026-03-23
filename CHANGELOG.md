@@ -9,6 +9,10 @@
 #### Interface - Enregistrement
 - [x] **Fix preview HEIC** : Correction de l'affichage des images HEIC sur la page "Enregistrer" (Chrome/Edge : pas de preview + message, Safari/iOS : preview fonctionnelle)
 
+#### Vignettes d'enregistrements
+- [x] **Fix vignettes aujourd'hui** : Remplacement du code inline par le composant `RecordingCard` pour la section "Aujourd'hui" (assure la cohérence du CSS blur pour les vignettes verrouillées)
+- [x] **Documentation RecordingCard** : Ajout de règles de développement dans le README pour éviter la régression
+
 #### Dépendances
 - [x] **Mises à jour Dependabot** : sharp 0.34.5, vite 8.0.1, @sveltejs/vite-plugin-svelte 7.0.0
 

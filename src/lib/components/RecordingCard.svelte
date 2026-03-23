@@ -52,7 +52,8 @@
 	class:locked={!available} 
 	class:listened={isListened}
 	class:playing={isCurrent && available}
-	style={hasImage ? `background-image: url(/uploads/${hasImage})` : ''}
+	class:with-bg={hasImage}
+	style:--bg-image={hasImage ? `url(/uploads/${hasImage})` : null}
 	onclick={() => { if (!cardSwiped) onplay(index); }}
 	ontouchstart={(e) => ontouchstart(e)}
 	ontouchend={(e) => ontouchend(e)}
@@ -127,6 +128,10 @@
 		cursor: pointer;
 		transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
 		overflow: hidden;
+	}
+
+	.recording-card.with-bg {
+		background-image: var(--bg-image);
 	}
 
 	.recording-card:hover {
