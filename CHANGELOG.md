@@ -4,23 +4,21 @@
 
 ## v2.4.6 (2026-03-23)
 
-### Nettoyage et données de test
+### Corrections et améliorations
 
-#### Base de données
-- [x] **Nettoyage des entrées fantômes** : Suppression de 23 enregistrements sans fichiers audio correspondants
-- [x] **Nettoyage historique** : Suppression des entrées orphelines dans `listening_history`
-- [x] **Création capsules de test** : Ajout de 3 capsules fonctionnelles pour les dates demandées :
-  - **28 janvier 2026** : Audio 8 secondes (bip) + image bleue
-  - **1er février 2026** : Audio 12 secondes (bip) + image verte  
-  - **27 février 2026** : Audio 15 secondes (bip) + image orange
+#### Interface - Calendrier
+- [x] **Fix calendrier page 2+** : Chargement automatique des données du calendrier quand on accède directement à une page >= 2
+- [x] **Fix affichage calendrier** : Les cellules du calendrier s'affichent correctement avec les jours et les capsules
 
 #### Correction chemins de fichiers
 - [x] **Fix répertoire uploads** : Déplacement des fichiers audio de `uploads/recordings/` vers `uploads/` (correspondance avec les chemins en base)
 - [x] **Fix images 404** : Correction du chemin des images de test
 
-#### Interface - Calendrier
-- [x] **Fix calendrier page 2+** : Chargement automatique des données du calendrier quand on accède directement à une page >= 2
-- [x] **Fix affichage calendrier** : Les cellules du calendrier s'affichent correctement avec les jours et les capsules
+#### Données de test
+- [x] **Ajout capsules de test** : 3 capsules fonctionnelles pour les dates historiques :
+  - **28 janvier 2026** : Audio 8 secondes (bip) + image bleue
+  - **1er février 2026** : Audio 12 secondes (bip) + image verte  
+  - **27 février 2026** : Audio 15 secondes (bip) + image orange
 
 ---
 
