@@ -293,6 +293,17 @@
 			}
 		}
 	});
+	
+	// Charger le calendrier quand nécessaire
+	$effect(() => {
+		if (showCalendar && Object.keys(calendarDates).length === 0 && !loadingCalendar) {
+			loadingCalendar = true;
+			loadCalendarDates().then(() => {
+				computeCalendarCells();
+				loadingCalendar = false;
+			});
+		}
+	});
 
 	async function loadMore() {
 		if (loadingMore) return;
