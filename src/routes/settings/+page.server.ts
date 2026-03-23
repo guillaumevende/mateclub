@@ -4,6 +4,7 @@ import { hashSync } from 'bcrypt';
 import { updateUserAvatar, updateUserHour, updateUserTimezone, getUserById, updateUserPassword, updateUserPseudo, isPseudoAvailable } from '$lib/server/db';
 import { readdirSync, existsSync } from 'fs';
 import { join } from 'path';
+import { version } from '../../../package.json';
 
 // Regex pour validation pseudo: lettres, chiffres, accents européens, espaces, - . _
 const PSEUDO_REGEX = /^[a-zA-Z0-9\s\-._àáâãäåæçèéêëìíîïñòóôõöùúûüýÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝŸ]{3,22}$/;
@@ -63,7 +64,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 		hour: user?.daily_notification_hour || 420,
 		timezones,
 		savedImage,
-		csrfToken: locals.csrfToken ?? ''
+		csrfToken: locals.csrfToken ?? '',
+		version
 	};
 };
 

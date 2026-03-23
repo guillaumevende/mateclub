@@ -6,6 +6,10 @@
 
 ### Corrections et améliorations
 
+#### Interface - Paramètres
+- [x] **Affichage version** : Numéro de version de l'application affiché en bas de la page "Réglages" (texte discret blanc)
+- [x] **Automatisation** : Version synchronisée automatiquement depuis `package.json` sans intervention manuelle
+
 #### Interface - Calendrier
 - [x] **Fix calendrier page 2+** : Chargement automatique des données du calendrier quand on accède directement à une page >= 2
 - [x] **Fix affichage calendrier** : Les cellules du calendrier s'affichent correctement avec les jours et les capsules

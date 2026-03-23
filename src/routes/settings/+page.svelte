@@ -10,6 +10,7 @@
 			user?: { pseudo: string; avatar: string; daily_notification_hour: number; timezone: string } 
 			timezones: Timezone[]
 			savedImage: string | null
+			version: string
 		}, 
 		form?: { success?: boolean; passwordError?: string; error?: string } 
 	} = $props();
@@ -459,6 +460,8 @@
 	</form>
 
 	<a href="/logout" class="btn" data-sveltekit-reload>Déconnexion</a>
+
+	<p class="app-version">v{(data as any).version || ''}</p>
 </div>
 
 <style>
@@ -840,5 +843,13 @@
 
 	.upload-zone.disabled input {
 		pointer-events: none;
+	}
+
+	.app-version {
+		text-align: center;
+		font-size: 0.75rem;
+		color: rgba(255, 255, 255, 0.3);
+		margin-top: 2rem;
+		margin-bottom: 1rem;
 	}
 </style>
