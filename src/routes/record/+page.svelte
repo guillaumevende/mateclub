@@ -124,6 +124,13 @@
 		}
 	}
 
+	function canDisplayHeic(): boolean {
+		const ua = navigator.userAgent;
+		const isSafari = ua.includes('Safari') && !ua.includes('Chrome') && !ua.includes('Edg');
+		const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+		return isSafari || isIOS;
+	}
+
 	async function checkMicPermission() {
 		if (!navigator.permissions || !navigator.permissions.query) {
 			micPermissionState = 'unknown';
@@ -420,7 +427,12 @@ function stopRecording() {
 		
 		if (isHeic) {
 			imageBlob = file;
-			imagePreview = URL.createObjectURL(file);
+			if (canDisplayHeic()) {
+				imagePreview = URL.createObjectURL(file);
+			} else {
+				imagePreview = null;
+				imageWarning = 'Image HEIC sélectionnée. Elle sera convertie automatiquement.';
+			}
 			return;
 		}
 		
