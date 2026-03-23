@@ -337,7 +337,7 @@ function stopRecording() {
 	isStopping = false;
 }
 
-	async function handleImageSelect(e: Event) {
+		async function handleImageSelect(e: Event) {
 		const input = e.target as HTMLInputElement;
 		if (input.files && input.files[0]) {
 			const file = input.files[0];
@@ -358,7 +358,12 @@ function stopRecording() {
 			if (isHeic) {
 				// Envoyer HEIC brut, le serveur convertira en JPEG
 				imageBlob = file;
-				imagePreview = URL.createObjectURL(file);
+				if (canDisplayHeic()) {
+					imagePreview = URL.createObjectURL(file);
+				} else {
+					imagePreview = null;
+					imageWarning = 'Image HEIC sélectionnée. Elle sera convertie automatiquement.';
+				}
 				return;
 			}
 			
