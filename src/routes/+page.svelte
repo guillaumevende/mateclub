@@ -710,73 +710,24 @@
 				<div class="recordings-scroller">
 					<div class="recordings-row">
 						{#each todayDay.recordings as recording, index}
-							{@const hasImage = recording.image_filename}
-							{@const isListened = isRecordingListened(recording)}
-							{@const isPlaying = isCurrentPlaying(recording.id)}
-							{@const isCurrent = isCurrentRecording(recording.id)}
-							<div 
-								class="recording-card" 
-								class:locked={!todayDay.available} 
-								class:listened={isListened}
-								class:playing={isCurrent && todayDay.available}
-								class:with-bg={hasImage}
-								style:--bg-image={hasImage ? `url(/uploads/${hasImage})` : null}
-								onclick={() => { if (!cardSwiped) todayDay && playFromRecording(todayDay, index); }}
-								ontouchstart={(e) => handleCardTouchStart(e)}
+							<RecordingCard
+								{recording}
+								{index}
+								available={todayDay.available}
+								{cardSwiped}
+								{player}
+								threshold={data.threshold}
+								{isRecordingListened}
+								{isCurrentPlaying}
+								{isCurrentRecording}
+								onplay={(i) => todayDay && playFromRecording(todayDay, i)}
+								ontouchstart={handleCardTouchStart}
 								ontouchend={(e) => todayDay && handleCardTouchEnd(e, todayDay, index)}
-								role="button"
-								tabindex="0"
-								onkeydown={(e) => e.key === 'Enter' && todayDay && playFromRecording(todayDay, index)}
-							>
-								<div class="card-top">
-									<div class="card-time">{formatTime(recording.recorded_at)}</div>
-									<div class="card-author">
-										<Avatar avatar={recording.avatar} size="small" />
-										<span class="pseudo">{recording.pseudo}</span>
-									</div>
-								</div>
-								{#if todayDay.available}
-									<div class="card-center-duration">
-										{#if isCurrent && player.isPlaying}
-											<span class="duration current-time">{formatTimeSeconds(player.progress)}</span>
-										{:else}
-											<span class="duration">{formatDuration(recording.duration_seconds)}</span>
-										{/if}
-										{#if isPlaying}
-											<span class="status-indicator playing">▶ En cours</span>
-										{/if}
-									</div>
-									{#if recording.url}
-										<div class="url-link-container">
-											<a 
-												href={recording.url} 
-												target="_blank" 
-												rel="noopener noreferrer"
-												class="url-link"
-												onclick={(e) => e.stopPropagation()}
-											>
-												Ouvrir le lien
-											</a>
-										</div>
-									{/if}
-									<div class="card-bottom-player">
-										{#if hasImage}
-											<button 
-												class="card-thumbnail" 
-												onclick={(e) => { e.stopPropagation(); selectedImageUrl = `/uploads/${hasImage}`; }}
-												aria-label="Voir l'image"
-											>
-												<img src="/uploads/{hasImage}" alt="" />
-											</button>
-										{/if}
-									</div>
-								{:else}
-									<div class="card-center-locked">
-										<span class="lock-icon">🔒</span>
-										<span class="locked-text">Reviens demain à {data.threshold}</span>
-									</div>
-								{/if}
-							</div>
+								onimageclick={(url) => selectedImageUrl = url}
+								{formatTime}
+								{formatDuration}
+								{formatTimeSeconds}
+							/>
 						{/each}
 					</div>
 				</div>

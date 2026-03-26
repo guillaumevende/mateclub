@@ -99,13 +99,66 @@ MateClub est une application web PWA permettant à un groupe d'amis d'enregistre
 
 ## Architecture des composants
 
-Le projet suit une architecture modulaire avec des composants Svelte de moins de 300 lignes pour faciliter la maintenance :
+Le projet suit une architecture modulaire avec des composants Svelte de moins de 300 lignes pour faciliter la maintenance.
+
+### Règles de développement RecordingCard
+
+**IMPORTANT** : Pour assurer le bon fonctionnement du CSS des vignettes (notamment l'effet blur sur les vignettes verrouillées), les cartes d'enregistrement **doivent** utiliser le composant `RecordingCard.svelte` et non du code inline.
+
+#### Pourquoi ?
+
+Le composant `RecordingCard` utilise :
+1. Une **variable CSS** (`--bg-image`) pour l'image de fond
+2. Le pseudo-élément `::before` avec `background: inherit` pour flouter l'image
+3. La classe `.with-bg` combinée à la variable CSS
+
+Le CSS de floutage **ne fonctionne pas** avec les styles inline `style="background-image: url(...)"`.
+
+#### Utilisation correcte
+
+```svelte
+<RecordingCard
+  {recording}
+  {index}
+  available={day.available}
+  {cardSwiped}
+  {player}
+  threshold={data.threshold}
+  {isRecordingListened}
+  {isCurrentPlaying}
+  {isCurrentRecording}
+  onplay={(i) => playFromRecording(day, i)}
+  ontouchstart={handleCardTouchStart}
+  ontouchend={(e) => handleCardTouchEnd(e, day, index)}
+  onimageclick={(url) => selectedImageUrl = url}
+  {formatTime}
+  {formatDuration}
+  {formatTimeSeconds}
+/>
+```
+
+#### Ne PAS faire
+
+```svelte
+<!-- ❌ NE PAS faire : code inline avec style inline -->
+<div 
+  class="recording-card"
+  class:locked={!day.available}
+  style="background-image: url(/uploads/{image})"
+>
+  ...
+</div>
+```
+
+Cela cassera l'effet de flou sur les vignettes verrouillées.
+
+### Composants extraits
 
 ### Composants extraits
 
 | Composant | Lignes | Description | Utilisé dans |
 |-----------|--------|-------------|--------------|
-| `RecordingCard.svelte` | 345 | Carte d'enregistrement (315×420px) avec styles encapsulés | Page d'accueil |
+| `RecordingCard.svelte` | 321 | Carte d'enregistrement (315×420px) avec styles encapsulés et blur | Page d'accueil (3 contexts) |
 | `ImageUpload.svelte` | 232 | Upload image avec compression HEIC/JPEG et drag & drop | Page enregistrer |
 | `TeamList.svelte` | 110 | Modal "La team" avec liste des utilisateurs | Page d'accueil |
 | `Calendar.svelte` | 220 | Calendrier interactif avec navigation mensuelle | Page d'accueil |
