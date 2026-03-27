@@ -1,6 +1,21 @@
 import type { PageServerLoad, Actions } from './$types';
 import { redirect, fail } from '@sveltejs/kit';
-import { getAllUsers, createUser, deleteUser, updateUserHour, toggleSuperPowers, getUserById, isPseudoAvailable, toggleLogsEnabled, toggleJinglesEnabled } from '$lib/server/db';
+import { 
+	getAllUsers, 
+	createUser, 
+	deleteUser, 
+	updateUserHour, 
+	toggleSuperPowers, 
+	getUserById, 
+	isPseudoAvailable, 
+	toggleLogsEnabled, 
+	toggleJinglesEnabled,
+	getPendingRegistrations,
+	approveRegistration,
+	rejectRegistration,
+	isRegistrationAllowed,
+	setAppConfig
+} from '$lib/server/db';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) {
@@ -13,7 +28,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 
 	const users = getAllUsers();
 	const currentUser = getUserById(locals.user.id);
-	return { users, currentUser, csrfToken: locals.csrfToken };
+	const pendingRegistrations = getPendingRegistrations();
+	const allowRegistration = isRegistrationAllowed();
+	return { users, currentUser, csrfToken: locals.csrfToken, pendingRegistrations, allowRegistration };
 };
 
 export const actions: Actions = {
@@ -94,7 +111,7 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	toggleJingles: async ({ request, locals }) => {
+		toggleJingles: async ({ request, locals }) => {
 		const data = await request.formData();
 		const enabled = data.get('enabled') === 'true';
 
@@ -102,5 +119,51 @@ export const actions: Actions = {
 			toggleJinglesEnabled(locals.user.id, enabled);
 		}
 		return { success: true };
+	},
+
+	approveRegistration: async ({ request, locals }) => {
+		if (!locals.user?.is_admin) {
+			return fail(403, { error: 'Non autorisé' });
+		}
+		
+		const data = await request.formData();
+		const registrationId = data.get('registration_id')?.toString();
+
+		if (registrationId) {
+			try {
+				const user = approveRegistration(parseInt(registrationId, 10));
+				return { success: true, message: `Utilisateur "${user.pseudo}" validé avec succès` };
+			} catch (e) {
+				return fail(400, { error: 'Erreur lors de la validation' });
+			}
+		}
+		return { success: false };
+	},
+
+	rejectRegistration: async ({ request, locals }) => {
+		if (!locals.user?.is_admin) {
+			return fail(403, { error: 'Non autorisé' });
+		}
+		
+		const data = await request.formData();
+		const registrationId = data.get('registration_id')?.toString();
+
+		if (registrationId) {
+			rejectRegistration(parseInt(registrationId, 10));
+			return { success: true };
+		}
+		return { success: false };
+	},
+
+	toggleRegistration: async ({ request, locals }) => {
+		if (!locals.user?.is_admin) {
+			return fail(403, { error: 'Non autorisé' });
+		}
+		
+		const data = await request.formData();
+		const enabled = data.get('enabled') === 'true';
+		
+		setAppConfig('allow_registration', enabled ? 'true' : 'false');
+		return { success: true, allowRegistration: enabled };
 	}
 };

@@ -58,7 +58,7 @@
 		hasRecordings: boolean;
 	};
 
-	let { data }: { data: PageData & { user?: User; allUsers: UserList[]; threshold: number; unreadStats?: { count: number; totalSeconds: number }; hasMore?: boolean } } = $props();
+	let { data }: { data: PageData & { user?: User; allUsers: UserList[]; threshold: number; unreadStats?: { count: number; totalSeconds: number }; hasMore?: boolean; pendingRegistrationsCount?: number } } = $props();
 	let showTeam = $state(false);
 	let currentPage = $state(1);
 	let allDays = $state<DayRecordings[]>([]);
@@ -548,6 +548,11 @@
 	ontouchend={handleTouchEnd}
 >
 	<header>
+		{#if data.user?.is_admin && data.pendingRegistrationsCount && data.pendingRegistrationsCount > 0}
+			<a href="/admin" class="admin-badge" title="{data.pendingRegistrationsCount} inscription{data.pendingRegistrationsCount !== 1 ? 's' : ''} en attente">
+				<span class="badge-count">{data.pendingRegistrationsCount}</span>
+			</a>
+		{/if}
 		<img src="/logo512px.png" alt="MateClub" class="logo" />
 		<p class="date">{getTodayDate()}</p>
 		<p class="welcome">Bienvenue, {data.user?.pseudo} !</p>
@@ -855,6 +860,37 @@
 		text-align: center;
 		padding: 1rem 0;
 		position: relative;
+	}
+
+	.admin-badge {
+		position: absolute;
+		top: 0.5rem;
+		left: 0;
+		width: 32px;
+		height: 32px;
+		background: #e94560;
+		border-radius: 50%;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		text-decoration: none;
+		animation: pulse-badge 2s infinite;
+		z-index: 100;
+	}
+
+	.badge-count {
+		color: white;
+		font-weight: bold;
+		font-size: 0.875rem;
+	}
+
+	@keyframes pulse-badge {
+		0%, 100% {
+			box-shadow: 0 0 0 0 rgba(233, 69, 96, 0.7);
+		}
+		50% {
+			box-shadow: 0 0 0 10px rgba(233, 69, 96, 0);
+		}
 	}
 
 	.logo {
