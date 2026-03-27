@@ -6,22 +6,6 @@
 	// Liste des emojis pour l'avatar (même liste que dans admin)
 	const emojis = ['☕', '😀', '😎', '🤠', '🥳', '😇', '🤩', '😈', '👻', '🤖', '🎸', '🎮', '🚀', '🍕', '🍺', '🌈', '🔥', '⭐', '❤️'];
 	
-	// Fuseaux horaires communs
-	const timezones = [
-		{ value: 'Europe/Paris', label: 'Europe/Paris' },
-		{ value: 'Europe/London', label: 'Europe/London' },
-		{ value: 'Europe/Berlin', label: 'Europe/Berlin' },
-		{ value: 'America/New_York', label: 'New York (EST)' },
-		{ value: 'America/Los_Angeles', label: 'Los Angeles (PST)' },
-		{ value: 'America/Chicago', label: 'Chicago (CST)' },
-		{ value: 'America/Toronto', label: 'Toronto' },
-		{ value: 'Asia/Tokyo', label: 'Tokyo' },
-		{ value: 'Asia/Shanghai', label: 'Shanghai' },
-		{ value: 'Australia/Sydney', label: 'Sydney' },
-		{ value: 'Pacific/Auckland', label: 'Auckland' },
-		{ value: 'UTC', label: 'UTC' }
-	];
-	
 	let selectedAvatar = $state('☕');
 	let selectedTimezone = $state('Europe/Paris');
 	let password = $state('');
@@ -53,7 +37,6 @@
 		<div class="success-message">
 			<h2>✅ Inscription réussie !</h2>
 			<p>{form?.message}</p>
-			<p class="sub-message">Un administrateur va valider ton inscription. Tu recevras un email quand ce sera fait.</p>
 			<a href="/login" class="back-link">Retour à la connexion</a>
 		</div>
 	{:else if data?.closed}
@@ -77,7 +60,7 @@
 					type="text" 
 					id="pseudo" 
 					name="pseudo" 
-					placeholder="Choisis un pseudo unique" 
+					placeholder="Choisis un pseudo" 
 					required 
 					minlength="3"
 					maxlength="30"
@@ -146,7 +129,7 @@
 			<div class="form-group">
 				<label for="timezone">Fuseau horaire</label>
 				<select id="timezone" name="timezone" bind:value={selectedTimezone}>
-					{#each timezones as tz}
+					{#each data.timezones as tz}
 						<option value={tz.value}>{tz.label}</option>
 					{/each}
 				</select>
@@ -304,7 +287,7 @@
 
 	.success-message p {
 		color: #eee;
-		margin-bottom: 0.5rem;
+		margin-bottom: 1.5rem;
 	}
 
 	.closed-message {

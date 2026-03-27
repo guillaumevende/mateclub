@@ -10,6 +10,23 @@ import {
 } from '$lib/server/db';
 import { version } from '../../../package.json';
 
+function getTimezones() {
+	const timezones = Intl.supportedValuesOf('timeZone');
+	const now = new Date();
+	
+	return timezones.map(tz => {
+		const formatter = new Intl.DateTimeFormat('en-US', {
+			timeZone: tz,
+			timeZoneName: 'shortOffset'
+		});
+		const parts = formatter.formatToParts(now);
+		const offset = parts.find(p => p.type === 'timeZoneName')?.value || '';
+		return { value: tz, label: `${tz} (${offset})` };
+	}).sort((a, b) => a.label.localeCompare(b.label));
+}
+
+const timezones = getTimezones();
+
 export const load: PageServerLoad = async ({ locals }) => {
 	// Vérifie si les inscriptions sont ouvertes
 	const closed = !isRegistrationAllowed();
@@ -22,7 +39,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	return {
 		csrfToken: locals.csrfToken,
 		version,
-		closed
+		closed,
+		timezones
 	};
 };
 

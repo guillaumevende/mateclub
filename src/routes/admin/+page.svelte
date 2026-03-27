@@ -239,8 +239,11 @@
 			<div class="pending-item">
 				<div class="pending-info">
 					<span class="pending-avatar">{registration.avatar}</span>
-					<span class="pending-pseudo">{registration.pseudo}</span>
-					<span class="pending-timezone">{registration.timezone}</span>
+					<div class="pending-details">
+						<span class="pending-pseudo">{registration.pseudo}</span>
+						<span class="pending-date">inscription le {new Date(registration.requested_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })} à {new Date(registration.requested_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+						<span class="pending-timezone">{registration.timezone}</span>
+					</div>
 				</div>
 				<div class="pending-actions">
 					<form method="POST" action="?/approveRegistration" use:enhance={() => {
@@ -735,6 +738,13 @@
 		display: flex;
 		align-items: center;
 		gap: 0.75rem;
+		flex: 1;
+	}
+
+	.pending-details {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
 	}
 
 	.pending-avatar {
@@ -746,14 +756,28 @@
 		color: #eee;
 	}
 
-	.pending-timezone {
+	.pending-date {
 		color: #888;
-		font-size: 0.8rem;
+		font-size: 0.75rem;
+	}
+
+	.pending-timezone {
+		color: #666;
+		font-size: 0.75rem;
 	}
 
 	.pending-actions {
 		display: flex;
 		gap: 0.5rem;
+		width: 100%;
+	}
+
+	.pending-actions form {
+		flex: 1;
+	}
+
+	.pending-actions button {
+		width: 100%;
 	}
 
 	.approve-btn {
