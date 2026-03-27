@@ -1,6 +1,15 @@
 import type { PageServerLoad, Actions } from './$types';
 import { redirect, fail } from '@sveltejs/kit';
-import { getUserByPseudo, verifyPassword, createSession, canAttemptLogin, recordLoginAttempt, getRemainingLockoutTime } from '$lib/server/db';
+import { 
+	getUserByPseudo, 
+	verifyPassword, 
+	createSession, 
+	canAttemptLogin, 
+	recordLoginAttempt, 
+	getRemainingLockoutTime,
+	isPendingRegistration,
+	isRegistrationAllowed
+} from '$lib/server/db';
 import { version } from '../../../package.json';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -9,7 +18,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	}
 	return {
 		csrfToken: locals.csrfToken,
-		version
+		version,
+		allowRegistration: isRegistrationAllowed()
 	};
 };
 
@@ -36,6 +46,15 @@ export const actions: Actions = {
 		}
 
 		const user = getUserByPseudo(pseudo);
+		
+		// Vérifie si l'utilisateur est en attente de validation
+		if (!user && isPendingRegistration(pseudo)) {
+			return fail(403, { 
+				error: 'Ton inscription est en attente de validation par un administrateur.',
+				pending: true 
+			});
+		}
+		
 		if (!user || !verifyPassword(user.password_hash, password)) {
 			recordLoginAttempt(clientIp, user?.id);
 			return fail(401, { error: 'Identifiants invalides' });

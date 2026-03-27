@@ -18,7 +18,16 @@
 		jingles_enabled?: number;
 	};
 
-	let { data, form }: { data: PageData & { currentUser?: User; csrfToken?: string }; form?: { success?: boolean; error?: string } } = $props();
+	type PendingRegistration = {
+		id: number;
+		pseudo: string;
+		avatar: string;
+		timezone: string;
+		requested_at: string;
+		status: string;
+	};
+
+	let { data, form }: { data: PageData & { currentUser?: User; csrfToken?: string; pendingRegistrations?: PendingRegistration[]; allowRegistration?: boolean }; form?: { success?: boolean; error?: string; message?: string } } = $props();
 
 	const emojis = ['☕', '😀', '😎', '🤠', '🥳', '😇', '🤩', '😈', '👻', '🤖', '🎸', '🎮', '🚀', '🍕', '🍺', '🌈', '🔥', '⭐', '❤️'];
 	
@@ -43,6 +52,7 @@
 	let canConfirmDelete = $state(false);
 
 	let superPowersEnabled = $state(data.currentUser?.super_powers === 1);
+	let allowRegistrationEnabled = $state(data.allowRegistration === true);
 
 	function openDeleteModal(user: User) {
 		userToDelete = user;
@@ -183,6 +193,93 @@
 			</form>
 		{/if}
 	</section>
+
+	<section>
+		<h2>Configuration des inscriptions</h2>
+		<p class="super-text">
+			Autorisez ou interdisez les nouvelles inscriptions. Quand les inscriptions sont ouvertes, 
+			les visiteurs peuvent créer un compte qui devra être validé par un administrateur.
+		</p>
+		{#if allowRegistrationEnabled}
+			<form method="POST" action="?/toggleRegistration" use:enhance={() => {
+				return async ({ result }) => {
+					if (result.type === 'success') {
+						allowRegistrationEnabled = false;
+					}
+				};
+			}}>
+				<input type="hidden" name="csrf_token" value={data.csrfToken} />
+				<input type="hidden" name="enabled" value="false" />
+				<button type="submit" class="super-btn registration-btn">🔴 Fermer les inscriptions</button>
+			</form>
+		{:else}
+			<form method="POST" action="?/toggleRegistration" use:enhance={() => {
+				return async ({ result }) => {
+					if (result.type === 'success') {
+						allowRegistrationEnabled = true;
+					}
+				};
+			}}>
+				<input type="hidden" name="csrf_token" value={data.csrfToken} />
+				<input type="hidden" name="enabled" value="true" />
+				<button type="submit" class="super-btn registration-btn">✅ Ouvrir les inscriptions</button>
+			</form>
+		{/if}
+	</section>
+
+	{#if data.pendingRegistrations && data.pendingRegistrations.length > 0}
+	<section class="pending-section">
+		<h2>Inscriptions en attente ({data.pendingRegistrations.length})</h2>
+		<p class="super-text">
+			Validez ou rejetez les demandes d'inscription. Les utilisateurs rejetés sont supprimés définitivement.
+		</p>
+		
+		<div class="pending-list">
+			{#each data.pendingRegistrations as registration}
+			<div class="pending-item">
+				<div class="pending-info">
+					<span class="pending-avatar">{registration.avatar}</span>
+					<div class="pending-details">
+						<span class="pending-pseudo">{registration.pseudo}</span>
+						<span class="pending-date">inscription le {new Date(registration.requested_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })} à {new Date(registration.requested_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+						<span class="pending-timezone">{registration.timezone}</span>
+					</div>
+				</div>
+				<div class="pending-actions">
+					<form method="POST" action="?/approveRegistration" use:enhance={() => {
+						return async ({ result }) => {
+							if (result.type === 'success') {
+								window.location.reload();
+							}
+						};
+					}}>
+						<input type="hidden" name="csrf_token" value={data.csrfToken} />
+						<input type="hidden" name="registration_id" value={registration.id} />
+						<button type="submit" class="approve-btn">✅ Valider</button>
+					</form>
+					
+					<form method="POST" action="?/rejectRegistration" use:enhance={() => {
+						return async ({ result }) => {
+							if (result.type === 'success') {
+								window.location.reload();
+							}
+						};
+					}}>
+						<input type="hidden" name="csrf_token" value={data.csrfToken} />
+						<input type="hidden" name="registration_id" value={registration.id} />
+						<button type="submit" class="reject-btn">❌ Rejeter</button>
+					</form>
+				</div>
+			</div>
+			{/each}
+		</div>
+	</section>
+	{:else}
+	<section class="pending-section empty">
+		<h2>Inscriptions en attente</h2>
+		<p class="super-text">Aucune inscription en attente.</p>
+	</section>
+	{/if}
 
 	<section>
 		<h2>Créer un utilisateur</h2>
@@ -602,5 +699,114 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.25rem;
+	}
+
+	.registration-btn {
+		width: 100%;
+	}
+
+	.pending-section {
+		background: #2a2a4e;
+		border-radius: 12px;
+		padding: 1.5rem;
+		margin-bottom: 1.5rem;
+	}
+
+	.pending-section.empty {
+		opacity: 0.6;
+	}
+
+	.pending-list {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		margin-top: 1rem;
+	}
+
+	.pending-item {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		background: #1a1a2e;
+		padding: 1rem;
+		border-radius: 8px;
+		flex-wrap: wrap;
+		gap: 1rem;
+	}
+
+	.pending-info {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		flex: 1;
+	}
+
+	.pending-details {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.pending-avatar {
+		font-size: 1.5rem;
+	}
+
+	.pending-pseudo {
+		font-weight: 600;
+		color: #eee;
+	}
+
+	.pending-date {
+		color: #888;
+		font-size: 0.75rem;
+	}
+
+	.pending-timezone {
+		color: #666;
+		font-size: 0.75rem;
+	}
+
+	.pending-actions {
+		display: flex;
+		gap: 0.5rem;
+		width: 100%;
+	}
+
+	.pending-actions form {
+		flex: 1;
+	}
+
+	.pending-actions button {
+		width: 100%;
+	}
+
+	.approve-btn {
+		background: #22c55e;
+		color: white;
+		border: none;
+		padding: 0.5rem 1rem;
+		border-radius: 6px;
+		cursor: pointer;
+		font-weight: 600;
+		font-size: 0.875rem;
+	}
+
+	.approve-btn:hover {
+		background: #16a34a;
+	}
+
+	.reject-btn {
+		background: #ef4444;
+		color: white;
+		border: none;
+		padding: 0.5rem 1rem;
+		border-radius: 6px;
+		cursor: pointer;
+		font-weight: 600;
+		font-size: 0.875rem;
+	}
+
+	.reject-btn:hover {
+		background: #dc2626;
 	}
 </style>

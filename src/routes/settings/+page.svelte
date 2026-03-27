@@ -237,6 +237,12 @@
 	}
 	
 	function getAvatarDisplay() {
+		// Si on a une prévisualisation en attente (nouvelle image pas encore sauvegardée)
+		if (imagePreview && hasPendingImage) {
+			return { type: 'preview', value: imagePreview };
+		}
+		
+		// Sinon, comportement normal
 		if (isImageAvatar && data.user?.avatar) {
 			return { type: 'image', value: data.user.avatar };
 		}
@@ -259,7 +265,9 @@
 
 	<!-- Affichage avatar actuel en haut -->
 	<div class="current-avatar-display">
-		{#if getAvatarDisplay().type === 'image'}
+		{#if getAvatarDisplay().type === 'preview'}
+			<img src={getAvatarDisplay().value} alt="Avatar" class="avatar-image" />
+		{:else if getAvatarDisplay().type === 'image'}
 			<img src="/uploads/avatars/{getAvatarDisplay().value}" alt="Avatar" class="avatar-image" />
 		{:else}
 			<span class="avatar-emoji">{getAvatarDisplay().value}</span>

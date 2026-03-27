@@ -2,6 +2,43 @@
 
 ---
 
+## v2.5.0-beta (2026-03-27)
+
+### Nouvelle fonctionnalité : Système d'inscription Beta
+
+#### Inscription
+- [x] **Page d'inscription** : Nouvelle page `/register` accessible publiquement
+- [x] **Formulaire sécurisé** : CSRF, rate limiting, validation mot de passe 12+ caractères
+- [x] **Confirmation** : Message "Tu es bien inscrit : attends qu'on valide ton accès"
+- [x] **Page fermées** : Message instead d'erreur 403 si inscriptions fermées
+
+#### Administration
+- [x] **Toggle inscriptions** : L'admin peut activer/désactiver les inscriptions depuis le panel admin
+- [x] **Liste en attente** : Visualisation des demandes d'inscription en attente
+- [x] **Validation un par un** : Boutons "Valider" et "Rejeter" pour chaque demande
+- [x] **Pastille notification** : Pastille rouge sur l'accueil admin avec nombre d'inscriptions en attente
+
+#### Base de données
+- [x] **Table pending_registrations** : Stockage des demandes d'inscription en attente
+- [x] **Table app_config** : Configuration de l'application (allow_registration)
+- [x] **Fonctions DB** : createPendingRegistration, approveRegistration, rejectRegistration, isRegistrationAllowed, etc.
+
+### Corrections de bugs
+
+#### Interface - Calendrier
+- [x] **Fix noms de mois** : Correction du décalage dans getMonthName() (suppression du -1)
+- [x] **Robustesse** : Les noms de mois utilisent maintenant directement l'index JavaScript (0-11)
+
+#### Pagination et affichage
+- [x] **Fix bouton "Charger plus"** : La logique vérifie maintenant s'il y a des jours supplémentaires au-delà de ceux affichés
+- [x] **Filtre 3 mois** : La page d'accueil et le compteur de capsules non lues filtrent maintenant sur les 3 derniers mois
+- [x] **Alignement compteur** : Le nombre de capsules non lues correspond à l'affichage
+
+### Documentation
+- [x] **Règles RecordingCard** : Documentation dans le README pour éviter la régression du CSS des capsules verrouillées
+
+---
+
 ## v2.4.7 (2026-03-23)
 
 ### Corrections et améliorations

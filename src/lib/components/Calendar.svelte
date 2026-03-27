@@ -24,7 +24,7 @@
 
 	function getMonthName(month: number): string {
 		const monthNames = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-		return monthNames[month - 1];
+		return monthNames[month];
 	}
 
 	function handleCalendarClick(e: MouseEvent) {

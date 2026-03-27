@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { getRecordingsGroupedByDayWithHasMore, getUserById, getAllUsers, getUserTimezone, getUnreadCount } from '$lib/server/db';
+import { getRecordingsGroupedByDayWithHasMore, getUserById, getAllUsers, getUserTimezone, getUnreadCount, getPendingRegistrationsCount } from '$lib/server/db';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) {
@@ -21,6 +21,9 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const mins = thresholdMinutes % 60;
 	const threshold = mins === 0 ? `${hours}h` : `${hours}h${mins.toString().padStart(2, '0')}`;
 
+	// Si admin, récupère le nombre d'inscriptions en attente
+	const pendingRegistrationsCount = user?.is_admin ? getPendingRegistrationsCount() : 0;
+
 	return {
 		days,
 		hasMore,
@@ -28,6 +31,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		user,
 		allUsers,
 		page,
-		unreadStats
+		unreadStats,
+		pendingRegistrationsCount
 	};
 };

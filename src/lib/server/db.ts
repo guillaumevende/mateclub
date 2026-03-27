@@ -134,6 +134,36 @@ try {
 	// Table déjà existante
 }
 
+try {
+	db.exec(`
+		CREATE TABLE IF NOT EXISTS pending_registrations (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			pseudo TEXT UNIQUE NOT NULL,
+			password_hash TEXT NOT NULL,
+			avatar TEXT DEFAULT '☕',
+			timezone TEXT DEFAULT 'Europe/Paris',
+			requested_at DATETIME DEFAULT (datetime('now', 'localtime')),
+			status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected'))
+		)
+	`);
+} catch (e) {
+	// Table déjà existante
+}
+
+try {
+	db.exec(`
+		CREATE TABLE IF NOT EXISTS app_config (
+			key TEXT PRIMARY KEY,
+			value TEXT NOT NULL
+		)
+	`);
+	// Initialiser la configuration par défaut
+	const stmt = db.prepare('INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)');
+	stmt.run('allow_registration', 'false');
+} catch (e) {
+	// Table déjà existante
+}
+
 export type User = {
 	id: number;
 	pseudo: string;
@@ -395,9 +425,18 @@ export function getRecordingsGroupedByDayWithHasMore(
 	const userTimezone = timezone || user.timezone || 'Europe/Paris';
 	const threshold = user.daily_notification_hour;
 
+	// Filtrer sur les 3 derniers mois
+	const threeMonthsAgo = new Date();
+	threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+	const threeMonthsAgoStr = threeMonthsAgo.toISOString();
+
 	const offset = (page - 1) * limit;
 
-	// Demander (limit + 1) * 3 enregistrements pour détecter s'il y a plus de données
+	// Calculer la date de début pour cette page (pour vérifier s'il y a plus de jours)
+	const startDate = new Date();
+	startDate.setDate(startDate.getDate() - (page * limit * 1)); // Approximation
+
+	// Requête principale : récupérer les enregistrements des 3 derniers mois
 	const stmt = db.prepare(`
 		SELECT
 			r.id, r.user_id, r.filename, r.image_filename, r.url, r.duration_seconds, r.recorded_at,
@@ -406,10 +445,12 @@ export function getRecordingsGroupedByDayWithHasMore(
 		FROM recordings r
 		JOIN users u ON r.user_id = u.id
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
+		WHERE r.recorded_at >= ?
 		ORDER BY r.recorded_at DESC
 		LIMIT ? OFFSET ?
 	`);
-	const results = stmt.all(userId, (limit + 1) * 3, offset) as Recording[];
+	// Demander enough records pour avoir tous les jours (limit * 10 par sécurité)
+	const results = stmt.all(userId, threeMonthsAgoStr, limit * 10, offset) as Recording[];
 
 	const grouped: Record<string, Recording[]> = {};
 	for (const row of results) {
@@ -418,10 +459,15 @@ export function getRecordingsGroupedByDayWithHasMore(
 		grouped[date].push(row);
 	}
 
-	const today = getCurrentDateInTimezone(userTimezone);
+	// Trier les dates par ordre décroissant (plus récent au plus ancien)
+	const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+	// Prendre seulement 'limit' jours
+	const selectedDates = sortedDates.slice(0, limit);
 
 	const days: DayRecordings[] = [];
-	for (const [date, recordings] of Object.entries(grouped)) {
+	for (const date of selectedDates) {
+		const recordings = grouped[date];
 		const isAvailable = recordings.some(r =>
 			isDateAvailable(r.recorded_at, user.super_powers === 1, threshold, userTimezone)
 		);
@@ -435,26 +481,30 @@ export function getRecordingsGroupedByDayWithHasMore(
 		});
 	}
 
-	// Vérifier s'il y a plus de données en vérifiant le nombre d'enregistrements retournés
-	const hasMore = results.length >= (limit + 1) * 3;
+	// Vérifier s'il y a plus de jours au-delà de ceux affichés
+	const hasMore = sortedDates.length > limit;
 
-	// Retourner seulement 'limit' jours
 	return {
-		days: days.slice(0, limit),
+		days,
 		hasMore
 	};
 }
 
 export function getUnreadCount(userId: number): { count: number; totalSeconds: number } {
+	// Filtrer sur les 3 derniers mois pour correspondre à l'affichage
+	const threeMonthsAgo = new Date();
+	threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+	const threeMonthsAgoStr = threeMonthsAgo.toISOString();
+	
 	const stmt = db.prepare(`
 		SELECT 
 			COUNT(*) as count,
 			COALESCE(SUM(r.duration_seconds), 0) as totalSeconds
 		FROM recordings r
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
-		WHERE l.id IS NULL AND r.user_id != ?
+		WHERE l.id IS NULL AND r.user_id != ? AND r.recorded_at >= ?
 	`);
-	const result = stmt.get(userId, userId) as { count: number; totalSeconds: number };
+	const result = stmt.get(userId, userId, threeMonthsAgoStr) as { count: number; totalSeconds: number };
 	return result;
 }
 
@@ -892,4 +942,116 @@ export function consumeCSRFToken(token: string): void {
 export function cleanupExpiredCSRF(): void {
 	const stmt = db.prepare('DELETE FROM csrf_tokens WHERE expires_at < datetime(\'now\')');
 	stmt.run();
+}
+
+// ============ REGISTRATION MANAGEMENT FUNCTIONS ============
+
+export type PendingRegistration = {
+	id: number;
+	pseudo: string;
+	password_hash: string;
+	avatar: string;
+	timezone: string;
+	requested_at: string;
+	status: string;
+};
+
+export function createPendingRegistration(
+	pseudo: string, 
+	password: string, 
+	avatar: string = '☕',
+	timezone: string = 'Europe/Paris'
+): PendingRegistration {
+	const passwordHash = hashSync(password, 10);
+	const stmt = db.prepare(`
+		INSERT INTO pending_registrations (pseudo, password_hash, avatar, timezone)
+		VALUES (?, ?, ?, ?)
+		RETURNING *
+	`);
+	return stmt.get(pseudo, passwordHash, avatar, timezone) as PendingRegistration;
+}
+
+export function getPendingRegistrations(): PendingRegistration[] {
+	const stmt = db.prepare(`
+		SELECT * FROM pending_registrations 
+		WHERE status = 'pending'
+		ORDER BY requested_at DESC
+	`);
+	return stmt.all() as PendingRegistration[];
+}
+
+export function getPendingRegistrationsCount(): number {
+	const stmt = db.prepare(`
+		SELECT COUNT(*) as count FROM pending_registrations 
+		WHERE status = 'pending'
+	`);
+	const result = stmt.get() as { count: number };
+	return result.count;
+}
+
+export function isPendingRegistration(pseudo: string): boolean {
+	const stmt = db.prepare('SELECT id FROM pending_registrations WHERE pseudo = ? AND status = ?');
+	const result = stmt.get(pseudo, 'pending');
+	return !!result;
+}
+
+export function isPseudoAvailableForRegistration(pseudo: string): boolean {
+	// Vérifie que le pseudo n'est pas déjà utilisé dans users ni dans pending_registrations
+	const userStmt = db.prepare('SELECT id FROM users WHERE pseudo = ?');
+	const pendingStmt = db.prepare('SELECT id FROM pending_registrations WHERE pseudo = ? AND status = ?');
+	
+	const userExists = userStmt.get(pseudo);
+	const pendingExists = pendingStmt.get(pseudo, 'pending');
+	
+	return !userExists && !pendingExists;
+}
+
+export function approveRegistration(id: number): User {
+	// Récupère la demande
+	const getStmt = db.prepare('SELECT * FROM pending_registrations WHERE id = ? AND status = ?');
+	const registration = getStmt.get(id, 'pending') as PendingRegistration | undefined;
+	
+	if (!registration) {
+		throw new Error('Registration not found or already processed');
+	}
+	
+	// Crée l'utilisateur avec le même hash de mot de passe
+	const insertUserStmt = db.prepare(`
+		INSERT INTO users (pseudo, password_hash, avatar, timezone, is_admin, super_powers)
+		VALUES (?, ?, ?, ?, 0, 0)
+		RETURNING id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, logs_enabled, jingles_enabled
+	`);
+	const user = insertUserStmt.get(
+		registration.pseudo, 
+		registration.password_hash, 
+		registration.avatar, 
+		registration.timezone
+	) as User;
+	
+	// Met à jour le statut de la demande
+	const updateStmt = db.prepare('UPDATE pending_registrations SET status = ? WHERE id = ?');
+	updateStmt.run('approved', id);
+	
+	return user;
+}
+
+export function rejectRegistration(id: number): void {
+	const stmt = db.prepare('DELETE FROM pending_registrations WHERE id = ? AND status = ?');
+	stmt.run(id, 'pending');
+}
+
+export function getAppConfig(key: string): string | null {
+	const stmt = db.prepare('SELECT value FROM app_config WHERE key = ?');
+	const result = stmt.get(key) as { value: string } | undefined;
+	return result?.value || null;
+}
+
+export function setAppConfig(key: string, value: string): void {
+	const stmt = db.prepare('INSERT OR REPLACE INTO app_config (key, value) VALUES (?, ?)');
+	stmt.run(key, value);
+}
+
+export function isRegistrationAllowed(): boolean {
+	const value = getAppConfig('allow_registration');
+	return value === 'true';
 }
