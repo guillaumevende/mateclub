@@ -9,7 +9,7 @@
 	import TeamList from '$lib/components/TeamList.svelte';
 	import Calendar from '$lib/components/Calendar.svelte';
 	import { scrollLock } from '$lib/actions/scrollLock';
-	import { triggerHaptic } from '$lib/utils/haptics';
+	import { triggerHaptic, triggerLockedHaptic } from '$lib/utils/haptics';
 	import { playerStore, lastListenedRecordingId, type Recording, type DayRecordings, type PlayerState, playRecording, togglePlayPause, closePlayer, playNext } from '$lib/stores/player';
 	import { debug } from '$lib/debug';
 	import '$lib/shared.css';
@@ -358,7 +358,10 @@
 	}
 
 	function playFromRecording(day: DayRecordings, index: number) {
-		if (!day.available) return;
+		if (!day.available) {
+			triggerLockedHaptic();
+			return;
+		}
 		triggerHaptic('nudge');
 		playRecording(day, index);
 	}
