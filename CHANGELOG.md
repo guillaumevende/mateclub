@@ -2,6 +2,29 @@
 
 ---
 
+## v2.6.0 (2026-03-29)
+
+### 🎨 Nouvelle identité visuelle
+
+#### Assets régénérés
+- [x] **Logo principal** : Toutes les déclinaisons générées depuis `logoHD.png`
+- [x] **icon-512x512.png** : Icône PWA principale (512x512)
+- [x] **icon-192x192.png** : Icône PWA (192x192)
+- [x] **apple-touch-icon.png** : Icône iOS (180x180)
+- [x] **favicon-32x32.png** : Favicon navigateur (32x32)
+- [x] **favicon-16x16.png** : Favicon navigateur petit (16x16)
+- [x] **favicon.ico** : Favicon multi-résolution
+
+#### Nettoyage
+- [x] **Suppression logo512px.png** : Ancienne version obsolète remplacée
+- [x] **Suppression backup** : Fichier `+page.svelte.backup-2026-03-12` obsolète
+
+#### Code mis à jour
+- [x] **Toutes les pages** : Références `/logo512px.png` → `/icon-512x512.png`
+- [x] **Player metadata** : Mise à jour des artwork dans `player.ts`
+
+---
+
 ## v2.5.0-beta (2026-03-27)
 
 ### Nouvelle fonctionnalité : Système d'inscription Beta
