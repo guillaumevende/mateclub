@@ -1,6 +1,6 @@
 {
-	"name": "Mate Club",
-	"short_name": "Mate Club",
+	"name": "Maté Club",
+	"short_name": "Maté Club",
 	"description": "Votre podcast quotidien entre amis",
 	"start_url": "/",
 	"display": "standalone",
