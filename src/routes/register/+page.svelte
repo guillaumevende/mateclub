@@ -31,7 +31,7 @@
 </script>
 
 <div class="register-container">
-	<img src="/logo512px.png" alt="MateClub" class="logo" />
+	<img src="/icon-512x512.png" alt="MateClub" class="logo" />
 
 	{#if form?.success}
 		<div class="success-message">

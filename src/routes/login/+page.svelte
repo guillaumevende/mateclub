@@ -12,7 +12,7 @@
 </script>
 
 <div class="login-container">
-	<img src="/logo512px.png" alt="MateClub" class="logo" />
+	<img src="/icon-512x512.png" alt="MateClub" class="logo" />
 
 	<form method="POST">
 		<input type="text" name="pseudo" placeholder="Pseudo" required autocomplete="username" onkeydown={handleKeydown} />

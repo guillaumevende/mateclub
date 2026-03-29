@@ -422,8 +422,7 @@ export function updateMediaSessionMetadata(recording: Recording | null) {
     artist: `MateClub - ${durationStr}`,
     artwork: [
       { src: '/icon-192x192.png', sizes: '192x192', type: 'image/png' },
-      { src: '/icon-512x512.png', sizes: '512x512', type: 'image/png' },
-      { src: '/logo512px.png', sizes: '512x512', type: 'image/png' }
+      { src: '/icon-512x512.png', sizes: '512x512', type: 'image/png' }
     ]
   });
 }

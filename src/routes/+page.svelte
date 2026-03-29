@@ -556,7 +556,7 @@
 				<span class="badge-count">{data.pendingRegistrationsCount}</span>
 			</a>
 		{/if}
-		<img src="/logo512px.png" alt="MateClub" class="logo" />
+		<img src="/icon-512x512.png" alt="MateClub" class="logo" />
 		<p class="date">{getTodayDate()}</p>
 		<p class="welcome">Bienvenue, {data.user?.pseudo} !</p>
 		{#if unreadStats.count > 0}
