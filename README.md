@@ -1,4 +1,4 @@
-# Maté Club
+# 🧉 Maté Club
 
 <div align="center">
 
