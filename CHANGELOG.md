@@ -119,7 +119,6 @@
 #### Sécurité & UX
 - [x] **Fix CSRF token** : Les tokens ne sont plus consommés après une erreur, permettant de corriger et resoumettre
 - [x] **Validation magic numbers HEIC** : Ajout des signatures HEIC/HEIF dans `fileValidation.ts`
->>>>>>> origin/main
 
 ### 🔒 Corrections de sécurité majeures
 
@@ -250,7 +249,6 @@ Réduction de la taille des fichiers `+page.svelte` (1848 → 1277 lignes) et `r
 | **Total lignes** | 3256 | 2549 | **-707 lignes** |
 | Tests | 3 | 63 | +60 tests |
 | Composants extraits | 0 | 4 | +4 composants |
->>>>>>> origin/main
 
 ---
 
