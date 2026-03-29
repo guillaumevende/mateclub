@@ -2,7 +2,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Alpha-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-2.4.3-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-2.5.0--beta-blue?style=for-the-badge)
 
 > **⚠️ En cours de développement**
 >
@@ -273,6 +273,36 @@ docker compose up -d --build
 ```
 
 **Note :** Le flag `--build` force la reconstruction de l'image Docker si des changements de code sont détectés. Sans ce flag, Docker utiliserait l'ancienne image en cache.
+
+#### Remise à zéro
+
+Pour réinitialiser complètement une instance (supprimer toutes les données, utilisateurs, enregistrements) :
+
+**Docker :**
+```bash
+docker compose down
+
+rm -rf data/ uploads/
+
+mkdir -p data uploads
+
+docker compose up -d
+```
+
+**Manuel :**
+```bash
+rm -rf data/ uploads/
+
+mkdir -p data uploads
+
+npm run build && npm run start
+```
+
+**Attention :** Cette opération supprime définitivement :
+- La base de données SQLite (`data/mateclub.db`)
+- Tous les fichiers audio et images (`uploads/`)
+
+Après reset, l'application affichera `/setup` pour créer un nouvel administrateur.
 
 #### Configuration avancée
 
