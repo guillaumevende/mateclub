@@ -1,12 +1,24 @@
 # MateClub
 
-![Status](https://img.shields.io/badge/Status-Alpha-orange?style=for-the-badge)
-![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-2.5.0--beta-blue?style=for-the-badge)
+<div align="center">
 
-> **⚠️ En cours de développement**
+<img src="static/icon-512x512.png" alt="MateClub Logo" width="200">
+
+![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
+![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-2.6.0-blue?style=for-the-badge)
+
+</div>
+
+✨ **Ce projet est une expérimentation de *vibe coding* de Guillaume Vendé, créateur du podcast [Tech Café](https://techcafe.fr)** ✨
+
+🤝 **Soutenez-moi sur [patreon.com/techcafe](https://patreon.com/techcafe) : le premier niveau d'abonnement est gratuit !**
+
+---
+
+> ⚠️ **En cours de développement**
 >
-> MateClub est actuellement en **phase alpha**. L'application est utilisée en production par un petit groupe de testeurs mais est encore en développement actif.
+> MateClub est actuellement en **phase beta**. L'application est utilisée en production par un petit groupe de testeurs mais est encore en développement actif.
 >
 > - Des bugs peuvent survenir
 > - Des fonctionnalités peuvent changer
