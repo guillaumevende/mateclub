@@ -419,7 +419,7 @@ export function updateMediaSessionMetadata(recording: Recording | null) {
   
   navigator.mediaSession.metadata = new MediaMetadata({
     title: recording.pseudo,
-    artist: `MateClub - ${durationStr}`,
+    artist: `Maté Club - ${durationStr}`,
     artwork: [
       { src: '/icon-192x192.png', sizes: '192x192', type: 'image/png' },
       { src: '/icon-512x512.png', sizes: '512x512', type: 'image/png' }

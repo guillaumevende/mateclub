@@ -6,7 +6,7 @@
 </script>
 
 <div class="setup-container">
-	<img src="/icon-512x512.png" alt="MateClub" class="logo" />
+	<img src="/icon-512x512.png" alt="Maté Club" class="logo" />
 
 	<h1>Configuration initiale</h1>
 	<p class="subtitle">Créez votre compte administrateur</p>

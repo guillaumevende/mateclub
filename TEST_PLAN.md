@@ -1,4 +1,4 @@
-# Plan de Test - MateClub
+# Plan de Test - Maté Club
 
 ## Vue d'ensemble
 

@@ -1,8 +1,8 @@
-# MateClub
+# Maté Club
 
 <div align="center">
 
-<img src="static/icon-512x512.png" alt="MateClub Logo" width="200">
+<img src="static/icon-512x512.png" alt="Maté Club Logo" width="200">
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
@@ -18,7 +18,7 @@
 
 > ⚠️ **En cours de développement**
 >
-> MateClub est actuellement en **phase beta**. L'application est utilisée en production par un petit groupe de testeurs mais est encore en développement actif.
+> Maté Club est actuellement en **phase beta**. L'application est utilisée en production par un petit groupe de testeurs mais est encore en développement actif.
 >
 > - Des bugs peuvent survenir
 > - Des fonctionnalités peuvent changer
@@ -28,7 +28,7 @@
 
 ## Description
 
-MateClub est une application web PWA permettant à un groupe d'amis d'enregistrer et partager des capsules audio quotidiennes. Chaque membre peut enregistrer des messages vocaux jusqu'à 3 minutes, avec possibilité d'ajouter une miniature image et un lien URL.
+Maté Club est une application web PWA permettant à un groupe d'amis d'enregistrer et partager des capsules audio quotidiennes. Chaque membre peut enregistrer des messages vocaux jusqu'à 3 minutes, avec possibilité d'ajouter une miniature image et un lien URL.
 
 ## Fonctionnalités
 
@@ -376,7 +376,7 @@ VOTRE_DOMAINE {
 }
 ```
 
-**Note importante** : Si Caddy est déjà installé dans un conteneur Docker séparé (pas dans le même docker-compose que MateClub), utilisez l'IP de l'hôte au lieu de `localhost` :
+**Note importante** : Si Caddy est déjà installé dans un conteneur Docker séparé (pas dans le même docker-compose que Maté Club), utilisez l'IP de l'hôte au lieu de `localhost` :
 
 ```caddyfile
 VOTRE_DOMAINE {
