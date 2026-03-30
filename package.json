@@ -24,7 +24,7 @@
     "better-sqlite3": "^12.6.2",
     "browser-image-compression": "^2.0.2",
     "sharp": "^0.34.5",
-    "svelte": "^5.53.9",
+    "svelte": "^5.55.1",
     "typescript": "^5.9.3",
     "vite": "^8.0.1",
     "web-haptics": "^0.0.6"
