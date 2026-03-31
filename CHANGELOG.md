@@ -2,6 +2,30 @@
 
 ---
 
+## v2.6.1 (2026-03-31)
+
+### 🐛 Corrections de bugs critiques
+
+#### Gestion des fuseaux horaires
+- **Migration des timestamps** : Conversion de CEST (UTC+2) vers UTC pour tous les enregistrements historiques
+- **Correction du stockage** : Les nouveaux enregistrements sont désormais stockés en UTC (`datetime('now')` au lieu de `datetime('now', 'localtime')`)
+- **Affichage correct** : Conversion automatique UTC → heure locale de l'utilisateur via `Intl.DateTimeFormat`
+- **Script de migration** : `scripts/migrate-timezone.sql` pour mise à jour des données existantes
+
+#### Impact
+- Résolution du décalage de 2h constaté depuis le changement d'heure (30 mars 2026)
+- Uniformisation de la gestion des horaires sur toute l'application
+- Les capsules créées à 8h30 CEST s'affichent désormais correctement à 8h30 (et non 6h30)
+
+#### Fichiers modifiés
+- `src/lib/server/db.ts` : Timestamps en UTC pour les nouvelles entrées
+- `scripts/migrate-timezone.sql` : Script de migration des données existantes
+- `package.json` : Mise à jour version 2.6.1
+- `CHANGELOG.md` : Documentation des changements
+- `README.md` : Section sur la gestion des horaires
+
+---
+
 ## v2.6.0 (2026-03-29)
 
 ### 🎨 Nouvelle identité visuelle
