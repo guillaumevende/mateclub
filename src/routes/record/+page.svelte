@@ -21,6 +21,7 @@
 	};
 
 	let isRecording = $state(false);
+	let isProcessing = $state(false); // Indique que l'enregistrement est en cours de finalisation
 	let mediaRecorder: MediaRecorder | null = $state(null);
 	let chunks: Blob[] = []; // Non-réactif : évite les problèmes de closure
 	let timer = $state(0);
@@ -287,6 +288,7 @@
 					debug.recording.error('Aucun chunk audio collecté');
 					error = 'Erreur d\'enregistrement - veuillez réessayer';
 					isRecording = false;
+					isProcessing = false;
 					return;
 				}
 				
@@ -294,6 +296,7 @@
 				audioUrl = URL.createObjectURL(recordedBlob);
 				stream.getTracks().forEach(track => track.stop());
 				isRecording = false;
+				isProcessing = false;
 			};
 		} catch (e) {
 			error = 'Impossible d\'accéder au micro';
@@ -302,6 +305,7 @@
 
 	function stopRecording() {
 		debug.recording.log('stopRecording appelé - state:', mediaRecorder?.state, 'chunks:', chunks.length);
+		isProcessing = true;
 		
 		releaseWakeLock();
 		document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -329,11 +333,12 @@
 			if (isRecording) {
 				isRecording = false;
 				isStopping = false;
+				isProcessing = false;
 				if (chunks.length === 0) {
 					error = 'Erreur d\'enregistrement - veuillez réessayer';
 				}
 			}
-		}, 2000); // 2 secondes de timeout
+		}, 5000); // 5 secondes de timeout
 		
 		setTimeout(() => {
 			debug.recording.log('Timeout stop - state:', mediaRecorder?.state, 'chunks:', chunks.length);
@@ -348,6 +353,7 @@
 		debug.recording.log('MediaRecorder déjà inactif - réinitialisation forcée');
 		isRecording = false;
 		isStopping = false;
+		isProcessing = false;
 		if (chunks.length === 0) {
 			error = 'Erreur d\'enregistrement - veuillez réessayer';
 		}
@@ -626,7 +632,12 @@
 					<p class="error">{error}</p>
 				{/if}
 
-				{#if isRecording}
+				{#if isProcessing}
+					<div class="processing-indicator">
+						<span class="processing-spinner"></span>
+						<span>Finalisation de l'enregistrement...</span>
+					</div>
+				{:else if isRecording}
 					<button class="stop" onclick={stopRecording}>Arrêter</button>
 				{:else}
 					<button class="record" onclick={startRecording}>Commencer l'enregistrement</button>
@@ -790,6 +801,34 @@
 
 	button.stop {
 		background: #ff6b6b;
+	}
+
+	.processing-indicator {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.75rem;
+		padding: 1rem;
+		background: rgba(255, 255, 255, 0.1);
+		border-radius: 8px;
+		color: #fff;
+		font-size: 1rem;
+	}
+
+	.processing-spinner {
+		display: inline-block;
+		width: 20px;
+		height: 20px;
+		border: 2px solid rgba(255, 255, 255, 0.3);
+		border-top-color: #fff;
+		border-radius: 50%;
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	.preview {

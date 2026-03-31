@@ -529,6 +529,10 @@
 	}
 
 	function isRecordingListened(recording: Recording): boolean {
+		// Les capsules de l'utilisateur courant ne montrent jamais le filet "non lue"
+		if (data.user && recording.user_id === data.user.id) {
+			return true;
+		}
 		return listenedRecordings.has(recording.id) || recording.listened_by_user === 1;
 	}
 </script>
