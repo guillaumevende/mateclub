@@ -688,6 +688,11 @@ export function deleteSession(sessionId: string): void {
 	stmt.run(sessionId);
 }
 
+export function cleanupExpiredSessions(): void {
+	const stmt = db.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')");
+	stmt.run();
+}
+
 export function saveRecording(userId: number, audioData: Buffer, durationSeconds: number, imageData?: Buffer, url?: string | null, audioHash?: string): Recording {
 	debug.db.log('saveRecording - audioData:', audioData.length, 'bytes, imageData:', imageData?.length || 'none');
 	
@@ -942,6 +947,19 @@ export function consumeCSRFToken(token: string): void {
 export function cleanupExpiredCSRF(): void {
 	const stmt = db.prepare('DELETE FROM csrf_tokens WHERE expires_at < datetime(\'now\')');
 	stmt.run();
+}
+
+let lastCleanup = 0;
+const CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 heure
+
+export function periodicCleanup(): void {
+	const now = Date.now();
+	if (now - lastCleanup < CLEANUP_INTERVAL) return;
+	lastCleanup = now;
+
+	cleanupExpiredSessions();
+	cleanupExpiredCSRF();
+	cleanupOldLoginAttempts();
 }
 
 // ============ REGISTRATION MANAGEMENT FUNCTIONS ============
