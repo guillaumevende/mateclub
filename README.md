@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-2.6.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-2.6.1-blue?style=for-the-badge)
 
 </div>
 
@@ -65,6 +65,25 @@ Maté Club est une application web PWA permettant à un groupe d'amis d'enregist
 - **Système de seuils** - Chaque utilisateur définit son heure de publication quotidienne
 - **Super pouvoirs** - Rôle admin avec lecture anticipée (voir toutes les capsules sans attendre)
 - **Timezone** - Fuseau horaire configurable par utilisateur
+
+### Gestion des fuseaux horaires
+L'application gère automatiquement les conversions de fuseaux horaires pour garantir une expérience cohérente pour tous les utilisateurs, quelle que soit leur localisation géographique.
+
+**Architecture** :
+- **Stockage** : Tous les timestamps sont enregistrés en **UTC** (Universal Coordinated Time)
+- **Affichage** : Conversion automatique vers le fuseau horaire configuré par l'utilisateur
+- **Seuil de déblocage** : Calculé selon l'heure locale de l'utilisateur qui consulte
+- **Groupement par jour** : Les capsules sont regroupées par "jour logique" basé sur :
+  1. L'heure locale de l'utilisateur qui consulte
+  2. Le seuil horaire configuré (ex: 7h00)
+  3. L'heure d'enregistrement convertie dans le fuseau de l'utilisateur
+
+**Exemple** :
+- Alice à Paris (UTC+2) publie à 8h30
+- Bob à New York (UTC-4) consulte à 14h00 locales
+- Alice voit sa capsule dans le groupe "aujourd'hui" à 8h30
+- Bob voit la même capsule dans le groupe "aujourd'hui" à 2h30 (heure NY)
+- Si Bob change son seuil à 11h, la capsule passe dans le groupe "hier" (car 2h30 < 11h)
 
 ### Panel Admin
 - **Gestion des utilisateurs** - Liste, création, suppression

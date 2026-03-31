@@ -32,7 +32,7 @@ db.exec(`
 		super_powers INTEGER DEFAULT 0,
 		daily_notification_hour INTEGER DEFAULT 420,
 		timezone TEXT DEFAULT 'Europe/Paris',
-		created_at DATETIME DEFAULT (datetime('now', 'localtime'))
+		created_at DATETIME DEFAULT (datetime('now'))
 	);
 
 	CREATE TABLE IF NOT EXISTS recordings (
@@ -42,7 +42,7 @@ db.exec(`
 		image_filename TEXT,
 		url TEXT,
 		duration_seconds INTEGER NOT NULL,
-		recorded_at DATETIME DEFAULT (datetime('now', 'localtime')),
+		recorded_at DATETIME DEFAULT (datetime('now')),
 		FOREIGN KEY (user_id) REFERENCES users(id)
 	);
 
@@ -50,7 +50,7 @@ db.exec(`
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		user_id INTEGER NOT NULL,
 		recording_id INTEGER NOT NULL,
-		listened_at DATETIME DEFAULT (datetime('now', 'localtime')),
+		listened_at DATETIME DEFAULT (datetime('now')),
 		FOREIGN KEY (user_id) REFERENCES users(id),
 		FOREIGN KEY (recording_id) REFERENCES recordings(id),
 		UNIQUE(user_id, recording_id)
@@ -142,7 +142,7 @@ try {
 			password_hash TEXT NOT NULL,
 			avatar TEXT DEFAULT '☕',
 			timezone TEXT DEFAULT 'Europe/Paris',
-			requested_at DATETIME DEFAULT (datetime('now', 'localtime')),
+			requested_at DATETIME DEFAULT (datetime('now')),
 			status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected'))
 		)
 	`);
