@@ -286,12 +286,14 @@
 				if (chunks.length === 0) {
 					debug.recording.error('Aucun chunk audio collecté');
 					error = 'Erreur d\'enregistrement - veuillez réessayer';
+					isRecording = false;
 					return;
 				}
 				
 				recordedBlob = new Blob(chunks, { type });
 				audioUrl = URL.createObjectURL(recordedBlob);
 				stream.getTracks().forEach(track => track.stop());
+				isRecording = false;
 			};
 		} catch (e) {
 			error = 'Impossible d\'accéder au micro';
@@ -308,7 +310,6 @@
 		clearInterval(timerInterval);
 		timerInterval = null;
 	}
-	isRecording = false;
 	
 	if (mediaRecorder && mediaRecorder.state !== 'inactive') {
 		mediaRecorder.requestData();
