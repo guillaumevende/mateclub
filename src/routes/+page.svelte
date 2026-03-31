@@ -471,7 +471,10 @@
 		
 		if (dateStr === today) return `${fireEmoji}Aujourd'hui`;
 		if (dateStr === yesterday) return `${fireEmoji}Hier, ${formatDate(dateStr)}`;
-		const date = new Date(dateStr);
+		// Forcer l'interprétation UTC en ajoutant 'Z' si pas de timezone
+		const date = dateStr.includes('T') || dateStr.includes('Z')
+			? new Date(dateStr)
+			: new Date(dateStr.replace(' ', 'T') + 'Z');
 		const formattedDate = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 		return `${fireEmoji}${formattedDate.charAt(0).toUpperCase()}${formattedDate.slice(1)}`;
 	}
@@ -487,7 +490,11 @@
 	}
 
 	function formatDate(dateStr: string): string {
-		const date = new Date(dateStr);
+		// Forcer l'interprétation UTC en ajoutant 'Z' si pas de timezone
+		const date = dateStr.includes('T') || dateStr.includes('Z')
+			? new Date(dateStr)
+			: new Date(dateStr.replace(' ', 'T') + 'Z');
+		
 		return date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 	}
 
@@ -498,7 +505,11 @@
 	}
 
 	function formatTime(dateStr: string): string {
-		const date = new Date(dateStr);
+		// Forcer l'interprétation UTC en ajoutant 'Z' si pas de timezone
+		const date = dateStr.includes('T') || dateStr.includes('Z')
+			? new Date(dateStr)
+			: new Date(dateStr.replace(' ', 'T') + 'Z');
+		
 		const timezone = data.user?.timezone || 'Europe/Paris';
 		const formatter = new Intl.DateTimeFormat('fr-FR', {
 			hour: '2-digit',
