@@ -22,7 +22,7 @@
 
 	let isRecording = $state(false);
 	let mediaRecorder: MediaRecorder | null = $state(null);
-	let chunks: Blob[] = $state([]);
+	let chunks: Blob[] = []; // Non-réactif : évite les problèmes de closure
 	let timer = $state(0);
 	let timerInterval: ReturnType<typeof setInterval> | null = $state(null);
 	let audioUrl: string | null = $state(null);
@@ -253,7 +253,7 @@
 			}
 			
 			mediaRecorder = new MediaRecorder(stream, { mimeType });
-			chunks = [];
+			chunks.length = 0; // Vider sans changer la référence
 
 			mediaRecorder.onstart = () => {
 				debug.recording.log('MediaRecorder démarré');
@@ -315,13 +315,42 @@
 		mediaRecorder.requestData();
 		debug.recording.log('requestData() appelé');
 		
+		// Timeout de secours au cas où onstop ne serait pas appelé
+		const stopTimeout = setTimeout(() => {
+			debug.recording.log('Timeout de secours - forçage arrêt');
+			if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+				try {
+					mediaRecorder.stop();
+				} catch (e) {
+					// Ignorer l'erreur si déjà arrêté
+				}
+			}
+			// Forcer la réinitialisation si onstop n'a pas été appelé
+			if (isRecording) {
+				isRecording = false;
+				isStopping = false;
+				if (chunks.length === 0) {
+					error = 'Erreur d\'enregistrement - veuillez réessayer';
+				}
+			}
+		}, 2000); // 2 secondes de timeout
+		
 		setTimeout(() => {
 			debug.recording.log('Timeout stop - state:', mediaRecorder?.state, 'chunks:', chunks.length);
 			if (mediaRecorder && mediaRecorder.state !== 'inactive') {
 				mediaRecorder.stop();
 				debug.recording.log('stop() appelé');
 			}
+			clearTimeout(stopTimeout); // Annuler le timeout de secours si tout va bien
 		}, 300);
+	} else {
+		// MediaRecorder déjà inactif ou inexistant
+		debug.recording.log('MediaRecorder déjà inactif - réinitialisation forcée');
+		isRecording = false;
+		isStopping = false;
+		if (chunks.length === 0) {
+			error = 'Erreur d\'enregistrement - veuillez réessayer';
+		}
 	}
 	
 	isStopping = false;
