@@ -95,7 +95,7 @@
 	// Touch/swipe handling for track change on cards
 	let cardTouchStartX = 0;
 	let cardTouchStartY = 0;
-	let cardSwiped = false;
+	let cardSwiped = $state(false);
 	const SWIPE_THRESHOLD = 50;
 
 	function handleCardTouchStart(e: TouchEvent) {
@@ -147,25 +147,22 @@
 		return { count: unread.length, totalSeconds };
 	});
 
-	$effect(() => {
-		const unsubscribe = playerStore.subscribe(state => {
-			player = state;
-		});
-		return unsubscribe;
+	// Subscribe to player store outside of $effect to avoid infinite loops
+	playerStore.subscribe(state => {
+		player = state;
 	});
 
-	$effect(() => {
-		const unsubscribe = lastListenedRecordingId.subscribe((recordingId: number | null) => {
-			if (recordingId !== null) {
-				listenedRecordings = new Set([...listenedRecordings, recordingId]);
-			}
-		});
-		return unsubscribe;
+	// Subscribe to lastListenedRecordingId outside of $effect
+	lastListenedRecordingId.subscribe((recordingId: number | null) => {
+		if (recordingId !== null) {
+			listenedRecordings = new Set([...listenedRecordings, recordingId]);
+		}
 	});
 
+	// Auto-scroll horizontally within the current day's scroller when playing
 	$effect(() => {
 		if (player.isPlaying && player.currentDay && player.currentRecording) {
-			scrollToCard(player.currentDay, player.currentIndex);
+			scrollToCardHorizontal(player.currentDay, player.currentIndex);
 		}
 	});
 
@@ -409,6 +406,29 @@
 		}
 	}
 
+	// Scroll only horizontally within the day's scroller, without vertical page scroll
+	function scrollToCardHorizontal(dayDate: string, index: number) {
+		const dayElement = document.querySelector(`[data-day="${dayDate}"]`);
+		if (!dayElement) return;
+		
+		// Check if day is visible in viewport (don't scroll vertically if not)
+		const rect = dayElement.getBoundingClientRect();
+		const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
+		if (!isVisible) return;
+		
+		const scroller = dayElement.querySelector('.recordings-scroller');
+		if (scroller) {
+			const cards = scroller.querySelectorAll('.recording-card');
+			if (cards[index]) {
+				// Scroll only horizontally, don't scroll the page vertically
+				const cardRect = cards[index].getBoundingClientRect();
+				const scrollerRect = scroller.getBoundingClientRect();
+				const scrollLeft = cardRect.left - scrollerRect.left + scroller.scrollLeft - (scrollerRect.width / 2) + (cardRect.width / 2);
+				scroller.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+			}
+		}
+	}
+
 	function getDayAuthors(recordings: Recording[]): Recording[] {
 		const seen = new Set<number>();
 		return recordings.filter(r => {
@@ -540,6 +560,10 @@
 	}
 
 	function isRecordingListened(recording: Recording): boolean {
+		// Les capsules de l'utilisateur courant ne montrent jamais le filet "non lue"
+		if (data.user && recording.user_id === data.user.id) {
+			return true;
+		}
 		return listenedRecordings.has(recording.id) || recording.listened_by_user === 1;
 	}
 </script>
@@ -555,11 +579,13 @@
 	</div>
 {/if}
 
-<div 
-	class="container" 
+<div
+	class="container"
 	ontouchstart={handleTouchStart}
 	ontouchmove={handleTouchMove}
 	ontouchend={handleTouchEnd}
+	role="application"
+	aria-label="Page principale"
 >
 	<header>
 		{#if data.user?.is_admin && data.pendingRegistrationsCount && data.pendingRegistrationsCount > 0}
@@ -591,14 +617,30 @@
 	<TeamList allUsers={data.allUsers} bind:showTeam />
 
 	{#if selectedDayRecordings}
-		<div class="modal-overlay" use:scrollLock={selectedDayRecordings !== null} onclick={closeDayModal}>
-			<div class="modal day-modal" onclick={(e) => e.stopPropagation()}>
+		<div
+			class="modal-overlay"
+			use:scrollLock={selectedDayRecordings !== null}
+			onclick={closeDayModal}
+			onkeydown={(e) => e.key === 'Escape' && closeDayModal()}
+			role="button"
+			tabindex="0"
+			aria-label="Fermer la modale"
+		>
+			<div
+				class="modal day-modal"
+				onclick={(e) => e.stopPropagation()}
+				onkeydown={(e) => e.key === 'Escape' && closeDayModal()}
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="day-modal-title"
+				tabindex="-1"
+			>
 				<!-- Croix de fermeture au-dessus de la modale -->
 				<button class="close-btn modal-close-outer" onclick={closeDayModal}>✕</button>
 				
 				<div class="day-header-new modal-header">
 					<div class="day-header-left">
-						<h2 class="day-title">
+						<h2 class="day-title" id="day-modal-title">
 							{formatDateHeader(selectedDayRecordings.date, selectedDayRecordings.recordings)}
 							{#if !selectedDayRecordings.available}
 								<span class="locked-icon">🔒</span>
@@ -1043,16 +1085,6 @@
 		padding: 1rem;
 	}
 
-	.day-header {
-		font-size: 1.125rem;
-		color: #ccc;
-		font-weight: normal;
-		margin-bottom: 1rem;
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
 	/* New Day Header Layout */
 	.day-header-new {
 		display: flex;
@@ -1197,114 +1229,8 @@
 		padding: 2rem;
 	}
 
-	/* Player Bar Styles */
-	.player-bar {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		margin-top: 1rem;
-		padding: 0.75rem 1rem;
-		background: #1a1a2e;
-		border-radius: 12px;
-		border: 2px solid #e94560;
-	}
-
-	.play-btn {
-		width: 48px;
-		height: 48px;
-		border-radius: 50%;
-		background: #e94560;
-		border: none;
-		color: white;
-		font-size: 1.5rem;
-		cursor: pointer;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		transition: transform 0.2s, background 0.2s;
-		flex-shrink: 0;
-	}
-
-	.play-btn:hover:not(:disabled) {
-		transform: scale(1.1);
-		background: #ff6b6b;
-	}
-
-	.play-btn:disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
-	}
-
-	.spinner {
-		width: 24px;
-		height: 24px;
-		border: 3px solid rgba(255, 255, 255, 0.3);
-		border-top-color: white;
-		border-radius: 50%;
-		animation: spin 1s linear infinite;
-	}
-
 	@keyframes spin {
 		to { transform: rotate(360deg); }
-	}
-
-	.player-authors {
-		display: flex;
-		gap: -8px;
-		flex-shrink: 0;
-	}
-
-	.author-avatar {
-		margin-left: -17px;
-		border: 2px solid #1a1a2e;
-		border-radius: 50%;
-		transition: transform 0.2s;
-	}
-
-	.author-avatar:first-child {
-		margin-left: 0;
-	}
-
-	.author-avatar:hover {
-		transform: scale(1.1);
-		z-index: 1;
-	}
-
-	.player-progress {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		min-width: 150px;
-	}
-
-	.progress-bar {
-		height: 6px;
-		background: #2a2a4e;
-		border-radius: 3px;
-		overflow: hidden;
-		cursor: pointer;
-	}
-
-	.progress-fill {
-		height: 100%;
-		background: linear-gradient(90deg, #e94560, #ff6b6b);
-		border-radius: 3px;
-		transition: width 0.1s linear;
-	}
-
-	.time-display {
-		font-size: 0.75rem;
-		color: #888;
-		text-align: center;
-		font-family: monospace;
-	}
-
-	/* Modal player bar */
-	:global(.day-modal .player-bar) {
-		margin-top: 1.5rem;
-		position: sticky;
-		bottom: 0;
 	}
 </style>
 

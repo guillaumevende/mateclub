@@ -18,11 +18,27 @@
 </script>
 
 {#if showTeam}
-	<div class="modal-overlay" use:scrollLock={showTeam} onclick={() => showTeam = false}>
-		<div class="modal" onclick={(e) => e.stopPropagation()}>
+	<div
+		class="modal-overlay"
+		use:scrollLock={showTeam}
+		onclick={() => showTeam = false}
+		onkeydown={(e) => e.key === 'Escape' && (showTeam = false)}
+		role="button"
+		tabindex="0"
+		aria-label="Fermer la modale"
+	>
+		<div
+			class="modal"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.key === 'Escape' && (showTeam = false)}
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="team-title"
+			tabindex="-1"
+		>
 			<button class="close-btn modal-close-outer" onclick={() => showTeam = false}>✕</button>
 			
-			<h2>La team</h2>
+			<h2 id="team-title">La team</h2>
 			<ul class="team-list">
 				{#each allUsers as user}
 					{@const count = user.recording_count ?? 0}

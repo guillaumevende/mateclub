@@ -2,6 +2,58 @@
 
 ---
 
+## v2.7.0 (2026-04-01) - Branch: hotfix/timezone-display
+
+### ✨ Nouvelles fonctionnalités
+
+#### Sons de fin de capsule
+- **Ding.mp3** : Joué automatiquement après chaque capsule (volume 60%)
+- **Doudoudou.mp3** : Joué après la dernière capsule du jour
+- Fonctionne en arrière-plan, pas de contrôle utilisateur
+
+#### Installation PWA facilitée
+- Composant `@khmyznikov/pwa-install` pour dialog d'installation
+- Affichage automatique après 5 secondes sur première visite
+- Instructions natives iOS/Android/Desktop
+- Couleur personnalisée (#e94560) et texte en français
+
+#### Visualiseur audio
+- 8 barres verticales animées pendant l'enregistrement
+- Gradient vert → jaune → rouge
+
+#### Navigation améliorée
+- Clic sur date dans FloatingPlayer pour scroller vers le jour
+- Suppression du scroll vertical automatique bloquant
+
+### 🐛 Corrections de bugs
+
+#### Stabilité enregistrement
+- `isRecording = false` déplacé dans callback `onstop`
+- Timeout 5s pour appareils lents
+- Indicateur "Finalisation..." visuel
+
+#### Accessibilité (A11y)
+- Tous les composants interactifs avec attributs ARIA
+- Navigation clavier complète (Enter, Espace, Échap)
+- Labels pour lecteurs d'écran
+
+#### API
+- Renommage endpoint `/listen` → `/listened`
+
+### 🔧 Migrations base de données
+
+**À exécuter AVANT déploiement :**
+
+```bash
+# 1. Migration fuseau horaire (CRITIQUE)
+sqlite3 data/mateclub.db < scripts/migrate-timezone.sql
+
+# 2. Ajout colonne last_login
+sqlite3 data/mateclub.db < scripts/migrate-last-login.sql
+```
+
+---
+
 ## v2.6.1 (2026-03-31)
 
 ### 🐛 Corrections de bugs critiques

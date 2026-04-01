@@ -75,6 +75,7 @@ function logDebug(msg: string) {
 let audioElement: HTMLAudioElement | null = null;
 let guardianElement: HTMLAudioElement | null = null;
 let jingleElement: HTMLAudioElement | null = null;
+let endSoundElement: HTMLAudioElement | null = null;
 let isInitialized = false;
 
 // Jingle configuration - volume is now set in the MP3 file itself
@@ -111,6 +112,53 @@ function initJingleAudio() {
   jingle.load();
   
   logDebug('🎵 Jingle audio initialized');
+}
+
+function getEndSoundElement(): HTMLAudioElement {
+  if (!endSoundElement) {
+    if (typeof document !== 'undefined') {
+      const domEndSound = document.getElementById('end-sound-audio') as HTMLAudioElement;
+      if (domEndSound) {
+        endSoundElement = domEndSound;
+      } else {
+        endSoundElement = new Audio();
+        endSoundElement.preload = 'auto';
+      }
+    } else {
+      endSoundElement = new Audio();
+      endSoundElement.preload = 'auto';
+    }
+  }
+  return endSoundElement;
+}
+
+function playEndSound(soundUrl: string): Promise<void> {
+  return new Promise((resolve) => {
+    const endSound = getEndSoundElement();
+    
+    logDebug(`🔔 Playing end sound: ${soundUrl}`);
+    
+    endSound.src = soundUrl;
+    endSound.volume = 0.6; // 60% volume
+    endSound.load();
+    
+    endSound.onended = () => {
+      logDebug('🔔 End sound finished');
+      endSound.onended = null;
+      resolve();
+    };
+    
+    endSound.onerror = () => {
+      logDebug('🔔 End sound error, continuing...');
+      endSound.onerror = null;
+      resolve();
+    };
+    
+    endSound.play().catch((e) => {
+      logDebug(`🔔 End sound play failed: ${e}`);
+      resolve();
+    });
+  });
 }
 
 function playJingleIntro(): Promise<void> {
@@ -240,6 +288,11 @@ function initAudioElement() {
       fetch(`/api/recordings/${recordingThatJustFinished.id}/listened`, { method: 'POST' }).catch(() => {});
       lastListenedRecordingId.set(recordingThatJustFinished.id);
     }
+    
+    // Jouer le son de fin approprié
+    const isLastRecordingOfDay = dayData && currentIndexAtEnd === dayData.recordings.length - 1;
+    const endSoundUrl = isLastRecordingOfDay ? '/doudoudou.mp3' : '/ding.mp3';
+    await playEndSound(endSoundUrl);
     
     if (dayData && currentIndexAtEnd < dayData.recordings.length - 1) {
       const nextIndex = currentIndexAtEnd + 1;

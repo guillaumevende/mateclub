@@ -71,6 +71,7 @@
 				maxWidthOrHeight: 1200,
 				maxSizeMB: 1,
 				useWebWorker: false,
+				libURL: '/lib/browser-image-compression.js',
 				onProgress: (progress: number) => {
 					compressionProgress = Math.min(Math.round(progress * 100), 100);
 				}

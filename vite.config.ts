@@ -10,7 +10,10 @@ export default defineConfig({
 		fs: {
 			allow: ['.', './uploads']
 		},
-		allowedHosts: true
+		allowedHosts: true,
+		watch: {
+			ignored: ['**/.svelte-kit/**', '**/node_modules/**', '**/uploads/**']
+		}
 	},
 	test: {
 		alias: {

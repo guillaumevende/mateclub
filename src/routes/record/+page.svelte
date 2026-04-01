@@ -65,6 +65,12 @@
 	// Recording stop flag to prevent recursive calls
 	let isStopping = false;
 
+	// Audio visualizer state
+	let audioContext: AudioContext | null = $state(null);
+	let audioAnalyser: AnalyserNode | null = $state(null);
+	let visualizerData = $state<number[]>([5, 5, 5, 5, 5, 5, 5, 5]);
+	let animationFrameId: number | null = null;
+
 	$effect(() => {
 		const unsubscribe = playerStore.subscribe(state => {
 			player = state;
@@ -216,8 +222,19 @@
 	}
 
 	function formatDate(dateStr: string): string {
-		const date = new Date(dateStr);
+		// Forcer l'interprétation UTC en ajoutant 'Z' si pas de timezone
+		const date = dateStr.includes('T') || dateStr.includes('Z')
+			? new Date(dateStr)
+			: new Date(dateStr.replace(' ', 'T') + 'Z');
 		return date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+	}
+
+	function formatTime(dateStr: string): string {
+		// Forcer l'interprétation UTC en ajoutant 'Z' si pas de timezone
+		const date = dateStr.includes('T') || dateStr.includes('Z')
+			? new Date(dateStr)
+			: new Date(dateStr.replace(' ', 'T') + 'Z');
+		return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }).replace(':', 'h');
 	}
 
 	function formatDuration(seconds: number): string {
@@ -263,6 +280,21 @@
 			isRecording = true;
 			showRecordingsList = false;
 			timer = 0;
+
+			// Initialize audio visualizer
+			try {
+				audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+				audioAnalyser = audioContext.createAnalyser();
+				audioAnalyser.fftSize = 64;
+				audioAnalyser.smoothingTimeConstant = 0.85;
+				
+				const source = audioContext.createMediaStreamSource(stream);
+				source.connect(audioAnalyser);
+				
+				startVisualizerAnimation();
+			} catch (err) {
+				debug.recording.error('Erreur initialisation visualiseur:', err);
+			}
 			
 			timerInterval = setInterval(() => {
 				timer++;
@@ -324,7 +356,50 @@
 	}
 	
 	isStopping = false;
+	
+	// Stop audio visualizer
+	if (animationFrameId) {
+		cancelAnimationFrame(animationFrameId);
+		animationFrameId = null;
+	}
+	if (audioContext) {
+		audioContext.close().catch(() => {});
+		audioContext = null;
+	}
+	audioAnalyser = null;
+	visualizerData = [5, 5, 5, 5, 5, 5, 5, 5];
 }
+
+	function startVisualizerAnimation() {
+		if (!audioAnalyser) return;
+		
+		const dataArray = new Uint8Array(audioAnalyser.frequencyBinCount);
+		
+		function updateVisualizer() {
+			if (!audioAnalyser || !isRecording) return;
+			
+			audioAnalyser.getByteFrequencyData(dataArray);
+			
+			// Divide into 8 frequency bands
+			const bars: number[] = [];
+			const step = Math.floor(dataArray.length / 8);
+			
+			for (let i = 0; i < 8; i++) {
+				let sum = 0;
+				for (let j = 0; j < step; j++) {
+					sum += dataArray[i * step + j];
+				}
+				const average = sum / step;
+				const height = Math.max(5, (average / 255) * 100);
+				bars.push(height);
+			}
+			
+			visualizerData = bars;
+			animationFrameId = requestAnimationFrame(updateVisualizer);
+		}
+		
+		updateVisualizer();
+	}
 
 
 	function reset() {
@@ -351,7 +426,7 @@
 		isSending = false;
 	}
 
-	function formatTime(seconds: number): string {
+	function formatTimeSeconds(seconds: number): string {
 		const mins = Math.floor(seconds / 60);
 		const secs = seconds % 60;
 		return `${mins}:${secs.toString().padStart(2, '0')}`;
@@ -555,7 +630,7 @@
 			<div class="audio-preview">
 			<audio controls preload="auto" src={audioUrl}></audio>
 		</div>
-		<p class="duration">Durée: {formatTime(timer)}</p>
+		<p class="duration">Durée: {formatTimeSeconds(timer)}</p>
 			
 			{#if error}
 				<p class="error">{error}</p>
@@ -589,7 +664,7 @@
 				{/if}
 				
 				<div class="timer {isRecording ? 'recording' : ''} {isRecording && timer >= 160 ? 'warning' : ''}">
-					{formatTime(timer)} / 3:00
+					{formatTimeSeconds(timer)} / 3:00
 				</div>
 
 				{#if error}
@@ -598,6 +673,16 @@
 
 				{#if isRecording}
 					<button class="stop" onclick={stopRecording}>Arrêter</button>
+
+					<!-- Audio Visualizer -->
+					<div class="audio-visualizer">
+						{#each visualizerData as height, i}
+						<div
+							class="visualizer-bar"
+							style="height: {height}%"
+						></div>
+						{/each}
+					</div>
 				{:else}
 					<button class="record" onclick={startRecording}>Commencer l'enregistrement</button>
 				{/if}
@@ -625,10 +710,10 @@
 					{:else}
 						<div class="recording-thumb recording-thumb-empty">🎙️</div>
 					{/if}
-					<div class="recording-info">
-						<span class="recording-date">{formatDate(recording.recorded_at)}</span>
-						<span class="recording-duration">{formatDuration(recording.duration_seconds)}</span>
-					</div>
+				<div class="recording-info">
+					<span class="recording-date">{formatDate(recording.recorded_at)} ({formatTime(recording.recorded_at)})</span>
+					<span class="recording-duration">{formatDuration(recording.duration_seconds)}</span>
+				</div>
 					<div class="recording-actions">
 						{#if recording.url}
 							<a 
@@ -668,9 +753,25 @@
 
 <!-- Delete Confirmation Modal -->
 {#if showDeleteModal}
-	<div class="modal-overlay" use:scrollLock={showDeleteModal} onclick={cancelDelete}>
-		<div class="modal" onclick={(e) => e.stopPropagation()}>
-			<h3>Confirmer la suppression</h3>
+	<div
+		class="modal-overlay"
+		use:scrollLock={showDeleteModal}
+		onclick={cancelDelete}
+		onkeydown={(e) => e.key === 'Escape' && cancelDelete()}
+		role="button"
+		tabindex="0"
+		aria-label="Fermer la modale"
+	>
+		<div
+			class="modal"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.key === 'Escape' && cancelDelete()}
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="delete-modal-title"
+			tabindex="-1"
+		>
+			<h3 id="delete-modal-title">Confirmer la suppression</h3>
 			<p>Êtes-vous sûr de vouloir supprimer cet enregistrement ? Cette action est irréversible.</p>
 			<div class="modal-actions">
 				<button class="cancel-btn" onclick={cancelDelete}>Annuler</button>
@@ -700,6 +801,36 @@
 		flex-direction: column;
 		align-items: center;
 		gap: 2rem;
+	}
+
+	.audio-visualizer {
+		display: flex;
+		align-items: flex-end;
+		justify-content: center;
+		gap: 2px;
+		height: 150px;
+		padding: 1rem;
+		background: rgba(0, 0, 0, 0.2);
+		border-radius: 8px;
+		margin-top: 1rem;
+		width: 100%;
+		max-width: 300px;
+	}
+
+	.visualizer-bar {
+		flex: 1;
+		min-width: 8px;
+		max-width: 30px;
+		border-radius: 2px 2px 0 0;
+		background: linear-gradient(to top,
+			#22c55e 0%,
+			#22c55e 60%,
+			#eab308 60%,
+			#eab308 85%,
+			#ef4444 85%,
+			#ef4444 100%
+		);
+		transition: height 0.05s ease-out;
 	}
 
 	.timer {
@@ -741,13 +872,6 @@
 		margin-bottom: 0.5rem;
 	}
 
-	.image-warning {
-		color: #ff9500;
-		font-weight: bold;
-		text-align: center;
-		margin: 0.5rem 0;
-	}
-
 	button {
 		padding: 1rem 2rem;
 		font-size: 1.25rem;
@@ -771,37 +895,6 @@
 		gap: 1rem;
 	}
 
-	.image-preview {
-		position: relative;
-		width: 100%;
-		aspect-ratio: 210 / 200;
-		border-radius: 12px;
-		overflow: hidden;
-	}
-
-	.image-preview img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-
-	.remove-image {
-		position: absolute;
-		top: 8px;
-		right: 8px;
-		width: 32px;
-		height: 32px;
-		border-radius: 50%;
-		background: rgba(0, 0, 0, 0.6);
-		color: white;
-		border: none;
-		cursor: pointer;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 1.2rem;
-	}
-
 	.url-input {
 		width: 100%;
 		padding: 0.75rem;
@@ -814,37 +907,6 @@
 
 	.url-input::placeholder {
 		color: #666;
-	}
-
-	.image-upload {
-		width: 100%;
-		aspect-ratio: 210 / 200;
-		border: 2px dashed #444;
-		border-radius: 12px;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		cursor: pointer;
-		transition: border-color 0.2s, border-width 0.2s;
- 	}
-
-	.image-upload:hover {
-		border-color: #e94560;
- 	}
-
-	.image-upload.dragging {
-		border-color: #4ade80;
-		border-width: 4px;
-		background: rgba(74, 222, 128, 0.1);
-	}
-
-	.image-upload input {
-		display: none;
-	}
-
-	.image-upload span {
-		color: #888;
-		font-size: 0.9rem;
 	}
 
 	.duration {
@@ -952,15 +1014,6 @@
 		min-width: 200px;
 	}
 
-	/* Fix bouton suppression rond parfait */
-	.remove-image {
-		aspect-ratio: 1 / 1;
-		min-width: 32px;
-		min-height: 32px;
-		padding: 0;
-		line-height: 1;
-	}
-
 	/* Fix curseur audio */
 	audio {
 		width: 100%;
@@ -1000,45 +1053,6 @@
 			width: 100%;
 			min-width: 300px;
 		}
-	}
-
-	/* Compression progress bar (uniforme avec settings) */
-	.compression-progress {
-		margin: 1rem 0;
-		width: 100%;
-	}
-
-	.progress-bar-container {
-		width: 100%;
-		height: 6px;
-		background: #2a2a4e;
-		border-radius: 3px;
-		overflow: hidden;
-		margin-bottom: 0.5rem;
-	}
-
-	.progress-bar-fill {
-		height: 100%;
-		background: linear-gradient(90deg, #4ade80, #22c55e);
-		border-radius: 3px;
-		transition: width 0.3s ease;
-	}
-
-	.progress-text {
-		font-size: 0.85rem;
-		color: #888;
-		text-align: center;
-		display: block;
-	}
-
-	.image-upload.disabled {
-		opacity: 0.6;
-		cursor: not-allowed;
-		pointer-events: none;
-	}
-
-	.image-upload.disabled input {
-		pointer-events: none;
 	}
 
 	@keyframes pulse-scale {

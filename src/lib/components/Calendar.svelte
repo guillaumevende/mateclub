@@ -43,7 +43,14 @@
 		{#each calendarMonths || [] as monthData, monthIndex}
 		<div class="month-table">
 			<h3 class="month-title">{getMonthName(monthData.month)} {monthData.year}</h3>
-			<div class="month-grid" onclick={handleCalendarClick} role="grid">
+			<div
+				class="month-grid"
+				onclick={handleCalendarClick}
+				onkeydown={(e) => e.key === 'Enter' && handleCalendarClick(e as unknown as MouseEvent)}
+				role="grid"
+				tabindex="0"
+				aria-label="Calendrier des capsules"
+			>
 				<span class="cell-header">Lu</span>
 				<span class="cell-header">Ma</span>
 				<span class="cell-header">Me</span>
@@ -53,17 +60,27 @@
 				<span class="cell-header">Di</span>
 				{#each calendarCells[monthIndex] || [] as cell}
 					{#if cell.day === -1}
-					<span class="cell-day cell-empty"></span>
-				{:else}
-					<span
-						class={cell.classes}
-						data-date={cell.key}
-						role={cell.hasRecordings ? 'button' : 'gridcell'}
-						tabindex={cell.hasRecordings ? 0 : -1}
-					>
-						{cell.day}
-					</span>
-				{/if}
+						<span class="cell-day cell-empty"></span>
+					{:else if cell.hasRecordings}
+						<span
+							class={cell.classes}
+							data-date={cell.key}
+							role="button"
+							tabindex="0"
+							onkeydown={(e) => e.key === 'Enter' && handleCalendarClick(e as unknown as MouseEvent)}
+							aria-label={`Voir les capsules du ${cell.day}`}
+						>
+							{cell.day}
+						</span>
+					{:else}
+						<span
+							class={cell.classes}
+							data-date={cell.key}
+							role="gridcell"
+						>
+							{cell.day}
+						</span>
+					{/if}
 				{/each}
 			</div>
 		</div>
