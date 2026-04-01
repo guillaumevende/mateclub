@@ -504,9 +504,15 @@
 		// Forcer l'interprétation UTC en ajoutant 'Z' si pas de timezone
 		let date: Date;
 		try {
-			const dateString = dateStr.includes('T') || dateStr.includes('Z')
-				? dateStr
-				: dateStr.replace(' ', 'T') + 'Z';
+			let dateString: string;
+			if (dateStr.includes('T') || dateStr.includes('Z')) {
+				dateString = dateStr;
+			} else if (dateStr.includes(' ')) {
+				dateString = dateStr.replace(' ', 'T') + 'Z';
+			} else {
+				dateString = dateStr + 'T00:00:00Z';
+			}
+			console.log('[formatDateHeader] dateString transformé:', dateString);
 			date = new Date(dateString);
 			
 			// Vérifier que la date est valide
@@ -535,9 +541,15 @@
 
 	function formatDate(dateStr: string): string {
 		// Forcer l'interprétation UTC en ajoutant 'Z' si pas de timezone
-		const date = dateStr.includes('T') || dateStr.includes('Z')
-			? new Date(dateStr)
-			: new Date(dateStr.replace(' ', 'T') + 'Z');
+		let dateString: string;
+		if (dateStr.includes('T') || dateStr.includes('Z')) {
+			dateString = dateStr;
+		} else if (dateStr.includes(' ')) {
+			dateString = dateStr.replace(' ', 'T') + 'Z';
+		} else {
+			dateString = dateStr + 'T00:00:00Z';
+		}
+		const date = new Date(dateString);
 		
 		return date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 	}
