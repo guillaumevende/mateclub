@@ -482,6 +482,15 @@
 	}
 
 	function formatDateHeader(dateStr: string, recordings: Recording[]): string {
+		// DEBUG: Log pour Safari
+		console.log('[formatDateHeader] dateStr:', dateStr, 'type:', typeof dateStr);
+		
+		// Validation robuste
+		if (!dateStr || typeof dateStr !== 'string') {
+			console.error('[formatDateHeader] dateStr invalide:', dateStr);
+			return 'Date inconnue';
+		}
+		
 		const today = getUserToday();
 		const yesterday = getUserYesterday();
 		
@@ -491,10 +500,25 @@
 		
 		if (dateStr === today) return `${fireEmoji}Aujourd'hui`;
 		if (dateStr === yesterday) return `${fireEmoji}Hier, ${formatDate(dateStr)}`;
+		
 		// Forcer l'interprétation UTC en ajoutant 'Z' si pas de timezone
-		const date = dateStr.includes('T') || dateStr.includes('Z')
-			? new Date(dateStr)
-			: new Date(dateStr.replace(' ', 'T') + 'Z');
+		let date: Date;
+		try {
+			const dateString = dateStr.includes('T') || dateStr.includes('Z')
+				? dateStr
+				: dateStr.replace(' ', 'T') + 'Z';
+			date = new Date(dateString);
+			
+			// Vérifier que la date est valide
+			if (isNaN(date.getTime())) {
+				console.error('[formatDateHeader] Date invalide:', dateStr, '->', date);
+				return 'Date inconnue';
+			}
+		} catch (e) {
+			console.error('[formatDateHeader] Erreur parsing:', dateStr, e);
+			return 'Date inconnue';
+		}
+		
 		const formattedDate = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 		return `${fireEmoji}${formattedDate.charAt(0).toUpperCase()}${formattedDate.slice(1)}`;
 	}
