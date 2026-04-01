@@ -681,3 +681,45 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 
 ### v1.0.0 (2026-03-12)
 - 🎉 Version initiale
+
+## Accessibilité (A11y)
+
+### Bonnes pratiques implémentées
+
+Tous les composants interactifs suivent les standards d'accessibilité WCAG :
+
+#### Éléments cliquables
+- **Attributs ARIA** : `role="button"` pour les divs interactives
+- **Navigation clavier** : `tabindex="0"` pour la tabulation
+- **Gestionnaires d'événements** : `onkeydown` pour Enter et Espace
+- **Labels** : `aria-label` descriptif pour les lecteurs d'écran
+
+#### Modales et overlays
+- **Overlay** : `role="button"`, `tabindex="0"`, fermeture avec Échap
+- **Modale** : `role="dialog"`, `aria-modal="true"`, `aria-labelledby` pour le titre
+- **Fermeture clavier** : Échap ferme la modale
+
+#### Grilles interactives
+- **Grid** : `role="grid"`, `tabindex="0"` pour la navigation
+- **Cellules** : `role="gridcell"` ou `role="button"` selon l'interactivité
+- **Focus** : `tabindex` conditionnel (0 si interactif, undefined sinon)
+
+### Composants corrigés
+
+| Composant | Corrections |
+|-----------|-------------|
+| `FloatingPlayer.svelte` | Date cliquable avec role, tabindex, onkeydown, aria-label ; progress-track avec navigation flèches ; z-index augmenté à 100 |
+| `TeamList.svelte` | Overlay et modale avec gestionnaires clavier, attributs ARIA, tabindex="-1" sur dialog |
+| `ImageViewer.svelte` | Overlay avec onkeydown, alt text vide (éviter redondance) |
+| `Calendar.svelte` | Grid avec onkeydown, cellules séparées interactives/non-interactives avec {#if} |
+| `+page.svelte` | Container avec role="application", modales avec attributs ARIA complets, cardSwiped réactive |
+
+### Vérification
+
+Les warnings Svelte a11y sont surveillés lors du développement. En cas d'apparition de nouveaux warnings :
+
+1. Ajouter `role` approprié aux éléments interactifs
+2. Ajouter `tabindex="0"` pour la navigation au clavier
+3. Implémenter `onkeydown` pour Enter/Espace
+4. Ajouter `aria-label` descriptif
+5. Utiliser `aria-labelledby` pour lier les titres aux modales

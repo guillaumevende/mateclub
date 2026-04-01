@@ -14,6 +14,8 @@
 		super_powers: number;
 		daily_notification_hour: number;
 		timezone: string;
+		created_at: string;
+		last_login: string | null;
 		logs_enabled?: number;
 		jingles_enabled?: number;
 	};
@@ -23,6 +25,7 @@
 		pseudo: string;
 		avatar: string;
 		timezone: string;
+		is_admin: number;
 		requested_at: string;
 		status: string;
 	};
@@ -51,8 +54,14 @@
 	let countdownInterval: ReturnType<typeof setInterval> | null = $state(null);
 	let canConfirmDelete = $state(false);
 
-	let superPowersEnabled = $state(data.currentUser?.super_powers === 1);
-	let allowRegistrationEnabled = $state(data.allowRegistration === true);
+	let superPowersEnabled = $state(false);
+	let allowRegistrationEnabled = $state(false);
+
+	// Synchroniser avec data quand il change
+	$effect(() => {
+		superPowersEnabled = data.currentUser?.super_powers === 1;
+		allowRegistrationEnabled = data.allowRegistration === true;
+	});
 
 	function openDeleteModal(user: User) {
 		userToDelete = user;
@@ -238,11 +247,35 @@
 			{#each data.pendingRegistrations as registration}
 			<div class="pending-item">
 				<div class="pending-info">
-					<span class="pending-avatar">{registration.avatar}</span>
-					<div class="pending-details">
+					<div class="pending-line-1">
+						<span class="pending-avatar">{registration.avatar}</span>
 						<span class="pending-pseudo">{registration.pseudo}</span>
-						<span class="pending-date">inscription le {new Date(registration.requested_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })} à {new Date(registration.requested_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
-						<span class="pending-timezone">{registration.timezone}</span>
+					</div>
+					<div class="pending-line-2">
+						<span class="badge" class:admin={registration.is_admin} class:member={!registration.is_admin}>
+							{registration.is_admin ? 'Admin' : 'Membre'}
+						</span>
+					</div>
+					<div class="pending-line-3">
+						<span class="pending-timezone">🌍 {registration.timezone}</span>
+					</div>
+					<div class="pending-line-4">
+						<span class="pending-date">
+							📅 Inscrit(e) le {(registration.requested_at.includes('T') || registration.requested_at.includes('Z') ? new Date(registration.requested_at) : new Date(registration.requested_at.replace(' ', 'T') + 'Z')).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })} à {(registration.requested_at.includes('T') || registration.requested_at.includes('Z') ? new Date(registration.requested_at) : new Date(registration.requested_at.replace(' ', 'T') + 'Z')).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+						</span>
+					</div>
+					<div class="pending-line-5">
+						<form method="POST" action="?/rejectRegistration" use:enhance={() => {
+							return async ({ result }) => {
+								if (result.type === 'success') {
+									window.location.reload();
+								}
+							};
+						}}>
+							<input type="hidden" name="csrf_token" value={data.csrfToken} />
+							<input type="hidden" name="registration_id" value={registration.id} />
+							<button type="submit" class="reject-btn">🗑️ Supprimer</button>
+						</form>
 					</div>
 				</div>
 				<div class="pending-actions">
@@ -252,22 +285,14 @@
 								window.location.reload();
 							}
 						};
-					}}>
+					}} class="approve-form">
 						<input type="hidden" name="csrf_token" value={data.csrfToken} />
 						<input type="hidden" name="registration_id" value={registration.id} />
+						<label class="checkbox-inline">
+							<input type="checkbox" name="is_admin" checked={registration.is_admin === 1} />
+							Admin
+						</label>
 						<button type="submit" class="approve-btn">✅ Valider</button>
-					</form>
-					
-					<form method="POST" action="?/rejectRegistration" use:enhance={() => {
-						return async ({ result }) => {
-							if (result.type === 'success') {
-								window.location.reload();
-							}
-						};
-					}}>
-						<input type="hidden" name="csrf_token" value={data.csrfToken} />
-						<input type="hidden" name="registration_id" value={registration.id} />
-						<button type="submit" class="reject-btn">❌ Rejeter</button>
 					</form>
 				</div>
 			</div>
@@ -400,33 +425,79 @@
 				{@const isLastAdmin = user.is_admin && adminCount === 1}
 				{@const isSelf = user.id === data.currentUser?.id}
 				{@const canDelete = !isLastAdmin && !isSelf}
-				<div class="user">
-					<Avatar avatar={user.avatar} size="small" />
-					<span class="pseudo">{user.pseudo}</span>
-					<span class="badge" class:admin={user.is_admin} class:member={!user.is_admin}>{user.is_admin ? 'Admin' : 'Membre'}</span>
-					<form method="POST" action="?/delete" style="display: none" data-user-id={user.id}>
-						<input type="hidden" name="csrf_token" value={data.csrfToken} />
-						<input type="hidden" name="user_id" value={user.id} />
-					</form>
-					<button 
-						type="button" 
-						class="delete"
-						class:disabled={!canDelete}
-						disabled={!canDelete}
-						title={isSelf ? 'Vous ne pouvez pas vous supprimer vous-même' : (isLastAdmin ? 'Impossible de supprimer le dernier admin' : '')}
-						onclick={() => canDelete && openDeleteModal(user)}
-					>
-						Supprimer
-					</button>
+				{@const createdAt = user.created_at.includes('T') || user.created_at.includes('Z') ? new Date(user.created_at) : new Date(user.created_at.replace(' ', 'T') + 'Z')}
+				{@const lastLogin = user.last_login ? (user.last_login.includes('T') || user.last_login.includes('Z') ? new Date(user.last_login) : new Date(user.last_login.replace(' ', 'T') + 'Z')) : null}
+				<div class="user-card">
+					<div class="user-row">
+						<div class="user-left">
+							<Avatar avatar={user.avatar} size="small" />
+							<span class="user-pseudo">{user.pseudo}</span>
+						</div>
+						<div class="user-right">
+							<span class="badge" class:admin={user.is_admin} class:member={!user.is_admin}>
+								{user.is_admin ? 'Admin' : 'Membre'}
+							</span>
+						</div>
+					</div>
+					<div class="user-row">
+						<div class="user-left">
+							<span class="user-timezone">🌍 {user.timezone}</span>
+						</div>
+						<div class="user-right">
+							<span class="user-created">{createdAt.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+						</div>
+					</div>
+					{#if lastLogin}
+					<div class="user-row">
+						<div class="user-left">
+							<span class="user-last-login-label">Dernière connexion :</span>
+						</div>
+						<div class="user-right">
+							<span class="user-last-login">{lastLogin.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })} à {lastLogin.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+						</div>
+					</div>
+					{/if}
+					<div class="user-row user-actions">
+						<form method="POST" action="?/delete" style="display: none" data-user-id={user.id}>
+							<input type="hidden" name="csrf_token" value={data.csrfToken} />
+							<input type="hidden" name="user_id" value={user.id} />
+						</form>
+						<button 
+							type="button" 
+							class="delete"
+							class:disabled={!canDelete}
+							disabled={!canDelete}
+							title={isSelf ? 'Vous ne pouvez pas vous supprimer vous-même' : (isLastAdmin ? 'Impossible de supprimer le dernier admin' : '')}
+							onclick={() => canDelete && openDeleteModal(user)}
+						>
+							🗑️ Supprimer
+						</button>
+					</div>
 				</div>
 			{/each}
 		</div>
 	</section>
 
 	{#if showDeleteModal && userToDelete}
-		<div class="modal-overlay" use:scrollLock={showDeleteModal} onclick={closeDeleteModal}>
-			<div class="modal" onclick={(e) => e.stopPropagation()}>
-				<h3>⚠️ Action sensible ⚠️</h3>
+		<div
+			class="modal-overlay"
+			use:scrollLock={showDeleteModal}
+			onclick={closeDeleteModal}
+			onkeydown={(e) => e.key === 'Escape' && closeDeleteModal()}
+			role="button"
+			tabindex="0"
+			aria-label="Fermer la modale"
+		>
+			<div
+				class="modal"
+				onclick={(e) => e.stopPropagation()}
+				onkeydown={(e) => e.key === 'Escape' && closeDeleteModal()}
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="admin-delete-modal-title"
+				tabindex="-1"
+			>
+				<h3 id="admin-delete-modal-title">⚠️ Action sensible ⚠️</h3>
 				<p class="warning-text">
 					En confirmant la suppression de l'utilisateur <strong>{userToDelete.pseudo}</strong>, 
 					il perdra son accès à l'application, ne pourra plus écouter ni participer. 
@@ -461,43 +532,81 @@
 	.users {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: 0.75rem;
 	}
 
-	.user {
+	.user-card {
 		display: flex;
-		align-items: center;
-		gap: 1rem;
-		padding: 0.75rem;
+		flex-direction: column;
+		gap: 0.5rem;
+		padding: 1rem;
 		background: #1a1a2e;
 		border-radius: 8px;
 	}
 
-	.pseudo {
-		flex: 1;
+	.user-row {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+	}
+
+	.user-left {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+	}
+
+	.user-right {
+		display: flex;
+		align-items: center;
+	}
+
+	.user-pseudo {
 		font-weight: 600;
+		color: #eee;
+		font-size: 1rem;
+	}
+
+	.user-timezone {
+		color: #aaa;
+		font-size: 0.85rem;
+	}
+
+	.user-created {
+		color: #666;
+		font-size: 0.75rem;
+	}
+
+	.user-last-login-label {
+		color: #888;
+		font-size: 0.85rem;
+	}
+
+	.user-last-login {
+		color: #fff;
+		font-size: 0.85rem;
 	}
 
 	.badge {
 		font-size: 0.75rem;
-		padding: 0.25rem 0.5rem;
+		padding: 0.25rem 0.75rem;
 		border-radius: 4px;
+		font-weight: 500;
 	}
 
 	.badge.admin {
 		background: #e94560;
+		color: #fff;
 	}
 
 	.badge.member {
-		background: transparent;
-		border: 1px solid #e94560;
-		color: #e94560;
+		background: #666;
+		color: #fff;
 	}
 
-	.save-btn {
-		margin-top: 1rem;
-		background: #e94560;
-		width: 100%;
+	.user-actions {
+		justify-content: flex-end;
+		margin-top: 0.5rem;
 	}
 
 	button[type="submit"]:disabled {
@@ -739,12 +848,6 @@
 		align-items: center;
 		gap: 0.75rem;
 		flex: 1;
-	}
-
-	.pending-details {
-		display: flex;
-		flex-direction: column;
-		gap: 0.25rem;
 	}
 
 	.pending-avatar {

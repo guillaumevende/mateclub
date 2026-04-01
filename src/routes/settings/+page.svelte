@@ -20,13 +20,21 @@
 	const PSEUDO_REGEX = /^[a-zA-Z0-9\s\-._àáâãäåæçèéêëìíîïñòóôõöùúûüýÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝŸ]{3,22}$/;
 
 	// État local
-	let pseudo = $state(data.user?.pseudo || '');
+	let pseudo = $state('');
 	let password = $state('');
 	let confirmPassword = $state('');
 	let imagePreview = $state<string | null>(null);
-	let isImageAvatar = $state(data.user?.avatar?.includes('avatar_') || false);
-	let selectedEmoji = $state(data.user?.avatar?.includes('avatar_') ? '' : (data.user?.avatar || '☕'));
-	let savedImageFilename = $state(data.savedImage);
+	let isImageAvatar = $state(false);
+	let selectedEmoji = $state('☕');
+	let savedImageFilename = $state<string | null>(null);
+
+	// Synchroniser avec data quand il change
+	$effect(() => {
+		pseudo = data.user?.pseudo || '';
+		isImageAvatar = data.user?.avatar?.includes('avatar_') || false;
+		selectedEmoji = data.user?.avatar?.includes('avatar_') ? '' : (data.user?.avatar || '☕');
+		savedImageFilename = data.savedImage;
+	});
 	let showSuccessModal = $state(false);
 	let compressionProgress = $state(0);
 	let isCompressing = $state(false);
@@ -138,6 +146,7 @@
 				maxSizeMB: 1,
 				initialQuality: 0.8,
 				useWebWorker: true,
+				libURL: '/lib/browser-image-compression.js',
 				onProgress: (progress: number) => {
 					compressionProgress = Math.round(progress * 100);
 				}
@@ -233,12 +242,12 @@
 		// On ne supprime PAS l'image, on garde la possibilité de revenir dessus
 		selectedEmoji = emoji;
 		isImageAvatar = false;
-		imagePreview = null;
+		// Note: on ne réinitialise PAS imagePreview ici pour garder la preview si on revient à l'image
 	}
 	
 	function getAvatarDisplay() {
-		// Si on a une prévisualisation en attente (nouvelle image pas encore sauvegardée)
-		if (imagePreview && hasPendingImage) {
+		// Si on a une prévisualisation locale (nouvelle image uploadée mais pas encore rechargée)
+		if (imagePreview) {
 			return { type: 'preview', value: imagePreview };
 		}
 		
@@ -254,9 +263,25 @@
 	<h1>Paramètres</h1>
 
 	{#if showSuccessModal}
-		<div class="modal-overlay" use:scrollLock={showSuccessModal} onclick={closeSuccessModal}>
-			<div class="modal" onclick={(e) => e.stopPropagation()}>
-				<h2>Succès !</h2>
+		<div
+			class="modal-overlay"
+			use:scrollLock={showSuccessModal}
+			onclick={closeSuccessModal}
+			onkeydown={(e) => e.key === 'Escape' && closeSuccessModal()}
+			role="button"
+			tabindex="0"
+			aria-label="Fermer la modale"
+		>
+			<div
+				class="modal"
+				onclick={(e) => e.stopPropagation()}
+				onkeydown={(e) => e.key === 'Escape' && closeSuccessModal()}
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="success-modal-title"
+				tabindex="-1"
+			>
+				<h2 id="success-modal-title">Succès !</h2>
 				<button class="close-btn" onclick={closeSuccessModal}>✕</button>
 				<p class="success-message">Paramètres sauvegardés avec succès !</p>
 			</div>
@@ -347,12 +372,14 @@
 			<h2>Avatar</h2>
 			
 			<!-- Upload image -->
-			<div 
+			<div
 				class="avatar-upload-section"
 				class:dragging={isDragging}
 				ondragover={handleDragOver}
 				ondragleave={handleDragLeave}
 				ondrop={handleDrop}
+				role="region"
+				aria-label="Zone de dépôt d'image"
 			>
 		{#if imagePreview}
 			<div class="image-preview">
@@ -362,12 +389,12 @@
 				
 				{#if isImageAvatar}
 					<label class="upload-zone" class:disabled={isCompressing}>
-						<input type="file" accept="image/*" capture="environment" onchange={handleImageSelect} disabled={isCompressing} />
+						<input type="file" accept="image/*" onchange={handleImageSelect} disabled={isCompressing} />
 						<span>🖼️ Changer la photo</span>
 					</label>
 				{:else}
 					<label class="upload-zone" class:disabled={isCompressing}>
-						<input type="file" accept="image/*" capture="environment" onchange={handleImageSelect} disabled={isCompressing} />
+						<input type="file" accept="image/*" onchange={handleImageSelect} disabled={isCompressing} />
 						<span>📷 Prendre ou choisir une photo</span>
 					</label>
 				{/if}
@@ -575,31 +602,6 @@
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
-	}
-
-	.heic-placeholder {
-		width: 100%;
-		height: 100%;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		background: #2a2a4e;
-		border-radius: 12px;
-		padding: 1rem;
-		text-align: center;
-	}
-
-	.heic-placeholder span {
-		font-size: 3rem;
-		margin-bottom: 0.5rem;
-	}
-
-	.heic-note {
-		font-size: 0.75rem;
-		color: #888;
-		margin: 0;
-		line-height: 1.4;
 	}
 
 	.image-confirmation {
