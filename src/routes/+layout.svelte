@@ -5,6 +5,7 @@
 	import { initHaptics, destroyHaptics } from '$lib/utils/haptics';
 	import FloatingPlayer from '$lib/components/FloatingPlayer.svelte';
 	import { onMount, onDestroy } from 'svelte';
+	import '@khmyznikov/pwa-install';
 
 	let { children, data }: { children: Snippet, data: { user?: { avatar: string; is_admin: number; pseudo: string; logs_enabled?: number; jingles_enabled?: number } } } = $props();
 
@@ -37,6 +38,20 @@
 				debugLogs.update((logs: string[]) => [...logs, `[${new Date().toLocaleTimeString()}] 🔊 Guardian STILL playing!`].slice(-30));
 			}
 		}, 3000);
+		
+		// Configurer et afficher l'invite d'installation PWA après 5 secondes si éligible
+		setTimeout(() => {
+			const pwaInstall = document.querySelector('pwa-install') as any;
+			if (pwaInstall) {
+				// Appliquer les styles personnalisés (couleur de l'app)
+				pwaInstall.styles = { '--tint-color': '#e94560' };
+				
+				// Afficher le dialog si éligible
+				if (!pwaInstall.isUnderStandaloneMode && pwaInstall.isInstallAvailable) {
+					pwaInstall.showDialog();
+				}
+			}
+		}, 5000);
 	});
 
 	function closeDebug() {
@@ -76,6 +91,7 @@
 <audio id="persistent-audio" preload="auto" style="display: none;"></audio>
 <audio id="audio-guardian" loop preload="auto" style="display: none;" src="/silence.mp3"></audio>
 <audio id="jingle-audio" preload="auto" style="display: none;" src="/jingle-intro.mp3"></audio>
+<audio id="end-sound-audio" preload="auto" style="display: none;"></audio>
 
 {#if debugVisible}
 <div id="debug-log" style="background: rgba(255, 255, 0, 0.95); color: black; padding: 10px; position: fixed; top: 0; left: 0; z-index: 9999; font-size: 11px; width: 100%; height: 70vh; overflow-y: auto; font-family: monospace; box-sizing: border-box;">
@@ -128,6 +144,12 @@
 		{/if}
 	</div>
 </nav>
+
+<pwa-install
+	manifest-url="/manifest.json"
+	use-local-storage
+	install-description="Installez Maté Club sur votre écran d'accueil pour accéder rapidement à vos capsules audio"
+></pwa-install>
 
 <main class:logged-in={!!data.user} class:with-player={showPlayer}>
 	{@render children()}
@@ -195,7 +217,7 @@
 		flex-direction: column;
 		justify-content: flex-end;
 		border-top: 1px solid #2a2a4e;
-		z-index: 1000;
+		z-index: 50;
 	}
 
 	nav.with-player {

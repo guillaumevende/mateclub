@@ -71,7 +71,11 @@
 		if (!player.currentRecording) return '';
 		
 		const timezone = $page.data.user?.timezone || 'Europe/Paris';
-		const recordedAt = new Date(player.currentRecording.recorded_at);
+		// Forcer l'interprétation UTC en ajoutant 'Z' si pas de timezone
+		const dateStr = player.currentRecording.recorded_at;
+		const recordedAt = dateStr.includes('T') || dateStr.includes('Z')
+			? new Date(dateStr)
+			: new Date(dateStr.replace(' ', 'T') + 'Z');
 		
 		const formatter = new Intl.DateTimeFormat('fr-FR', {
 			weekday: 'long',
@@ -83,6 +87,18 @@
 		});
 		
 		return formatter.format(recordedAt).replace(/^./, (str) => str.toUpperCase()).replace(':', 'h');
+	}
+
+	function handleDateClick() {
+		// Ne fonctionne que sur la page d'accueil
+		if ($page.url.pathname !== '/') return;
+		
+		if (!player.currentDay) return;
+		
+		const dayElement = document.querySelector(`[data-day="${player.currentDay}"]`);
+		if (dayElement) {
+			dayElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		}
 	}
 
 	function formatPosition(): string {
@@ -124,7 +140,18 @@
 			
 			<div class="content-wrapper">
 				<div class="info-column">
-					<div class="date-line">{formatFullDate()}</div>
+					{#if $page.url.pathname === '/'}
+						<div
+							class="date-line is-clickable"
+							onclick={handleDateClick}
+							onkeydown={(e) => e.key === 'Enter' && handleDateClick()}
+							role="button"
+							tabindex="0"
+							aria-label="Cliquer pour scroller vers ce jour"
+						>{formatFullDate()}</div>
+					{:else}
+						<div class="date-line">{formatFullDate()}</div>
+					{/if}
 					<div class="position-line">
 						{formatPosition()} • {formatDuration()}
 					</div>
@@ -162,16 +189,26 @@
 		
 		<div class="progress-container">
 			<span class="time current">{formatTime(player.progress)}</span>
-			<div 
-				class="progress-track" 
+			<div
+				class="progress-track"
 				onclick={(e) => handleSeekFromClick(e)}
 				onmousedown={startDrag}
 				ontouchstart={startDrag}
+				onkeydown={(e) => {
+					if (e.key === 'ArrowLeft') {
+						e.preventDefault();
+						seekTo(Math.max(0, player.progress - 5));
+					} else if (e.key === 'ArrowRight') {
+						e.preventDefault();
+						seekTo(Math.min(displayDuration, player.progress + 5));
+					}
+				}}
 				role="slider"
 				tabindex="0"
 				aria-valuenow={player.progress}
 				aria-valuemin={0}
 				aria-valuemax={displayDuration}
+				aria-label="Barre de progression audio"
 			>
 				<div class="progress-buffer" style="width: {bufferedPercent}%"></div>
 				<div class="progress-fill" style="width: {progressPercent}%"></div>
@@ -187,6 +224,8 @@
 		width: 100%;
 		max-width: 600px;
 		margin: 0 auto;
+		position: relative;
+		z-index: 100;
 	}
 
 	.player-layout {
@@ -232,6 +271,15 @@
 		font-size: 1rem;
 		line-height: 1.2;
 		text-align: center;
+	}
+
+	.date-line.is-clickable {
+		cursor: pointer;
+		transition: opacity 0.2s;
+	}
+
+	.date-line.is-clickable:hover {
+		opacity: 0.8;
 	}
 
 	.position-line {

@@ -24,10 +24,11 @@
 <svelte:window onkeydown={handleKeydown} />
 
 {#if isOpen && imageUrl}
-	<div 
-		class="image-viewer-overlay" 
+	<div
+		class="image-viewer-overlay"
 		use:scrollLock={isOpen}
 		onclick={handleClick}
+		onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleClick(e)}
 		role="button"
 		tabindex="0"
 		aria-label="Fermer l'image"

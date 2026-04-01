@@ -22,7 +22,7 @@ export const db = new Database(dbPath);
 
 // No automatic admin creation - first admin must be created via /setup page
 
-db.exec(`
+	db.exec(`
 	CREATE TABLE IF NOT EXISTS users (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		pseudo TEXT UNIQUE NOT NULL,
@@ -32,7 +32,8 @@ db.exec(`
 		super_powers INTEGER DEFAULT 0,
 		daily_notification_hour INTEGER DEFAULT 420,
 		timezone TEXT DEFAULT 'Europe/Paris',
-		created_at DATETIME DEFAULT (datetime('now'))
+		created_at DATETIME DEFAULT (datetime('now')),
+		last_login DATETIME
 	);
 
 	CREATE TABLE IF NOT EXISTS recordings (
@@ -142,6 +143,7 @@ try {
 			password_hash TEXT NOT NULL,
 			avatar TEXT DEFAULT '☕',
 			timezone TEXT DEFAULT 'Europe/Paris',
+			is_admin INTEGER DEFAULT 0,
 			requested_at DATETIME DEFAULT (datetime('now')),
 			status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'rejected'))
 		)
@@ -173,6 +175,7 @@ export type User = {
 	daily_notification_hour: number;
 	timezone: string;
 	created_at: string;
+	last_login: string | null;
 	logs_enabled?: number;
 	jingles_enabled?: number;
 };
@@ -526,7 +529,7 @@ export function hasAdmin(): boolean {
 }
 
 export function getUserById(id: number): User | undefined {
-	const stmt = db.prepare('SELECT id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, logs_enabled, jingles_enabled FROM users WHERE id = ?');
+	const stmt = db.prepare('SELECT id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, last_login, logs_enabled, jingles_enabled FROM users WHERE id = ?');
 	return stmt.get(id) as User | undefined;
 }
 
@@ -543,7 +546,7 @@ export function getAllUsers(): UserWithCount[] {
 	
 	const stmt = db.prepare(`
 		SELECT 
-			u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at,
+			u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login,
 			COALESCE((
 				SELECT COUNT(*) 
 				FROM recordings r 
@@ -666,9 +669,14 @@ export function createSession(userId: number): string {
 	return sessionId;
 }
 
+export function updateLastLogin(userId: number): void {
+	const stmt = db.prepare('UPDATE users SET last_login = datetime(\'now\') WHERE id = ?');
+	stmt.run(userId);
+}
+
 export function getSession(sessionId: string): User | undefined {
 	const stmt = db.prepare(`
-		SELECT u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.logs_enabled, u.jingles_enabled
+		SELECT u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled
 		FROM sessions s 
 		JOIN users u ON s.user_id = u.id 
 		WHERE s.id = ? AND s.expires_at > datetime('now')
@@ -952,6 +960,7 @@ export type PendingRegistration = {
 	password_hash: string;
 	avatar: string;
 	timezone: string;
+	is_admin: number;
 	requested_at: string;
 	status: string;
 };

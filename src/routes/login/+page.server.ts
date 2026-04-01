@@ -4,6 +4,7 @@ import {
 	getUserByPseudo, 
 	verifyPassword, 
 	createSession, 
+	updateLastLogin,
 	canAttemptLogin, 
 	recordLoginAttempt, 
 	getRemainingLockoutTime,
@@ -61,6 +62,7 @@ export const actions: Actions = {
 		}
 
 		const sessionId = createSession(user.id);
+		updateLastLogin(user.id);
 		
 		// Detect if behind proxy (Caddy adds X-Forwarded-Proto)
 		const forwardedProto = request.headers.get('x-forwarded-proto');
