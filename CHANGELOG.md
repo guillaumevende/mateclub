@@ -2,7 +2,35 @@
 
 ---
 
-## v2.7.1 (2026-04-02)
+## v0.27.0 (2026-04-02) - Migration Semantic Versioning
+
+### 🔄 Changement majeur
+
+#### Adoption de Semantic Versioning
+- **Migration** : Passage du système de versioning arbitraire 2.x à SemVer 0.x
+- **Raison** : Mieux refléter le statut beta du projet
+- **Impact** : Pas de changement fonctionnel, uniquement sémantique
+
+#### Nouvelle structure des versions
+- **0.x.y** : Phase beta, API susceptible de changer
+- Prochaines versions : 0.28.0, 0.29.0, puis 1.0.0 quand l'API sera stabilisée
+
+#### Documentation
+- Ajout section "Versioning" dans README.md
+- Ajout section "Branches" documentant `main` et `develop`
+- Mise à jour du badge de version (2.7.1 → 0.27.0)
+
+### 📚 Notes
+
+Les versions 2.x (de v2.0.0 à v2.7.1) représentent l'historique de développement avant l'adoption officielle de Semantic Versioning. Elles sont conservées dans ce changelog pour référence mais ne suivaient pas la logique SemVer.
+
+---
+
+## Historique des versions (pré-SemVer)
+
+Les versions suivantes ont été développées selon une numérotation arbitraire avant l'adoption de Semantic Versioning le 2026-04-02.
+
+### v2.7.1 (2026-04-02)
 
 ### ✨ Nouvelles fonctionnalités
 
