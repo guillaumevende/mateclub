@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.28.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.29.0-blue?style=for-the-badge)
 
 </div>
 
@@ -39,12 +39,35 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 - **Versions 2.x** (précédentes) : Numérotation historique avant adoption de SemVer (mars-avril 2026)
 - **Versions 0.x** (actuelles et futures) : Phase beta, API non stabilisée
 
-## Branches
+## Branches & Contribution
+
+### Structure
 
 - **`main`** : Version stable actuelle (production) - Toujours déployable
 - **`develop`** : Branche de développement, intégration des futures fonctionnalités
 
-Les contributions doivent passer par des Pull Requests sur `develop`. La branche `main` est protégée et ne reçoit que des merges depuis `develop` ou des hotfixes critiques.
+### Comment contribuer
+
+⚠️ **IMPORTANT : Les Pull Requests doivent toujours cibler la branche `develop`, jamais `main` !**
+
+**Workflow de contribution :**
+
+1. **Fork** le repository (si contributeur externe) ou créer une branche depuis `develop`
+2. **Développez** vos modifications sur votre branche
+3. **Testez** localement (`npm run dev`, `npm run check`)
+4. **Ouvrez une PR** vers la branche **`develop`**
+   - Utilisez le template de PR fourni
+   - Décrivez clairement vos changements
+   - Cochez la case "Ma PR cible la branche `develop`"
+5. **Attendez la review** et intégrez les retours si nécessaire
+6. **Merge** une fois approuvée
+
+**Pourquoi `develop` ?**
+- La branche `main` est protégée et réservée aux releases stables
+- Toutes les fonctionnalités sont intégrées et testées sur `develop` d'abord
+- La branche `main` ne reçoit que des merges depuis `develop` (pas de commits directs)
+
+**Exceptions** : Les hotfixes critiques de sécurité peuvent avoir une procédure spécifique.
 
 ## Fonctionnalités
 
