@@ -546,9 +546,10 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 - **better-sqlite3** (^12.6.x) - Base SQLite
 - **bcrypt** (^6.0.x) - Hachage mots de passe
 - **browser-image-compression** (^2.0.x) - Compression images
-- **sharp** (^0.33.x) - Conversion d'images (HEIC→JPEG)
+- **sharp** (^0.34.x) - Conversion d'images (HEIC→JPEG)
 - **web-haptics** (^0.0.6) - Retour haptique mobile
-- **vite** (^7.3.x) - Build tool
+- **@khmyznikov/pwa-install** (^0.6.x) - Dialog d'installation PWA
+- **vite** (^8.x) - Build tool
 - **typescript** (^5.9.x) - Typage
 
 ## API Routes
@@ -577,6 +578,82 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 - `POST /api/debug` - Logging automatique des erreurs côté client
 
 ## Journal des modifications
+
+### v2.7.1 (2026-04-02)
+
+#### ✨ Nouvelles fonctionnalités
+- **Sons de fin de capsule** : Ding.mp3 (après chaque capsule) et Doudoudou.mp3 (dernière capsule du jour)
+- **Installation PWA facilitée** : Composant @khmyznikov/pwa-install avec dialog d'installation
+- **Visualiseur audio** : 8 barres verticales animées pendant l'enregistrement
+- **Navigation améliorée** : Clic sur date dans FloatingPlayer pour scroller vers le jour
+
+#### 🐛 Corrections de bugs
+- **Stabilité enregistrement** : Timeout 5s pour appareils lents, indicateur "Finalisation..."
+- **Accessibilité (A11y)** : Tous les composants avec attributs ARIA, navigation clavier complète
+- **API** : Renommage endpoint `/listen` → `/listened`
+
+#### 🔧 Migrations
+- Migration fuseau horaire (CRITIQUE) : Conversion CEST → UTC
+- Ajout colonne last_login
+
+### v2.7.0 (2026-04-01)
+
+#### ✨ Fonctionnalités
+- Sons de fin de capsule (Ding/Doudoudou)
+- Installation PWA facilitée
+- Visualiseur audio
+
+#### 🐛 Corrections
+- Stabilité enregistrement
+- Accessibilité complète
+- API endpoint renommé
+
+### v2.6.1 (2026-03-31)
+
+#### 🐛 Corrections de bugs critiques
+- **Gestion des fuseaux horaires** : Migration timestamps CEST → UTC, résolution décalage 2h
+
+### v2.6.0 (2026-03-29)
+
+#### 🎨 Nouvelle identité visuelle
+- Régénération de tous les assets (logo, favicons, icônes PWA)
+- Nettoyage fichiers obsolètes
+
+### v2.5.0-beta (2026-03-27)
+
+#### ✨ Système d'inscription Beta
+- Page d'inscription publique avec formulaire sécurisé
+- Toggle inscriptions dans le panel admin
+- Liste et validation des demandes d'inscription
+
+#### 🐛 Corrections
+- Fix noms de mois dans le calendrier
+- Fix bouton "Charger plus"
+
+### v2.4.7 (2026-03-23)
+
+#### 🐛 Corrections
+- Fix preview HEIC sur page enregistrement
+- Fix vignettes "Aujourd'hui" avec RecordingCard
+
+### v2.4.6 (2026-03-23)
+
+#### ✨ Améliorations
+- Affichage version dans Settings et Login (synchronisé depuis package.json)
+- Fix calendrier page 2+
+- Fix chemins fichiers uploads
+
+### v2.4.5 (2026-03-23)
+
+#### 🐛 Corrections vignettes
+- Fix rendu vignettes verrouillées (CSS blur)
+- Fix dimensions et effet blur
+
+### v2.4.4 (2026-03-23)
+
+#### 🔧 Infrastructure
+- Fix BODY_SIZE_LIMIT à 20M dans docker-compose.yml
+- Documentation installation manuelle
 
 ### v2.4.3 (2026-03-22) - Corrections de sécurité et refactoring
 
