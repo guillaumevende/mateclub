@@ -609,6 +609,12 @@ export function updateUserAvatar(userId: number, avatar: string): void {
 }
 
 export function updateUserTimezone(userId: number, timezone: string): void {
+	// Valider que le timezone est reconnu par le moteur JavaScript
+	try {
+		Intl.DateTimeFormat(undefined, { timeZone: timezone });
+	} catch {
+		return; // Timezone invalide, on ne met pas à jour
+	}
 	const stmt = db.prepare('UPDATE users SET timezone = ? WHERE id = ?');
 	stmt.run(timezone, userId);
 }
@@ -694,6 +700,21 @@ export function refreshSession(sessionId: string): void {
 export function deleteSession(sessionId: string): void {
 	const stmt = db.prepare('DELETE FROM sessions WHERE id = ?');
 	stmt.run(sessionId);
+}
+
+export function cleanupExpiredSessions(): void {
+	const stmt = db.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')");
+	stmt.run();
+}
+
+export function deleteUserSessions(userId: number, exceptSessionId?: string): void {
+	if (exceptSessionId) {
+		const stmt = db.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?');
+		stmt.run(userId, exceptSessionId);
+	} else {
+		const stmt = db.prepare('DELETE FROM sessions WHERE user_id = ?');
+		stmt.run(userId);
+	}
 }
 
 export function saveRecording(userId: number, audioData: Buffer, durationSeconds: number, imageData?: Buffer, url?: string | null, audioHash?: string): Recording {
@@ -950,6 +971,19 @@ export function consumeCSRFToken(token: string): void {
 export function cleanupExpiredCSRF(): void {
 	const stmt = db.prepare('DELETE FROM csrf_tokens WHERE expires_at < datetime(\'now\')');
 	stmt.run();
+}
+
+let lastCleanup = 0;
+const CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 heure
+
+export function periodicCleanup(): void {
+	const now = Date.now();
+	if (now - lastCleanup < CLEANUP_INTERVAL) return;
+	lastCleanup = now;
+
+	cleanupExpiredSessions();
+	cleanupExpiredCSRF();
+	cleanupOldLoginAttempts();
 }
 
 // ============ REGISTRATION MANAGEMENT FUNCTIONS ============

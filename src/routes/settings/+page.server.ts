@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { redirect, fail } from '@sveltejs/kit';
 import { hashSync } from 'bcrypt';
-import { updateUserAvatar, updateUserHour, updateUserTimezone, getUserById, updateUserPassword, updateUserPseudo, isPseudoAvailable } from '$lib/server/db';
+import { updateUserAvatar, updateUserHour, updateUserTimezone, getUserById, updateUserPassword, updateUserPseudo, isPseudoAvailable, deleteUserSessions } from '$lib/server/db';
 import { readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { version } from '../../../package.json';
@@ -70,7 +70,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 };
 
 	export const actions: Actions = {
-	default: async ({ request, locals }) => {
+	default: async ({ request, locals, cookies }) => {
 		const data = await request.formData();
 		const avatar = data.get('avatar')?.toString() || '☕';
 		const avatarImage = data.get('avatarImage')?.toString();
@@ -143,6 +143,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 				}
 				const hashedPassword = hashSync(password, 10);
 				updateUserPassword(locals.user.id, hashedPassword);
+
+				// Invalider toutes les autres sessions (sécurité)
+				const sessionId = cookies.get('session');
+				if (sessionId) {
+					deleteUserSessions(locals.user.id, sessionId);
+				}
 			}
 			
 			// Si l'avatar est un emoji (pas une image avec chemin)

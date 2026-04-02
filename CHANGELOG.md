@@ -2,6 +2,57 @@
 
 ---
 
+## v0.29.0 (2026-04-02) - Corrections de sécurité et améliorations
+
+### 🔒 Sécurité
+
+#### Validation du fuseau horaire (PR #57)
+- **Validation avant sauvegarde** : Vérification que le timezone est reconnu par JavaScript avant enregistrement en base
+- **Protection** : Évite les erreurs `RangeError` sur `Intl.DateTimeFormat` qui pouvaient crasher l'application
+- **Silent fail** : Si timezone invalide, la mise à jour est ignorée sans erreur utilisateur
+
+#### Nettoyage périodique des données expirées (PR #58)
+- **Nouvelles fonctions** : `cleanupExpiredSessions()`, `cleanupExpiredCsrfTokens()`, `cleanupExpiredLoginAttempts()`
+- **Automatisation** : Nettoyage automatique des sessions, tokens CSRF et tentatives de login expirées
+- **Hygiène** : Réduction de la taille de la base de données et amélioration des performances
+
+#### Optimisation lecture fichiers (PR #59)
+- **Lecture partielle** : Lecture des 4 premiers octets uniquement pour la détection magic number (au lieu du fichier complet)
+- **Performance** : Réduction drastique de l'utilisation mémoire pour les gros fichiers (jusqu'à 20 Mo)
+- **Impact** : Moins de blocage du thread Node.js lors de la validation des uploads
+
+#### Invalidation des sessions au changement de mot de passe (PR #60)
+- **Nouvelle fonction** : `deleteUserSessions(userId, exceptSessionId?)` pour invalider toutes les sessions d'un utilisateur
+- **Sécurité renforcée** : Lors d'un changement de mot de passe, toutes les autres sessions sont automatiquement révoquées
+- **UX préservée** : La session courante est conservée (l'utilisateur reste connecté)
+- **Protection** : Empêche l'utilisation de sessions volées après un changement de mot de passe
+
+### 🛠️ Corrections complémentaires
+- Résolution de conflit de merge entre PR #57 et PR #60 sur `db.ts`
+
+---
+
+## v0.28.0 (2026-04-02) - Scroll initial sur première capsule non lue
+
+### ✨ Nouvelles fonctionnalités
+
+#### Positionnement scroll intelligent
+- **Scroll initial sur première non-lue** : Au chargement de la page, chaque journée positionne son scroll horizontal sur la première capsule non lue
+- **Comportement** : Les capsules lues restent à gauche, la première non-lue est visible par défaut
+- **Sans animation** : Le positionnement est instantané (pas de défilement animé au chargement)
+- **Fallback** : Si toutes les capsules d'une journée sont lues, le scroll reste sur la première
+
+#### Cas pris en charge
+- Page d'accueil (journée du jour + jours précédents)
+- Modale calendrier (quand on clique sur une date spécifique)
+- Lazy loading (quand on charge plus de jours avec "Charger plus")
+
+### 🎵 Comportement du jingle inchangé
+- Le jingle d'intro continue de se lancer uniquement si on commence la lecture par la première capsule de la journée
+- Si on commence en milieu de journée (via le positionnement automatique), pas de jingle
+
+---
+
 ## v0.27.0 (2026-04-02) - Migration Semantic Versioning
 
 ### 🔄 Changement majeur
