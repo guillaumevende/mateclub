@@ -707,6 +707,16 @@ export function cleanupExpiredSessions(): void {
 	stmt.run();
 }
 
+export function deleteUserSessions(userId: number, exceptSessionId?: string): void {
+	if (exceptSessionId) {
+		const stmt = db.prepare('DELETE FROM sessions WHERE user_id = ? AND id != ?');
+		stmt.run(userId, exceptSessionId);
+	} else {
+		const stmt = db.prepare('DELETE FROM sessions WHERE user_id = ?');
+		stmt.run(userId);
+	}
+}
+
 export function saveRecording(userId: number, audioData: Buffer, durationSeconds: number, imageData?: Buffer, url?: string | null, audioHash?: string): Recording {
 	debug.db.log('saveRecording - audioData:', audioData.length, 'bytes, imageData:', imageData?.length || 'none');
 	
