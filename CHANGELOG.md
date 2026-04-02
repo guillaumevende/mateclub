@@ -2,6 +2,38 @@
 
 ---
 
+## v2.7.1 (2026-04-02)
+
+### 🐛 Corrections de bugs
+
+#### Safari - Dates InvalidDate
+- **Correction format dates** : Ajout de `T00:00:00Z` pour les dates sans heure (ex: "2026-03-31" → "2026-03-31T00:00:00Z")
+- **Validation robuste** : Vérification que `dateStr` est une string valide avant parsing
+- **Fallback** : Retourne "Date inconnue" si la date est invalide
+- **Compatibilité** : Fonctionne sur Safari iOS et macOS
+
+#### Enregistrement - Stabilité
+- **Gestion états** : `isRecording = false` déplacé dans callback `onstop`
+- **Timeout** : Ajout de 5 secondes pour appareils lents
+- **Indicateur visuel** : Message "Finalisation..." pendant la création du fichier
+
+#### Admin - Structure
+- **Affichage amélioré** : Structure sur 5 lignes pour les inscriptions en attente
+  - Line 1 : Avatar + Pseudo
+  - Line 2 : Badge Admin/Membre
+  - Line 3 : Fuseau horaire
+  - Line 4 : Date d'inscription
+  - Line 5 : Bouton de suppression
+
+### 🔧 Fichiers modifiés
+- `src/routes/+page.svelte` : Correction parsing dates Safari
+- `src/routes/record/+page.svelte` : Stabilisation enregistrement
+- `src/routes/admin/+page.svelte` : Structure admin améliorée
+- `package.json` : Bump version 2.7.1
+- `README.md` : Badge version 2.7.1
+
+---
+
 ## v2.7.0 (2026-04-01) - Branch: hotfix/timezone-display
 
 ### ✨ Nouvelles fonctionnalités
