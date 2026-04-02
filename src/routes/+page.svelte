@@ -539,7 +539,6 @@
 
 	function formatDate(dateStr: string): string {
 		// Forcer l'interprétation UTC en ajoutant 'Z' si pas de timezone
-<<<<<<< HEAD
 		let dateString: string;
 		if (dateStr.includes('T') || dateStr.includes('Z')) {
 			dateString = dateStr;
@@ -549,11 +548,6 @@
 			dateString = dateStr + 'T00:00:00Z';
 		}
 		const date = new Date(dateString);
-=======
-		const date = dateStr.includes('T') || dateStr.includes('Z')
-			? new Date(dateStr)
-			: new Date(dateStr.replace(' ', 'T') + 'Z');
->>>>>>> beta-fix
 		
 		return date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 	}
