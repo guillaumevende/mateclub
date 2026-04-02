@@ -86,7 +86,8 @@
 		progress: 0,
 		duration: 0,
 		volume: 1,
-		isMuted: false
+		isMuted: false,
+		bufferedPercent: 0
 	});
 
 	// Image viewer state
@@ -260,6 +261,7 @@
 
 	// Sync data to component state - only when page changes
 	let prevPage = 0;
+	let initialScrollDone = false;
 	$effect(() => {
 		const page = data.page;
 		if (page && page !== prevPage) {
@@ -280,6 +282,12 @@
 				todayDay = data.days.find(d => d.date === today) || null;
 				currentPage = page;
 				showCalendar = page >= 2;
+				
+				// Initialize scroll positions after data is loaded (only on first load)
+				if (!initialScrollDone) {
+					initialScrollDone = true;
+					initializeScrollPositions();
+				}
 			}
 		}
 	});
@@ -334,6 +342,15 @@
 			const response = await fetch(`/api/recordings/by-date?date=${date}`);
 			const result = await response.json();
 			selectedDayRecordings = result.day;
+			
+			// Initialize scroll position for modal (scroll to first unread)
+			if (result.day && result.day.recordings.length > 0) {
+				// eslint-disable-next-line no-undef
+				requestAnimationFrame(() => {
+					const firstUnreadIndex = getFirstUnreadIndex(result.day);
+					scrollToCardWithoutAnimation(result.day.date, firstUnreadIndex);
+				});
+			}
 		} catch (e) {
 			console.error('Failed to load day recordings:', e);
 		}
@@ -427,6 +444,55 @@
 				scroller.scrollTo({ left: scrollLeft, behavior: 'smooth' });
 			}
 		}
+	}
+
+	// Find the index of the first unread recording for a day
+	function getFirstUnreadIndex(day: DayRecordings): number {
+		for (let i = 0; i < day.recordings.length; i++) {
+			if (!isRecordingListened(day.recordings[i])) {
+				return i;
+			}
+		}
+		return 0; // All read, return first
+	}
+
+	// Scroll to a specific card without animation (for initial positioning)
+	function scrollToCardWithoutAnimation(dayDate: string, index: number) {
+		const dayElement = document.querySelector(`[data-day="${dayDate}"]`);
+		if (!dayElement) return;
+		
+		const scroller = dayElement.querySelector('.recordings-scroller');
+		if (scroller) {
+			const cards = scroller.querySelectorAll('.recording-card');
+			if (cards[index]) {
+				// Calculate scroll position to align the card at the left (with a small margin)
+				const cardRect = cards[index].getBoundingClientRect();
+				const scrollerRect = scroller.getBoundingClientRect();
+				const scrollLeft = cardRect.left - scrollerRect.left + scroller.scrollLeft - 16; // 16px margin
+				scroller.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'auto' });
+			}
+		}
+	}
+
+	// Initialize scroll positions for all visible days (scroll to first unread)
+	function initializeScrollPositions() {
+		// Wait for DOM to be ready
+		// eslint-disable-next-line no-undef
+		requestAnimationFrame(() => {
+			// Scroll today section
+			if (todayDay && todayDay.recordings.length > 0) {
+				const firstUnreadIndex = getFirstUnreadIndex(todayDay);
+				scrollToCardWithoutAnimation(todayDay.date, firstUnreadIndex);
+			}
+			
+			// Scroll all past days
+			allDays.forEach(day => {
+				if (day.recordings.length > 0) {
+					const firstUnreadIndex = getFirstUnreadIndex(day);
+					scrollToCardWithoutAnimation(day.date, firstUnreadIndex);
+				}
+			});
+		});
 	}
 
 	function getDayAuthors(recordings: Recording[]): Recording[] {

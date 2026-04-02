@@ -2,6 +2,27 @@
 
 ---
 
+## v0.28.0 (2026-04-02) - Scroll initial sur première capsule non lue
+
+### ✨ Nouvelles fonctionnalités
+
+#### Positionnement scroll intelligent
+- **Scroll initial sur première non-lue** : Au chargement de la page, chaque journée positionne son scroll horizontal sur la première capsule non lue
+- **Comportement** : Les capsules lues restent à gauche, la première non-lue est visible par défaut
+- **Sans animation** : Le positionnement est instantané (pas de défilement animé au chargement)
+- **Fallback** : Si toutes les capsules d'une journée sont lues, le scroll reste sur la première
+
+#### Cas pris en charge
+- Page d'accueil (journée du jour + jours précédents)
+- Modale calendrier (quand on clique sur une date spécifique)
+- Lazy loading (quand on charge plus de jours avec "Charger plus")
+
+### 🎵 Comportement du jingle inchangé
+- Le jingle d'intro continue de se lancer uniquement si on commence la lecture par la première capsule de la journée
+- Si on commence en milieu de journée (via le positionnement automatique), pas de jingle
+
+---
+
 ## v0.27.0 (2026-04-02) - Migration Semantic Versioning
 
 ### 🔄 Changement majeur
