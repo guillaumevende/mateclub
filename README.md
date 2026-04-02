@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-2.7.1-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.27.0-blue?style=for-the-badge)
 
 </div>
 
@@ -29,6 +29,22 @@
 ## Description
 
 Maté Club est une application web PWA permettant à un groupe d'amis d'enregistrer et partager des capsules audio quotidiennes. Chaque membre peut enregistrer des messages vocaux jusqu'à 3 minutes, avec possibilité d'ajouter une miniature image et un lien URL.
+
+## Versioning
+
+Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
+
+⚠️ **Changement majeur de versioning (2026-04-02)** : Nous sommes passés du système arbitraire 2.x à un versioning SemVer 0.x pour mieux refléter le statut beta du projet.
+
+- **Versions 2.x** (précédentes) : Numérotation historique avant adoption de SemVer (mars-avril 2026)
+- **Versions 0.x** (actuelles et futures) : Phase beta, API non stabilisée
+
+## Branches
+
+- **`main`** : Version stable actuelle (production) - Toujours déployable
+- **`develop`** : Branche de développement, intégration des futures fonctionnalités
+
+Les contributions doivent passer par des Pull Requests sur `develop`. La branche `main` est protégée et ne reçoit que des merges depuis `develop` ou des hotfixes critiques.
 
 ## Fonctionnalités
 
