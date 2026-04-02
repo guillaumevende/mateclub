@@ -512,7 +512,6 @@
 			} else {
 				dateString = dateStr + 'T00:00:00Z';
 			}
-			console.log('[formatDateHeader] dateString transformé:', dateString);
 			date = new Date(dateString);
 			
 			// Vérifier que la date est valide
@@ -524,7 +523,6 @@
 			console.error('[formatDateHeader] Erreur parsing:', dateStr, e);
 			return 'Date inconnue';
 		}
-		
 		const formattedDate = date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 		return `${fireEmoji}${formattedDate.charAt(0).toUpperCase()}${formattedDate.slice(1)}`;
 	}
@@ -543,14 +541,13 @@
 		// Forcer l'interprétation UTC en ajoutant 'Z' si pas de timezone
 		let dateString: string;
 		if (dateStr.includes('T') || dateStr.includes('Z')) {
-			dateString = dateStr;
+		    dateString = dateStr;
 		} else if (dateStr.includes(' ')) {
-			dateString = dateStr.replace(' ', 'T') + 'Z';
+		    dateString = dateStr.replace(' ', 'T') + 'Z';
 		} else {
-			dateString = dateStr + 'T00:00:00Z';
+		    dateString = dateStr + 'T00:00:00Z';
 		}
 		const date = new Date(dateString);
-		
 		return date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 	}
 
