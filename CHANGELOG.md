@@ -2,7 +2,7 @@
 
 ---
 
-## v2.7.0 (2026-04-01) - Branch: hotfix/timezone-display
+## v2.7.1 (2026-04-02)
 
 ### ✨ Nouvelles fonctionnalités
 
