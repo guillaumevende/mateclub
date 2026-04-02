@@ -1,6 +1,5 @@
 import type { RequestHandler } from './$types';
-import { createReadStream, statSync, readFileSync, existsSync } from 'fs';
-import type { ObjectEncodingOptions } from 'fs';
+import { createReadStream, statSync, openSync, readSync, closeSync, existsSync } from 'fs';
 import { join, normalize } from 'path';
 import { redirect } from '@sveltejs/kit';
 import { Readable } from 'stream';
@@ -30,17 +29,22 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		const ext = normalizedPath.split('.').pop()?.toLowerCase();
 		let contentType = getContentType(ext);
 		
-		// Détection du format réel par magic numbers (seulement les premiers bytes)
-		const headerBuffer = readFileSync(normalizedPath, { start: 0, end: 3 } as ObjectEncodingOptions & { flag?: string });
-		if (headerBuffer.length > 0) {
-			const isPNG = headerBuffer[0] === 0x89 && headerBuffer[1] === 0x50 && headerBuffer[2] === 0x4E && headerBuffer[3] === 0x47;
-			const isJPEG = headerBuffer[0] === 0xFF && headerBuffer[1] === 0xD8 && headerBuffer[2] === 0xFF;
-			
-			if (isPNG && contentType !== 'image/png') {
-				contentType = 'image/png';
-			} else if (isJPEG && contentType !== 'image/jpeg') {
-				contentType = 'image/jpeg';
-			}
+		// Détection du format réel par magic numbers (4 premiers octets uniquement)
+		const headerBuffer = Buffer.alloc(4);
+		const fd = openSync(normalizedPath, 'r');
+		try {
+			readSync(fd, headerBuffer, 0, 4, 0);
+		} finally {
+			closeSync(fd);
+		}
+
+		const isPNG = headerBuffer[0] === 0x89 && headerBuffer[1] === 0x50 && headerBuffer[2] === 0x4E && headerBuffer[3] === 0x47;
+		const isJPEG = headerBuffer[0] === 0xFF && headerBuffer[1] === 0xD8 && headerBuffer[2] === 0xFF;
+
+		if (isPNG && contentType !== 'image/png') {
+			contentType = 'image/png';
+		} else if (isJPEG && contentType !== 'image/jpeg') {
+			contentType = 'image/jpeg';
 		}
 
 		return new Response(Readable.toWeb(createReadStream(normalizedPath)) as unknown as ReadableStream<Uint8Array>, {
