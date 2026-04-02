@@ -609,6 +609,12 @@ export function updateUserAvatar(userId: number, avatar: string): void {
 }
 
 export function updateUserTimezone(userId: number, timezone: string): void {
+	// Valider que le timezone est reconnu par le moteur JavaScript
+	try {
+		Intl.DateTimeFormat(undefined, { timeZone: timezone });
+	} catch {
+		return; // Timezone invalide, on ne met pas à jour
+	}
 	const stmt = db.prepare('UPDATE users SET timezone = ? WHERE id = ?');
 	stmt.run(timezone, userId);
 }
