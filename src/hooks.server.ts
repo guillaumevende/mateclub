@@ -1,8 +1,11 @@
 import type { Handle } from '@sveltejs/kit';
-import { getSession, hasAdmin, refreshSession, generateCSRFToken, validateCSRFToken } from '$lib/server/db';
+import { getSession, hasAdmin, refreshSession, generateCSRFToken, validateCSRFToken, periodicCleanup } from '$lib/server/db';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const sessionId = event.cookies.get('session');
+
+	// Nettoyage périodique des données expirées
+	periodicCleanup();
 
 	if (sessionId) {
 		const user = getSession(sessionId);
