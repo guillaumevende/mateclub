@@ -21,8 +21,9 @@
 	};
 
 	let isRecording = $state(false);
+	let isProcessing = $state(false); // Indique que l'enregistrement est en cours de finalisation
 	let mediaRecorder: MediaRecorder | null = $state(null);
-	let chunks: Blob[] = $state([]);
+	let chunks: Blob[] = []; // Non-réactif : évite les problèmes de closure
 	let timer = $state(0);
 	let timerInterval: ReturnType<typeof setInterval> | null = $state(null);
 	let audioUrl: string | null = $state(null);
@@ -270,7 +271,7 @@
 			}
 			
 			mediaRecorder = new MediaRecorder(stream, { mimeType });
-			chunks = [];
+			chunks.length = 0; // Vider sans changer la référence
 
 			mediaRecorder.onstart = () => {
 				debug.recording.log('MediaRecorder démarré');
@@ -318,12 +319,16 @@
 				if (chunks.length === 0) {
 					debug.recording.error('Aucun chunk audio collecté');
 					error = 'Erreur d\'enregistrement - veuillez réessayer';
+					isRecording = false;
+					isProcessing = false;
 					return;
 				}
 				
 				recordedBlob = new Blob(chunks, { type });
 				audioUrl = URL.createObjectURL(recordedBlob);
 				stream.getTracks().forEach(track => track.stop());
+				isRecording = false;
+				isProcessing = false;
 			};
 		} catch (e) {
 			error = 'Impossible d\'accéder au micro';
@@ -332,6 +337,7 @@
 
 	function stopRecording() {
 		debug.recording.log('stopRecording appelé - state:', mediaRecorder?.state, 'chunks:', chunks.length);
+		isProcessing = true;
 		
 		releaseWakeLock();
 		document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -340,11 +346,31 @@
 		clearInterval(timerInterval);
 		timerInterval = null;
 	}
-	isRecording = false;
 	
 	if (mediaRecorder && mediaRecorder.state !== 'inactive') {
 		mediaRecorder.requestData();
 		debug.recording.log('requestData() appelé');
+		
+		// Timeout de secours au cas où onstop ne serait pas appelé
+		const stopTimeout = setTimeout(() => {
+			debug.recording.log('Timeout de secours - forçage arrêt');
+			if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+				try {
+					mediaRecorder.stop();
+				} catch (e) {
+					// Ignorer l'erreur si déjà arrêté
+				}
+			}
+			// Forcer la réinitialisation si onstop n'a pas été appelé
+			if (isRecording) {
+				isRecording = false;
+				isStopping = false;
+				isProcessing = false;
+				if (chunks.length === 0) {
+					error = 'Erreur d\'enregistrement - veuillez réessayer';
+				}
+			}
+		}, 5000); // 5 secondes de timeout
 		
 		setTimeout(() => {
 			debug.recording.log('Timeout stop - state:', mediaRecorder?.state, 'chunks:', chunks.length);
@@ -352,7 +378,17 @@
 				mediaRecorder.stop();
 				debug.recording.log('stop() appelé');
 			}
+			clearTimeout(stopTimeout); // Annuler le timeout de secours si tout va bien
 		}, 300);
+	} else {
+		// MediaRecorder déjà inactif ou inexistant
+		debug.recording.log('MediaRecorder déjà inactif - réinitialisation forcée');
+		isRecording = false;
+		isStopping = false;
+		isProcessing = false;
+		if (chunks.length === 0) {
+			error = 'Erreur d\'enregistrement - veuillez réessayer';
+		}
 	}
 	
 	isStopping = false;
@@ -671,7 +707,12 @@
 					<p class="error">{error}</p>
 				{/if}
 
-				{#if isRecording}
+				{#if isProcessing}
+					<div class="processing-indicator">
+						<span class="processing-spinner"></span>
+						<span>Finalisation de l'enregistrement...</span>
+					</div>
+				{:else if isRecording}
 					<button class="stop" onclick={stopRecording}>Arrêter</button>
 
 					<!-- Audio Visualizer -->
@@ -884,6 +925,34 @@
 
 	button.stop {
 		background: #ff6b6b;
+	}
+
+	.processing-indicator {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.75rem;
+		padding: 1rem;
+		background: rgba(255, 255, 255, 0.1);
+		border-radius: 8px;
+		color: #fff;
+		font-size: 1rem;
+	}
+
+	.processing-spinner {
+		display: inline-block;
+		width: 20px;
+		height: 20px;
+		border: 2px solid rgba(255, 255, 255, 0.3);
+		border-top-color: #fff;
+		border-radius: 50%;
+		animation: spin 1s linear infinite;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	.preview {
