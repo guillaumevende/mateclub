@@ -27,7 +27,7 @@
     "sharp": "^0.34.5",
     "svelte": "^5.53.9",
     "typescript": "^5.9.3",
-    "vite": "^8.0.1",
+    "vite": "^8.0.5",
     "web-haptics": "^0.0.6"
   },
   "devDependencies": {
