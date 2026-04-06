@@ -22,7 +22,7 @@
     "@sveltejs/kit": "^2.55.0",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "bcrypt": "^6.0.0",
-    "better-sqlite3": "^12.6.2",
+    "better-sqlite3": "^12.8.0",
     "browser-image-compression": "^2.0.2",
     "sharp": "^0.34.5",
     "svelte": "^5.53.9",
