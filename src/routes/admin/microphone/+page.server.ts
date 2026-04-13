@@ -6,7 +6,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 		throw redirect(303, '/login');
 	}
 
+	if (!locals.user.is_admin) {
+		throw redirect(303, '/');
+	}
+
 	return {
-		isAdmin: locals.user.is_admin === 1
+		csrfToken: locals.csrfToken
 	};
 };

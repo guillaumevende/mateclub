@@ -6,6 +6,7 @@ Ce document couvre les plans de test pour :
 1. **Tests fonctionnels iOS Safari** (envoi audio)
 2. **Tests de sécurité** (vulnérabilités corrigées)
 3. **Tests des composants** (nouveau refactoring)
+4. **Diagnostic microphone iOS/PWA** (admin uniquement)
 
 ---
 
@@ -164,6 +165,56 @@ Identifier la cause des erreurs d'envoi "Erreur lors de l'envoi" intermittentes 
 |---|------------|--------------|-------------|
 | E1 | Courte | Fichiers > Documents | Image depuisDocuments |
 | E2 | Courte | Fichiers > Downloads | Image depuisDownloads |
+
+---
+
+## 4. Diagnostic microphone iOS / PWA (admin uniquement)
+
+### Objectif
+Déterminer si la redemande d'autorisation micro vient du réglage Safari/iPhone, du mode PWA standalone, ou d'un changement de contexte navigateur.
+
+### Pré-requis
+
+- Utiliser un compte admin
+- Ouvrir la page `/admin/microphone`
+- Tester uniquement via une origine HTTPS sur iPhone
+
+### Vérifications initiales
+
+```
+Test : Ouvrir /admin/microphone avant tout enregistrement
+Attendu : Affichage du contexte courant (iOS, Safari, standalone, secure context)
+Attendu : État de permissions.query si disponible
+Attendu : Journal vide ou contenant uniquement les événements de contexte/check
+```
+
+### Protocole Safari iPhone
+
+| # | Réglage Safari | Fermeture | Attendu côté admin |
+|---|---------------|-----------|--------------------|
+| M1 | Ask | Aucune | `permissions-query-result: prompt` puis `getusermedia-requested` |
+| M2 | Ask | Fermer Safari puis relancer | Comparer état et voir si iOS reprompt |
+| M3 | Ask | Kill Safari puis relancer | Vérifier si l'état change ou si iOS reprompt |
+| M4 | Allow | Fermer Safari puis relancer | Vérifier si `Allow` est conservé ou si iOS reprompt malgré tout |
+| M5 | Deny | Aucune | `getusermedia-error` ou état `denied`, sans démarrage d'enregistrement |
+
+### Protocole PWA installée
+
+| # | Réglage Safari | Fermeture | Attendu côté admin |
+|---|---------------|-----------|--------------------|
+| P1 | Ask | Aucune | Comparer le comportement avec Safari |
+| P2 | Ask | Fermer la PWA puis relancer | Vérifier si le prompt revient |
+| P3 | Ask | Kill la PWA puis relancer | Vérifier si le prompt revient |
+| P4 | Allow | Fermer/relancer | Vérifier si l'autorisation est réutilisée |
+
+### Critères de validation du code
+
+```
+Test : Déclencher un enregistrement avec le pré-prompt affiché
+Attendu : Le pré-prompt n'ouvre pas le micro
+Attendu : Un seul événement getusermedia-requested par enregistrement
+Attendu : Aucun double appel fonctionnel au micro avant la capture réelle
+```
 
 ---
 

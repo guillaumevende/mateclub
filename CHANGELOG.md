@@ -2,6 +2,26 @@
 
 ---
 
+## v0.30.0 (2026-04-13) - Diagnostic micro iOS réservé aux admins
+
+### ✨ Nouvelles fonctionnalités
+
+#### Diagnostic microphone iOS / PWA
+- **Nouvelle page admin** : ajout de `/admin/microphone` pour inspecter le contexte Safari/PWA et l'état du micro
+- **Journal horodaté** : suivi des événements `permissions.query`, `getUserMedia`, succès et erreurs
+- **Réservé aux admins** : aucun accès ou affichage supplémentaire pour les autres utilisateurs
+
+#### Flux micro simplifié
+- **Pré-prompt informatif** : le message d'introduction n'ouvre plus le micro
+- **Une seule demande réelle** : `getUserMedia` n'est appelé qu'au démarrage effectif de l'enregistrement
+- **Réessai facilité** : bouton pour revérifier l'état si le micro est marqué comme refusé
+
+### 📚 Documentation
+- README.md : ajout d'une section dédiée au comportement micro sur iPhone/iOS
+- TEST_PLAN.md : ajout d'un protocole Safari iPhone / PWA pour le diagnostic micro
+
+---
+
 ## v0.29.0 (2026-04-02) - Corrections de sécurité et améliorations
 
 ### 🔒 Sécurité

@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.29.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.30.0-blue?style=for-the-badge)
 
 </div>
 
@@ -92,6 +92,7 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 ### Interface & UX
 - **Authentification** - Login par pseudo/mot de passe (pas d'email requis)
 - **PWA installable** - Installation sur mobile via manifest
+- **Pré-prompt micro simplifié** - Le message d'information n'ouvre plus le micro; la vraie demande arrive au démarrage de l'enregistrement
 - **Pull-to-refresh** - Rechargement de la page d'accueil (désactivé sur modales)
 - **Scroll lock** - Empêche le scroll arrière-plan quand une modale est ouverte
 - **Navigation tactile** - Swipe horizontal pour changer de capsule
@@ -129,7 +130,22 @@ L'application gère automatiquement les conversions de fuseaux horaires pour gar
 - **Modification des seuils** - Heure de mise à disposition par utilisateur
 - **Super pouvoirs** - Attribution de privileges de lecture anticipée
 - **Logs de debug** - Activation des logs audio pour diagnostic
+- **Diagnostic microphone** - Page admin dédiée pour inspecter l'état micro, le contexte iOS/PWA et le journal `getUserMedia`
 - **Jingle d'intro** - Activation/désactivation du jingle musical
+
+## Microphone sur iPhone / iOS
+
+L'autorisation micro n'est pas stockée par Maté Club. Elle est gérée par le navigateur et le système d'exploitation.
+
+- Sur Safari iPhone, le site peut être réglé sur `Ask`, `Allow` ou `Deny`
+- En PWA installée, iOS peut aussi redemander l'autorisation selon le contexte de relance
+- L'application ne suppose plus qu'une autorisation accordée une fois sera forcément réutilisée
+
+Pour aider au diagnostic, un compte admin peut ouvrir `/admin/microphone` et consulter :
+
+- le support ou non de `navigator.permissions.query`
+- le contexte d'exécution (`Safari` vs PWA standalone)
+- le journal horodaté des appels `getUserMedia`
 
 ### Sécurité & Technique
 - **Headers de sécurité** - CSP, HSTS, X-Content-Type-Options, COOP, CORP

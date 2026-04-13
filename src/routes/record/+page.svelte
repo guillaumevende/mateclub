@@ -1,11 +1,14 @@
 <script lang="ts">
+	/* global AudioContext, AnalyserNode, DOMException, cancelAnimationFrame, requestAnimationFrame */
 	import { onMount } from 'svelte';
+	import type { PageData } from './$types';
 	import { playerStore, getAudioElement, updateMediaSessionMetadata, closePlayer, type Recording, type DayRecordings } from '$lib/stores/player';
 	import ImageViewer from '$lib/components/ImageViewer.svelte';
 	import ImageUpload from '$lib/components/ImageUpload.svelte';
 	import { scrollLock } from '$lib/actions/scrollLock';
 	import { triggerHaptic } from '$lib/utils/haptics';
 	import { debug } from '$lib/debug';
+	import { getMicExecutionContext, writeMicDiagnostic, type MicPermissionState } from '$lib/micDiagnostics';
 	import '$lib/shared.css';
 	
 	type UserRecording = {
@@ -54,8 +57,10 @@
 	// Image viewer state
 	let selectedImageUrl = $state<string | null>(null);
 
+	let { data }: { data: PageData } = $props();
+
 	// Mic permission state
-	let micPermissionState = $state<'prompt' | 'granted' | 'denied' | 'unknown'>('prompt');
+	let micPermissionState = $state<MicPermissionState>('prompt');
 	let showMicPrompt = $state(false);
 
 	// Wake Lock state
@@ -83,8 +88,21 @@
 	const RECORDINGS_LIMIT = 5;
 	const RECORDINGS_LOAD_MORE = 10;
 
+	function logMicDiagnostic(event: string, details?: string) {
+		if (!data.isAdmin) return;
+		writeMicDiagnostic(event, details);
+		debug.recording.log(`[MIC] ${event}`, details ?? '');
+	}
+
 	// Load recordings on mount
 	onMount(() => {
+		if (data.isAdmin) {
+			const context = getMicExecutionContext();
+			logMicDiagnostic(
+				'context',
+				`ios=${context.isIos} safari=${context.isSafari} standalone=${context.isStandalone} secure=${context.isSecureContext}`
+			);
+		}
 		loadRecordings();
 		checkMicPermission();
 		checkWakeLockSupport();
@@ -136,6 +154,7 @@
 	async function checkMicPermission() {
 		if (!navigator.permissions || !navigator.permissions.query) {
 			micPermissionState = 'unknown';
+			logMicDiagnostic('permissions-query-unsupported', 'navigator.permissions.query indisponible');
 			return;
 		}
 		
@@ -143,24 +162,34 @@
 			const result = await navigator.permissions.query({ name: 'microphone' as PermissionName });
 			micPermissionState = result.state;
 			showMicPrompt = result.state === 'prompt';
+			logMicDiagnostic('permissions-query-result', `state=${result.state}`);
 			
 			result.addEventListener('change', () => {
 				micPermissionState = result.state;
 				showMicPrompt = result.state === 'prompt';
+				logMicDiagnostic('permissions-query-change', `state=${result.state}`);
 			});
 		} catch {
 			micPermissionState = 'unknown';
+			logMicDiagnostic('permissions-query-error', 'permissions.query a échoué');
 		}
 	}
 
 	async function requestMicAccess() {
+		logMicDiagnostic('preprompt-authorize-clicked', 'L’utilisateur demande l’autorisation du micro depuis le pré-prompt');
+
 		try {
-			await navigator.mediaDevices.getUserMedia({ audio: true });
+			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+			stream.getTracks().forEach((track) => track.stop());
 			micPermissionState = 'granted';
 			showMicPrompt = false;
-		} catch (err) {
-			console.error('Mic access denied:', err);
-			micPermissionState = 'denied';
+			logMicDiagnostic('preprompt-getusermedia-success', `tracks=${stream.getTracks().length}`);
+		} catch (e) {
+			const message = e instanceof Error ? `${e.name}: ${e.message}` : 'Erreur inconnue';
+			logMicDiagnostic('preprompt-getusermedia-error', message);
+			if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) {
+				micPermissionState = 'denied';
+			}
 		}
 	}
 
@@ -260,7 +289,10 @@
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 		
 		try {
+			logMicDiagnostic('getusermedia-requested', 'Démarrage d’un enregistrement');
 			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+			micPermissionState = 'granted';
+			logMicDiagnostic('getusermedia-success', `tracks=${stream.getTracks().length}`);
 			
 			let mimeType = 'audio/mp4';
 			if (!MediaRecorder.isTypeSupported(mimeType)) {
@@ -331,6 +363,11 @@
 				isProcessing = false;
 			};
 		} catch (e) {
+			const message = e instanceof Error ? `${e.name}: ${e.message}` : 'Erreur inconnue';
+			logMicDiagnostic('getusermedia-error', message);
+			if (e instanceof DOMException && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) {
+				micPermissionState = 'denied';
+			}
 			error = 'Impossible d\'accéder au micro';
 		}
 	}
@@ -685,12 +722,13 @@
 				<div class="mic-prompt">
 					<p class="mic-prompt-text">Pour enregistrer un message vocal, j'ai besoin d'accéder à votre microphone.</p>
 					<button class="primary" onclick={requestMicAccess}>
-						Autoriser le micro
+						Demander l'autorisation du micro
 					</button>
 				</div>
 			{:else if micPermissionState === 'denied'}
 				<div class="mic-denied">
 					<p>Accès au microphone refusé. Veuillez l'activer dans les paramètres de votre navigateur pour utiliser cette fonctionnalité.</p>
+					<button class="secondary" onclick={checkMicPermission}>Vérifier à nouveau</button>
 				</div>
 			{:else}
 				{#if isRecording && (wakeLock || wakeLockFailed)}
