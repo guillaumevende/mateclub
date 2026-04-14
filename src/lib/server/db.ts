@@ -717,10 +717,10 @@ export function deleteUserSessions(userId: number, exceptSessionId?: string): vo
 	}
 }
 
-export function saveRecording(userId: number, audioData: Buffer, durationSeconds: number, imageData?: Buffer, url?: string | null, audioHash?: string): Recording {
+export function saveRecording(userId: number, audioData: Buffer, durationSeconds: number, audioExtension = 'm4a', imageData?: Buffer, url?: string | null, audioHash?: string): Recording {
 	debug.db.log('saveRecording - audioData:', audioData.length, 'bytes, imageData:', imageData?.length || 'none');
 	
-	const filename = `${Date.now()}-${crypto.randomUUID()}.m4a`;
+	const filename = `${Date.now()}-${crypto.randomUUID()}.${audioExtension}`;
 	const filepath = join(uploadsDir, filename);
 	debug.db.log('Écriture fichier audio:', filename);
 	writeFileSync(filepath, audioData);

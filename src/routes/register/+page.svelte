@@ -2,6 +2,14 @@
 	import type { ActionData } from './$types';
 
 	let { form, data }: { form: ActionData; data: any } = $props();
+
+	type RegisterFormState = ActionData & {
+		pseudoError?: boolean;
+		passwordError?: boolean;
+		passwordMatchError?: boolean;
+	};
+
+	const typedForm = $derived((form ?? {}) as RegisterFormState);
 	
 	// Liste des emojis pour l'avatar (même liste que dans admin)
 	const emojis = ['☕', '😀', '😎', '🤠', '🥳', '😇', '🤩', '😈', '👻', '🤖', '🎸', '🎮', '🚀', '🍕', '🍺', '🌈', '🔥', '⭐', '❤️'];
@@ -67,7 +75,7 @@
 					autocomplete="username"
 					bind:value={pseudo}
 					onkeydown={handleKeydown}
-					class:error={form?.pseudoError}
+					class:error={typedForm.pseudoError}
 				/>
 			</div>
 
@@ -84,7 +92,7 @@
 					bind:value={password}
 					oninput={checkPasswordLength}
 					onkeydown={handleKeydown}
-					class:error={form?.passwordError || !passwordLengthValid}
+					class:error={typedForm.passwordError || !passwordLengthValid}
 				/>
 				{#if !passwordLengthValid}
 					<p class="field-error">Le mot de passe doit contenir au moins 12 caractères</p>
@@ -103,7 +111,7 @@
 					bind:value={passwordConfirm}
 					oninput={checkPasswords}
 					onkeydown={handleKeydown}
-					class:error={form?.passwordMatchError || !passwordsMatch}
+					class:error={typedForm.passwordMatchError || !passwordsMatch}
 				/>
 				{#if !passwordsMatch && passwordConfirm.length > 0}
 					<p class="field-error">Les mots de passe ne correspondent pas</p>
@@ -111,8 +119,8 @@
 			</div>
 
 			<div class="form-group">
-				<label>Avatar</label>
-				<div class="avatar-grid">
+				<label for="avatar-selection">Avatar</label>
+				<div class="avatar-grid" id="avatar-selection">
 					{#each emojis as emoji}
 						<button
 							type="button"
@@ -207,7 +215,7 @@
 		border-color: #ff6b6b;
 	}
 
-	input.error, select.error {
+	input.error {
 		border-color: #ff4444;
 	}
 

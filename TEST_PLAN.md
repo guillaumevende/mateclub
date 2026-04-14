@@ -6,6 +6,7 @@ Ce document couvre les plans de test pour :
 1. **Tests fonctionnels iOS Safari** (envoi audio)
 2. **Tests de sécurité** (vulnérabilités corrigées)
 3. **Tests des composants** (nouveau refactoring)
+4. **Tests de compatibilité audio Android → Safari**
 
 ---
 
@@ -164,6 +165,28 @@ Identifier la cause des erreurs d'envoi "Erreur lors de l'envoi" intermittentes 
 |---|------------|--------------|-------------|
 | E1 | Courte | Fichiers > Documents | Image depuisDocuments |
 | E2 | Courte | Fichiers > Downloads | Image depuisDownloads |
+
+---
+
+## 4. Tests de compatibilité audio Android → Safari
+
+### Objectif
+Vérifier qu'une capsule enregistrée sur Android/Chrome reste lisible sur Safari grâce à la détection du vrai format audio et au transcodage serveur si nécessaire.
+
+### Scénarios
+
+```
+Test : Enregistrer une capsule sur Android/Chrome
+Attendu : Si Android envoie du WebM/OGG, le serveur convertit la capsule en `.m4a`
+Attendu : Si le format est déjà Safari-compatible, aucun transcodage inutile n'est lancé
+Attendu : La capsule se lit correctement sur Safari iPhone/iPad et Safari macOS
+```
+
+```
+Test : Relire une ancienne capsule historiquement stockée en .m4a mais contenant du WebM
+Attendu : Le serveur renvoie désormais le bon Content-Type selon le contenu réel
+Attendu : Safari joue la capsule avec le son, sans se contenter des jingles
+```
 
 ---
 

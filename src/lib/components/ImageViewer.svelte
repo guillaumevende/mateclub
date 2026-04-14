@@ -14,6 +14,11 @@
 		onClose();
 	}
 
+	function handleKeyboardActivation(e: KeyboardEvent) {
+		e.stopPropagation();
+		onClose();
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') {
 			onClose();
@@ -28,7 +33,7 @@
 		class="image-viewer-overlay"
 		use:scrollLock={isOpen}
 		onclick={handleClick}
-		onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleClick(e)}
+		onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleKeyboardActivation(e)}
 		role="button"
 		tabindex="0"
 		aria-label="Fermer l'image"

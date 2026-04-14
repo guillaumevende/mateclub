@@ -1,7 +1,8 @@
 import type { RequestHandler } from './$types';
 import { redirect, json } from '@sveltejs/kit';
 import { getRecordingById, getRecordingFilePath, markAsListened, deleteRecording } from '$lib/server/db';
-import { existsSync, createReadStream, statSync } from 'fs';
+import { existsSync, createReadStream, statSync, openSync, readSync, closeSync } from 'fs';
+import { detectAudioMimeType } from '$lib/server/fileValidation';
 import { Readable } from 'stream';
 
 export const GET: RequestHandler = async ({ params, locals }) => {
@@ -24,8 +25,23 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	}
 
 	const stat = statSync(filepath);
-	const isM4A = recording.filename.endsWith('.m4a');
-	const contentType = isM4A ? 'audio/mp4' : 'audio/webm';
+	const headerBuffer = Buffer.alloc(12);
+	const fd = openSync(filepath, 'r');
+	try {
+		readSync(fd, headerBuffer, 0, 12, 0);
+	} finally {
+		closeSync(fd);
+	}
+
+	const detectedMimeType = detectAudioMimeType(headerBuffer);
+	const fallbackMimeType = recording.filename.endsWith('.webm')
+		? 'audio/webm'
+		: recording.filename.endsWith('.ogg')
+			? 'audio/ogg'
+			: recording.filename.endsWith('.mp3')
+				? 'audio/mpeg'
+				: 'audio/mp4';
+	const contentType = detectedMimeType || fallbackMimeType;
 
 	return new Response(Readable.toWeb(createReadStream(filepath)) as unknown as ReadableStream<Uint8Array>, {
 		headers: {

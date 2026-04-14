@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isValidAudioBuffer, isValidImageBuffer } from '$lib/server/fileValidation';
+import { detectAudioMimeType, isValidAudioBuffer, isValidImageBuffer } from '$lib/server/fileValidation';
 
 describe('Validation buffer audio', () => {
 	it('devrait valider un buffer WebM valide', () => {
@@ -25,6 +25,16 @@ describe('Validation buffer audio', () => {
 	it('devrait rejeter un buffer texte comme audio', () => {
 		const textBuffer = Buffer.from('Hello World', 'utf-8');
 		expect(isValidAudioBuffer(textBuffer)).toBe(false);
+	});
+
+	it('devrait détecter le mime audio réel d’un buffer WebM', () => {
+		const webmBuffer = Buffer.from([0x1A, 0x45, 0xDF, 0xA3, 0x9B, 0x80]);
+		expect(detectAudioMimeType(webmBuffer)).toBe('audio/webm');
+	});
+
+	it('devrait détecter le mime audio réel d’un buffer MP4/M4A', () => {
+		const mp4Buffer = Buffer.from([0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70, 0x4D, 0x34, 0x41, 0x20]);
+		expect(detectAudioMimeType(mp4Buffer)).toBe('audio/mp4');
 	});
 });
 
