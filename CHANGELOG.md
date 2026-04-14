@@ -2,6 +2,26 @@
 
 ---
 
+## v0.30.1 (2026-04-14) - Conversion Safari des capsules Android
+
+### 🐛 Corrections
+
+#### Compatibilité audio Android → Safari
+- **Transcodage serveur ciblé** : les capsules WebM/OGG sont désormais converties en AAC/M4A avant stockage lorsque Safari risque de ne pas les lire
+- **Compatibilité conservée** : les capsules déjà enregistrées en MP4/M4A ou MP3 ne sont pas retraitées
+- **Déploiement Docker prêt** : l'image embarque maintenant `ffmpeg` pour garantir le transcodage sur l'instance auto-hébergée
+- **Impact** : les nouvelles capsules Android restent lisibles dans Safari, y compris quand Chrome Android n'envoie que du WebM
+
+### 🧪 Tests
+- Ajout de tests unitaires sur la décision de transcodage et le mapping mime/extension
+- Vérification maintenue de la détection du vrai format audio côté serveur
+
+### 📚 Documentation
+- README.md : précision sur la conversion Safari des formats Android incompatibles
+- TEST_PLAN.md : protocole mis à jour pour valider le transcodage serveur
+
+---
+
 ## v0.30.0 (2026-04-14) - Correction audio Android vers Safari
 
 ### 🐛 Corrections
@@ -10,7 +30,7 @@
 - **Détection du format réel** : le serveur détecte désormais le vrai format audio via les magic numbers au lieu de supposer `.m4a`
 - **Bonne extension au stockage** : les nouvelles capsules sont sauvegardées avec l'extension correcte (`.webm`, `.m4a`, `.ogg`, `.mp3`)
 - **Bonne réponse HTTP à la lecture** : l'API de lecture renvoie maintenant le bon `Content-Type` même pour les anciens fichiers mal nommés
-- **Impact** : les capsules enregistrées sur Android/Chrome et réellement encodées en WebM redeviennent audibles dans Safari
+- **Impact** : base nécessaire pour diagnostiquer les capsules Android/Chrome réellement encodées en WebM
 
 ### 🧪 Tests
 - Ajout de tests sur la détection du mime audio réel

@@ -2,6 +2,7 @@ import type { RequestHandler } from './$types';
 import { redirect, json } from '@sveltejs/kit';
 import { saveRecording, getRecentRecordingByHash } from '$lib/server/db';
 import { detectAudioMimeType, isValidAudioBuffer, isValidImageBuffer } from '$lib/server/fileValidation';
+import { prepareAudioForStorage } from '$lib/server/audioCompatibility';
 import crypto from 'crypto';
 import sharp from 'sharp';
 
@@ -69,13 +70,14 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	const detectedAudioMimeType = detectAudioMimeType(audioBuffer);
-	const audioExtension = detectedAudioMimeType === 'audio/webm'
-		? 'webm'
-		: detectedAudioMimeType === 'audio/ogg'
-			? 'ogg'
-			: detectedAudioMimeType === 'audio/mpeg'
-				? 'mp3'
-				: 'm4a';
+
+	let preparedAudio;
+	try {
+		preparedAudio = await prepareAudioForStorage(audioBuffer, detectedAudioMimeType);
+	} catch (err) {
+		console.error('[RECORDINGS] Error preparing audio for storage:', err);
+		return json({ error: 'Impossible de convertir cet audio pour les navigateurs Apple' }, { status: 400 });
+	}
 
 	const audioHash = crypto.createHash('sha256').update(audioBuffer).digest('hex');
 	const recentRecording = getRecentRecordingByHash(locals.user.id, audioHash, DUPLICATE_THRESHOLD_SECONDS);
@@ -88,7 +90,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		});
 	}
 
-	const buffer = audioBuffer;
+	const buffer = preparedAudio.buffer;
 
 	let imageBuffer: Buffer | undefined;
 	if (image && image.size > 0) {
@@ -133,7 +135,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	let recording;
 	try {
-		recording = saveRecording(locals.user.id, buffer, durationSeconds, audioExtension, imageBuffer, url || null, audioHash);
+		recording = saveRecording(
+			locals.user.id,
+			buffer,
+			durationSeconds,
+			preparedAudio.extension,
+			imageBuffer,
+			url || null,
+			audioHash
+		);
 	} catch (err) {
 		console.error('[RECORDINGS] Error saving recording:', err);
 		return json({ error: 'Erreur interne' }, { status: 500 });

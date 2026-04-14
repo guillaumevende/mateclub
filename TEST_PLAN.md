@@ -171,13 +171,14 @@ Identifier la cause des erreurs d'envoi "Erreur lors de l'envoi" intermittentes 
 ## 4. Tests de compatibilité audio Android → Safari
 
 ### Objectif
-Vérifier qu'une capsule enregistrée sur Android/Chrome est lisible sur Safari après détection du vrai format audio côté serveur.
+Vérifier qu'une capsule enregistrée sur Android/Chrome reste lisible sur Safari grâce à la détection du vrai format audio et au transcodage serveur si nécessaire.
 
 ### Scénarios
 
 ```
 Test : Enregistrer une capsule sur Android/Chrome
-Attendu : Le fichier est sauvegardé avec l'extension correspondant au vrai format (ex: .webm)
+Attendu : Si Android envoie du WebM/OGG, le serveur convertit la capsule en `.m4a`
+Attendu : Si le format est déjà Safari-compatible, aucun transcodage inutile n'est lancé
 Attendu : La capsule se lit correctement sur Safari iPhone/iPad et Safari macOS
 ```
 

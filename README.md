@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.30.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.30.1-blue?style=for-the-badge)
 
 </div>
 
@@ -73,7 +73,7 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 
 ### Audio & Lecture
 - **Enregistrement audio** - Durée max 3 minutes avec compression WebM
-- **Compatibilité Safari renforcée** - Les capsules Android WebM sont désormais servies avec le bon format audio
+- **Compatibilité Safari renforcée** - Les capsules Android WebM/OGG sont converties côté serveur en AAC/M4A si nécessaire pour rester lisibles dans Safari
 - **Screen Wake Lock** - Anti-veille pendant l'enregistrement (empêche le smartphone de se verrouiller)
 - **Player séquentiel** - Lecture automatique d'une capsule à la suivante
 - **Jingle d'intro** - Jingle musical au début de la première capsule du jour (activable via admin)
@@ -135,6 +135,7 @@ L'application gère automatiquement les conversions de fuseaux horaires pour gar
 ### Sécurité & Technique
 - **Headers de sécurité** - CSP, HSTS, X-Content-Type-Options, COOP, CORP
 - **Validation des fichiers** - Vérification des magic numbers pour audio et images (évite les faux fichiers)
+- **Transcodage serveur ciblé** - Conversion automatique des formats audio Android incompatibles Safari via `ffmpeg`
 - **Protection path traversal** - Validation stricte des chemins de fichiers
 - **Rate limiting** - 5 tentatives max par IP sur 15 minutes (protection brute-force)
 - **Cookies sécurisés** - Détection automatique HTTPS via proxy (Caddy/Nginx)
