@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.29.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.30.0-blue?style=for-the-badge)
 
 </div>
 
@@ -73,6 +73,7 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 
 ### Audio & Lecture
 - **Enregistrement audio** - Durée max 3 minutes avec compression WebM
+- **Compatibilité Safari renforcée** - Les capsules Android WebM sont désormais servies avec le bon format audio
 - **Screen Wake Lock** - Anti-veille pendant l'enregistrement (empêche le smartphone de se verrouiller)
 - **Player séquentiel** - Lecture automatique d'une capsule à la suivante
 - **Jingle d'intro** - Jingle musical au début de la première capsule du jour (activable via admin)
@@ -154,6 +155,7 @@ L'application gère automatiquement les conversions de fuseaux horaires pour gar
 ### Architecture
 - **Composants extraits** : RecordingCard, ImageUpload, TeamList, Calendar (architecture modulaire < 300 lignes par fichier)
 - **Streaming** : Téléchargement des fichiers audio/images via streams (pas de chargement mémoire complet)
+- **Détection format audio** : Le serveur détecte le vrai format des capsules (WebM, MP4/M4A, OGG, MP3) avant stockage et lecture
 
 ## Stack technique
 

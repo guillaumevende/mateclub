@@ -25,23 +25,32 @@ function matchesSignature(buffer: Buffer, signature: (number | null)[]): boolean
 	return signature.every((byte, i) => byte === null || byte === sig[i]);
 }
 
+export function detectAudioMimeType(buffer: Buffer): string | null {
+	for (const [mimeType, signature] of Object.entries(AUDIO_MIME_SIGNATURES)) {
+		if (matchesSignature(buffer, signature)) {
+			return mimeType;
+		}
+	}
+
+	return null;
+}
+
 export function validateAudioMimeType(buffer: Buffer, mimeType: string): boolean {
 	const validMimes = Object.keys(AUDIO_MIME_SIGNATURES);
 	
 	// Pour les types connus, vérifier le magic number
-	for (const validMime of validMimes) {
-		if (matchesSignature(buffer, AUDIO_MIME_SIGNATURES[validMime])) {
-			// Vérifier que le mimeType demandé est compatible
-			if (validMime === 'audio/mp4' && (mimeType === 'audio/mp4' || mimeType === 'audio/m4a')) {
-				return true;
-			}
-			if (validMime === mimeType) {
-				return true;
-			}
-			// WebM peut aussi être video/webm
-			if (validMime === 'audio/webm' && (mimeType === 'audio/webm' || mimeType === 'video/webm')) {
-				return true;
-			}
+	const detectedMime = detectAudioMimeType(buffer);
+	if (detectedMime) {
+		// Vérifier que le mimeType demandé est compatible
+		if (detectedMime === 'audio/mp4' && (mimeType === 'audio/mp4' || mimeType === 'audio/m4a')) {
+			return true;
+		}
+		if (detectedMime === mimeType) {
+			return true;
+		}
+		// WebM peut aussi être video/webm
+		if (detectedMime === 'audio/webm' && (mimeType === 'audio/webm' || mimeType === 'video/webm')) {
+			return true;
 		}
 	}
 	
@@ -70,15 +79,7 @@ export function validateImageMimeType(buffer: Buffer, mimeType: string): boolean
 }
 
 export function isValidAudioBuffer(buffer: Buffer): boolean {
-	const knownFormats = Object.values(AUDIO_MIME_SIGNATURES);
-	
-	for (const signature of knownFormats) {
-		if (matchesSignature(buffer, signature)) {
-			return true;
-		}
-	}
-	
-	return false;
+	return detectAudioMimeType(buffer) !== null;
 }
 
 export function isValidImageBuffer(buffer: Buffer): boolean {

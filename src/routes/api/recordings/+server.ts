@@ -1,7 +1,7 @@
 import type { RequestHandler } from './$types';
 import { redirect, json } from '@sveltejs/kit';
 import { saveRecording, getRecentRecordingByHash } from '$lib/server/db';
-import { isValidAudioBuffer, isValidImageBuffer } from '$lib/server/fileValidation';
+import { detectAudioMimeType, isValidAudioBuffer, isValidImageBuffer } from '$lib/server/fileValidation';
 import crypto from 'crypto';
 import sharp from 'sharp';
 
@@ -68,6 +68,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json({ error: 'Format audio non valide. Utilisez WebM, MP4/M4A, OGG ou MP3.' }, { status: 400 });
 	}
 
+	const detectedAudioMimeType = detectAudioMimeType(audioBuffer);
+	const audioExtension = detectedAudioMimeType === 'audio/webm'
+		? 'webm'
+		: detectedAudioMimeType === 'audio/ogg'
+			? 'ogg'
+			: detectedAudioMimeType === 'audio/mpeg'
+				? 'mp3'
+				: 'm4a';
+
 	const audioHash = crypto.createHash('sha256').update(audioBuffer).digest('hex');
 	const recentRecording = getRecentRecordingByHash(locals.user.id, audioHash, DUPLICATE_THRESHOLD_SECONDS);
 	
@@ -124,7 +133,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	let recording;
 	try {
-		recording = saveRecording(locals.user.id, buffer, durationSeconds, imageBuffer, url || null, audioHash);
+		recording = saveRecording(locals.user.id, buffer, durationSeconds, audioExtension, imageBuffer, url || null, audioHash);
 	} catch (err) {
 		console.error('[RECORDINGS] Error saving recording:', err);
 		return json({ error: 'Erreur interne' }, { status: 500 });

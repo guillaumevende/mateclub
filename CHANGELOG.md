@@ -2,6 +2,26 @@
 
 ---
 
+## v0.30.0 (2026-04-14) - Correction audio Android vers Safari
+
+### 🐛 Corrections
+
+#### Compatibilité audio Safari
+- **Détection du format réel** : le serveur détecte désormais le vrai format audio via les magic numbers au lieu de supposer `.m4a`
+- **Bonne extension au stockage** : les nouvelles capsules sont sauvegardées avec l'extension correcte (`.webm`, `.m4a`, `.ogg`, `.mp3`)
+- **Bonne réponse HTTP à la lecture** : l'API de lecture renvoie maintenant le bon `Content-Type` même pour les anciens fichiers mal nommés
+- **Impact** : les capsules enregistrées sur Android/Chrome et réellement encodées en WebM redeviennent audibles dans Safari
+
+### 🧪 Tests
+- Ajout de tests sur la détection du mime audio réel
+- Ajout d'un protocole de validation Android → Safari dans `TEST_PLAN.md`
+
+### 📚 Documentation
+- README.md : mention explicite de la compatibilité Safari renforcée
+- package.json : version mise à jour en `0.30.0`
+
+---
+
 ## v0.29.0 (2026-04-02) - Corrections de sécurité et améliorations
 
 ### 🔒 Sécurité
