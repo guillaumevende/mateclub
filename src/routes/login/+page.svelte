@@ -19,9 +19,12 @@
 		<input type="password" name="password" placeholder="Mot de passe" required autocomplete="current-password" onkeydown={handleKeydown} />
 		<input type="hidden" name="csrf_token" value={data?.csrfToken} />
 		
-		{#if form?.error}
+		{#if form?.pending}
+			<p class="pending">{form.error}</p>
+		{:else if form?.error}
 			<p class="error">{form.error}</p>
 		{/if}
+
 		<button type="submit">Connexion</button>
 	</form>
 
@@ -80,6 +83,16 @@
 		color: #ff6b6b;
 		font-size: 0.875rem;
 		text-align: center;
+	}
+
+	.pending {
+		color: #f59e0b;
+		font-size: 0.875rem;
+		text-align: center;
+		background: rgba(245, 158, 11, 0.1);
+		padding: 0.75rem;
+		border-radius: 8px;
+		border: 1px solid #f59e0b;
 	}
 
 	.register-link {

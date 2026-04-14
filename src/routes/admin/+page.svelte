@@ -172,14 +172,6 @@
  	</section>
 
 	<section>
-		<h2>Diagnostic microphone</h2>
-		<p class="super-text">
-			Ouvrez le panneau de diagnostic iOS/Safari pour vérifier l'état du micro, le contexte PWA et le journal des appels `getUserMedia`.
-		</p>
-		<a href="/admin/microphone" class="super-btn logs-btn diag-link">🎙️ Ouvrir le diagnostic microphone</a>
-	</section>
-
-	<section>
 		<h2>Jingle d'intro</h2>
 		<p class="super-text">
 			Ajoutez un jingle musical au début de la première capsule de la journée.
@@ -694,10 +686,6 @@
 
 	.super-btn:hover {
 		background: #d63650;
-	}
-
-	.diag-link {
-		text-decoration: none;
 	}
 
 	/* Modal de confirmation */

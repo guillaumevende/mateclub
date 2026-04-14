@@ -5,8 +5,4 @@ export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) {
 		throw redirect(303, '/login');
 	}
-
-	return {
-		isAdmin: locals.user.is_admin === 1
-	};
 };
