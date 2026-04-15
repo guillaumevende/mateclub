@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.30.4-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.30.5-blue?style=for-the-badge)
 
 </div>
 
