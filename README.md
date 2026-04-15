@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.30.1-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.30.2-blue?style=for-the-badge)
 
 </div>
 
@@ -73,12 +73,14 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 
 ### Audio & Lecture
 - **Enregistrement audio** - Durée max 3 minutes avec compression WebM
+- **Visualiseur rééquilibré** - Waveform d'enregistrement plus doux, plus bas et mieux réparti sur la voix
 - **Compatibilité Safari renforcée** - Les capsules Android WebM/OGG sont converties côté serveur en AAC/M4A si nécessaire pour rester lisibles dans Safari
 - **Screen Wake Lock** - Anti-veille pendant l'enregistrement (empêche le smartphone de se verrouiller)
 - **Player séquentiel** - Lecture automatique d'une capsule à la suivante
+- **File "À écouter"** - Toutes les capsules non lues disponibles peuvent s'enchaîner dans une seule session de lecture
 - **Jingle d'intro** - Jingle musical au début de la première capsule du jour (activable via admin)
 - **Lecture arrière-plan** - Fonctionne smartphone verrouillé via technique "audio guardian"
-- **MediaSession API** - Contrôles lockscreen (play/pause/next/prev)
+- **MediaSession API** - Contrôles lockscreen (play/pause/next/prev) avec reprise fiabilisée depuis le player de l'OS
 - **Haptique** - Vibration au démarrage de la lecture
 - **Déduplication SHA-256** - Détection des doublons basée sur le hash audio (seuil 30s)
 
@@ -96,9 +98,12 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 - **Pull-to-refresh** - Rechargement de la page d'accueil (désactivé sur modales)
 - **Scroll lock** - Empêche le scroll arrière-plan quand une modale est ouverte
 - **Navigation tactile** - Swipe horizontal pour changer de capsule
-- **Calendrier interactif** - Navigation par date avec code couleur
+- **Calendrier interactif** - Navigation par date avec code couleur cohérent, y compris après `Charger plus`
+- **Pastille "À écouter"** - Le résumé des capsules non lues ouvre une modale dédiée et lance immédiatement la lecture continue des capsules non lues
+- **Cartouches plus lisibles** - Avatar, pseudo, horaire, durée et badge `nouveau` sont réorganisés pour mieux distinguer lu / non lu
 - **Confirmation de suppression** - Modal avec countdown avant suppression
 - **UI de succès** - Choix de rester sur la page ou retourner à l'accueil après envoi
+- **Durées plus naturelles** - Le mini-player et la pastille des non lus affichent des libellés `N secondes` / `N minutes et S secondes` / `N heures et M minutes`
 - **Logs de debug** - Envoi automatique des erreurs côté client vers le serveur
 
 ### Système de seuils

@@ -113,13 +113,28 @@
 	function formatDuration(): string {
 		if (!player.currentRecording) return '';
 		
-		const mins = Math.floor(player.currentRecording.duration_seconds / 60);
-		const secs = player.currentRecording.duration_seconds % 60;
-		
-		if (secs === 0) {
-			return `${mins}min`;
+		const totalSeconds = player.currentRecording.duration_seconds;
+		const hours = Math.floor(totalSeconds / 3600);
+		const mins = Math.floor((totalSeconds % 3600) / 60);
+		const secs = totalSeconds % 60;
+
+		if (hours > 0) {
+			if (mins === 0) {
+				return `${hours} heure${hours > 1 ? 's' : ''}`;
+			}
+
+			return `${hours} heure${hours > 1 ? 's' : ''} et ${mins} minute${mins > 1 ? 's' : ''}`;
 		}
-		return `${mins}min ${secs}`;
+
+		if (mins === 0) {
+			return `${secs} seconde${secs > 1 ? 's' : ''}`;
+		}
+
+		if (secs === 0) {
+			return `${mins} minute${mins > 1 ? 's' : ''}`;
+		}
+
+		return `${mins} minute${mins > 1 ? 's' : ''} et ${secs} seconde${secs > 1 ? 's' : ''}`;
 	}
 
 	let hasPrevious = $derived(player.currentDayData && player.currentIndex > 0);
@@ -129,6 +144,7 @@
 	let displayDuration = $derived(player.currentRecording?.duration_seconds || 0);
 	let progressPercent = $derived((displayDuration > 0) ? Math.min(100, (player.progress / displayDuration) * 100) : 0);
 	let bufferedPercent = $derived(player.bufferedPercent || 0);
+	let remainingTime = $derived(Math.max(0, displayDuration - player.progress));
 </script>
 
 {#if player.currentRecording}
@@ -214,7 +230,7 @@
 				<div class="progress-fill" style="width: {progressPercent}%"></div>
 				<div class="progress-thumb" style="left: calc({progressPercent}% + 7px - {progressPercent * 0.14}px)"></div>
 			</div>
-			<span class="time duration">{formatTime(displayDuration)}</span>
+			<span class="time duration">-{formatTime(remainingTime)}</span>
 		</div>
 	</div>
 {/if}

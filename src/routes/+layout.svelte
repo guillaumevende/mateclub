@@ -217,7 +217,7 @@
 		flex-direction: column;
 		justify-content: flex-end;
 		border-top: 1px solid #2a2a4e;
-		z-index: 50;
+		z-index: 1100;
 	}
 
 	nav.with-player {

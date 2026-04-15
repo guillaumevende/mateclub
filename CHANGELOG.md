@@ -2,6 +2,48 @@
 
 ---
 
+## v0.30.2 (2026-04-15) - File d'écoute continue et interface affinée
+
+### ✨ Améliorations
+
+#### Waveform d'enregistrement
+- **Rendu plus doux** : le visualiseur de la page d'enregistrement est plus bas et visuellement moins agressif
+- **Palette chaude simplifiée** : les couleurs chaudes apparaissent uniquement quand une barre dépasse réellement un seuil élevé
+- **Spectre rééquilibré** : la répartition fréquentielle reflète mieux la voix sur toute la largeur au lieu d'animer surtout les barres de gauche
+- **Impact** : l'animation reste crédible audio tout en étant plus élégante et plus lisible pendant l'enregistrement
+
+#### Player mobile
+- **Contrôles OS fiabilisés** : reprise de lecture alignée entre le bouton de l'interface et les contrôles MediaSession Android/iOS
+- **Temps restant** : le mini-player affiche désormais la durée restante à droite au lieu de la durée totale
+- **Libellé naturel** : les durées s'affichent de façon plus lisible (`N secondes`, `N minutes et S secondes`, `N heures et M minutes`)
+
+#### Calendrier
+- **Code couleur cohérent après `Charger plus`** : les jours déjà chargés recalculent leur état rose/blanc directement à partir des capsules visibles
+- **Propres capsules exclues du rose** : l'API calendrier ne considère plus les capsules de l'utilisateur courant comme "non lues"
+
+#### Accueil
+- **Pastille "À écouter"** : le résumé des capsules non lues devient une pastille cliquable sous le message de bienvenue
+- **File continue de non lus** : un clic ouvre une modale dédiée qui rassemble toutes les capsules non lues disponibles dans une seule écoute en continu
+- **Lecture immédiate** : la première capsule démarre directement sans second clic
+- **Session persistée** : la file d'écoute garde sa sélection quand on ferme puis rouvre la modale pendant une lecture en cours
+- **Suivi horizontal** : les vignettes défilent automatiquement pendant l'écoute, avec séparateurs de dates intégrés
+
+#### Cartouches de capsules
+- **En-tête réorganisé** : avatar et pseudo passent à gauche, horaire à droite, et le badge `nouveau` se place au-dessus de la durée
+- **Statut plus lisible** : seules les capsules non lues affichent un badge `nouveau`
+- **Code couleur clarifié** : pseudo, horaire, durée et contour passent en rose pour les capsules non lues, en blanc pour les capsules déjà lues
+- **Covers plus contrastées** : le voile sombre global sur les images de couverture est légèrement renforcé
+
+### 🧪 Tests
+- Vérification manuelle du rendu sur prototype local avec vrai micro navigateur
+- `npm run check`
+- `npm test`
+
+### 📚 Documentation
+- README.md : mise à jour de la version et mention du visualiseur rééquilibré
+
+---
+
 ## v0.30.1 (2026-04-14) - Conversion Safari des capsules Android
 
 ### 🐛 Corrections

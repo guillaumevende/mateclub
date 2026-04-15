@@ -20,6 +20,22 @@
 		pseudo?: string;
 	};
 
+	type VisualizerBar = {
+		style: string;
+	};
+
+	const MAX_DURATION = 180;
+	const RECORDINGS_LIMIT = 5;
+	const RECORDINGS_LOAD_MORE = 10;
+	const VISUALIZER_BAR_COUNT = 8;
+	const VISUALIZER_MIN_HEIGHT = 12;
+	const VISUALIZER_MAX_HEIGHT = 82;
+	const VISUALIZER_BASE_COLOR = '#8cd8c1';
+	const VISUALIZER_WARM_COLOR = '#f1ca90';
+	const VISUALIZER_HOT_COLOR = '#f0a56b';
+	const VISUALIZER_WARM_THRESHOLD = 0.68;
+	const VISUALIZER_HOT_THRESHOLD = 0.87;
+
 	let isRecording = $state(false);
 	let isProcessing = $state(false); // Indique que l'enregistrement est en cours de finalisation
 	let mediaRecorder: MediaRecorder | null = $state(null);
@@ -67,10 +83,10 @@
 	let isStopping = false;
 
 	// Audio visualizer state
-	let audioContext: AudioContext | null = $state(null);
-	let audioAnalyser: AnalyserNode | null = $state(null);
-	let visualizerData = $state<number[]>([5, 5, 5, 5, 5, 5, 5, 5]);
-	let animationFrameId: number | null = null;
+	let audioContext: globalThis.AudioContext | null = $state(null);
+	let audioAnalyser: globalThis.AnalyserNode | null = $state(null);
+	let visualizerData = $state<VisualizerBar[]>(createIdleVisualizerData());
+	let animationFrameId: ReturnType<typeof window.requestAnimationFrame> | null = null;
 
 	$effect(() => {
 		const unsubscribe = playerStore.subscribe(state => {
@@ -78,10 +94,6 @@
 		});
 		return unsubscribe;
 	});
-
-	const MAX_DURATION = 180;
-	const RECORDINGS_LIMIT = 5;
-	const RECORDINGS_LOAD_MORE = 10;
 
 	// Load recordings on mount
 	onMount(() => {
@@ -244,6 +256,90 @@
 		return `${mins}:${secs.toString().padStart(2, '0')}`;
 	}
 
+	function createIdleVisualizerData(): VisualizerBar[] {
+		return Array.from({ length: VISUALIZER_BAR_COUNT }, () => ({
+			style: buildVisualizerBarStyle(0.12)
+		}));
+	}
+
+	function buildVisualizerBarStyle(intensity: number): string {
+		const clamped = Math.max(0.12, Math.min(intensity, 0.92));
+		const height = Math.round(VISUALIZER_MIN_HEIGHT + clamped * (VISUALIZER_MAX_HEIGHT - VISUALIZER_MIN_HEIGHT));
+		const opacity = (0.72 + clamped * 0.24).toFixed(3);
+		let background = VISUALIZER_BASE_COLOR;
+		const haloStrength = Math.max(0, (clamped - 0.62) / 0.3);
+		const haloSpread = (haloStrength * 22).toFixed(1);
+		const haloBlur = (haloStrength * 32).toFixed(1);
+		const haloOpacity = (haloStrength * 0.3).toFixed(3);
+		const innerGlowBlur = (haloStrength * 13).toFixed(1);
+		const innerGlowOpacity = (haloStrength * 0.22).toFixed(3);
+
+		if (clamped >= VISUALIZER_HOT_THRESHOLD) {
+			background = `linear-gradient(180deg, ${VISUALIZER_HOT_COLOR} 0%, ${VISUALIZER_HOT_COLOR} 12%, ${VISUALIZER_WARM_COLOR} 12%, ${VISUALIZER_WARM_COLOR} 30%, ${VISUALIZER_BASE_COLOR} 30%, ${VISUALIZER_BASE_COLOR} 100%)`;
+		} else if (clamped >= VISUALIZER_WARM_THRESHOLD) {
+			background = `linear-gradient(180deg, ${VISUALIZER_WARM_COLOR} 0%, ${VISUALIZER_WARM_COLOR} 18%, ${VISUALIZER_BASE_COLOR} 18%, ${VISUALIZER_BASE_COLOR} 100%)`;
+		}
+
+		return [
+			`height: ${height}px`,
+			`opacity: ${opacity}`,
+			`background: ${background}`,
+			`box-shadow:
+				0 0 ${haloBlur}px rgba(240, 165, 107, ${haloOpacity}),
+				0 0 ${haloSpread}px rgba(140, 216, 193, ${innerGlowOpacity}),
+				0 0 ${innerGlowBlur}px rgba(255, 255, 255, ${innerGlowOpacity}),
+				0 10px 20px rgba(0, 0, 0, 0.16)`
+		].join('; ');
+	}
+
+	function getWaveformRms(timeDomainData: Uint8Array): number {
+		let sum = 0;
+		for (let i = 0; i < timeDomainData.length; i++) {
+			const normalized = (timeDomainData[i] - 128) / 128;
+			sum += normalized * normalized;
+		}
+		return Math.sqrt(sum / timeDomainData.length);
+	}
+
+	function buildVisualizerBars(
+		frequencyData: Uint8Array,
+		timeDomainData: Uint8Array,
+		sampleRate: number
+	): VisualizerBar[] {
+		const nyquist = sampleRate / 2;
+		const ranges: [number, number][] = [
+			[40, 110],
+			[110, 220],
+			[220, 420],
+			[420, 780],
+			[780, 1400],
+			[1400, 2600],
+			[2600, 4200],
+			[4200, 7200]
+		];
+		const rms = getWaveformRms(timeDomainData);
+		const globalLift = Math.min(0.26, rms * 1.35);
+
+		return ranges.map(([low, high], index) => {
+			const start = Math.max(0, Math.floor((low / nyquist) * frequencyData.length));
+			const end = Math.min(frequencyData.length - 1, Math.ceil((high / nyquist) * frequencyData.length));
+			let sum = 0;
+			let count = 0;
+
+			for (let i = start; i <= end; i++) {
+				sum += frequencyData[i];
+				count++;
+			}
+
+			const average = count > 0 ? sum / count : 0;
+			const normalized = average / 255;
+			const emphasis = 1 + Math.max(0, 3 - index) * 0.08;
+			const redistributed = normalized * emphasis + globalLift * Math.max(0.24, 0.56 - index * 0.04);
+			const floor = Math.min(0.22, 0.08 + rms * (0.55 - index * 0.04));
+			return { style: buildVisualizerBarStyle(Math.max(redistributed, floor)) };
+		});
+	}
+
 	async function startRecording() {
 		triggerHaptic('success');
 		
@@ -285,9 +381,12 @@
 			// Initialize audio visualizer
 			try {
 				audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+				if (audioContext.state === 'suspended') {
+					await audioContext.resume();
+				}
 				audioAnalyser = audioContext.createAnalyser();
-				audioAnalyser.fftSize = 64;
-				audioAnalyser.smoothingTimeConstant = 0.85;
+				audioAnalyser.fftSize = 256;
+				audioAnalyser.smoothingTimeConstant = 0.72;
 				
 				const source = audioContext.createMediaStreamSource(stream);
 				source.connect(audioAnalyser);
@@ -395,7 +494,7 @@
 	
 	// Stop audio visualizer
 	if (animationFrameId) {
-		cancelAnimationFrame(animationFrameId);
+		window.cancelAnimationFrame(animationFrameId);
 		animationFrameId = null;
 	}
 	if (audioContext) {
@@ -403,35 +502,26 @@
 		audioContext = null;
 	}
 	audioAnalyser = null;
-	visualizerData = [5, 5, 5, 5, 5, 5, 5, 5];
+	visualizerData = createIdleVisualizerData();
 }
 
 	function startVisualizerAnimation() {
 		if (!audioAnalyser) return;
 		
-		const dataArray = new Uint8Array(audioAnalyser.frequencyBinCount);
+		const frequencyData = new Uint8Array(audioAnalyser.frequencyBinCount);
+		const timeDomainData = new Uint8Array(audioAnalyser.fftSize);
 		
 		function updateVisualizer() {
 			if (!audioAnalyser || !isRecording) return;
 			
-			audioAnalyser.getByteFrequencyData(dataArray);
-			
-			// Divide into 8 frequency bands
-			const bars: number[] = [];
-			const step = Math.floor(dataArray.length / 8);
-			
-			for (let i = 0; i < 8; i++) {
-				let sum = 0;
-				for (let j = 0; j < step; j++) {
-					sum += dataArray[i * step + j];
-				}
-				const average = sum / step;
-				const height = Math.max(5, (average / 255) * 100);
-				bars.push(height);
-			}
-			
-			visualizerData = bars;
-			animationFrameId = requestAnimationFrame(updateVisualizer);
+			audioAnalyser.getByteFrequencyData(frequencyData);
+			audioAnalyser.getByteTimeDomainData(timeDomainData);
+			visualizerData = buildVisualizerBars(
+				frequencyData,
+				timeDomainData,
+				audioContext?.sampleRate ?? 44100
+			);
+			animationFrameId = window.requestAnimationFrame(updateVisualizer);
 		}
 		
 		updateVisualizer();
@@ -717,10 +807,10 @@
 
 					<!-- Audio Visualizer -->
 					<div class="audio-visualizer">
-						{#each visualizerData as height, i}
+						{#each visualizerData as bar}
 						<div
 							class="visualizer-bar"
-							style="height: {height}%"
+							style={bar.style}
 						></div>
 						{/each}
 					</div>
@@ -848,30 +938,57 @@
 		display: flex;
 		align-items: flex-end;
 		justify-content: center;
-		gap: 2px;
-		height: 150px;
-		padding: 1rem;
-		background: rgba(0, 0, 0, 0.2);
-		border-radius: 8px;
+		gap: 6px;
+		height: 116px;
+		padding: 18px 10px 14px;
+		background:
+			linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
+			linear-gradient(180deg, rgba(27, 31, 53, 0.82), rgba(18, 22, 38, 0.86));
+		border: 1px solid rgba(255, 255, 255, 0.05);
+		border-radius: 18px;
+		box-shadow:
+			inset 0 1px 0 rgba(255, 255, 255, 0.04),
+			0 10px 24px rgba(0, 0, 0, 0.12);
 		margin-top: 1rem;
 		width: 100%;
-		max-width: 300px;
+		max-width: 320px;
+		position: relative;
+		overflow: hidden;
+	}
+
+	.audio-visualizer::before {
+		content: '';
+		position: absolute;
+		inset: -24% 18% auto;
+		height: 48px;
+		border-radius: 999px;
+		background: radial-gradient(circle, rgba(255, 255, 255, 0.05), transparent 72%);
+		opacity: 0.45;
+		pointer-events: none;
+	}
+
+	.audio-visualizer::after {
+		content: '';
+		position: absolute;
+		left: 12px;
+		right: 12px;
+		bottom: 16px;
+		height: 1px;
+		border-radius: 999px;
+		background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
 	}
 
 	.visualizer-bar {
 		flex: 1;
-		min-width: 8px;
-		max-width: 30px;
-		border-radius: 2px 2px 0 0;
-		background: linear-gradient(to top,
-			#22c55e 0%,
-			#22c55e 60%,
-			#eab308 60%,
-			#eab308 85%,
-			#ef4444 85%,
-			#ef4444 100%
-		);
-		transition: height 0.05s ease-out;
+		min-width: 14px;
+		max-width: 20px;
+		height: 12px;
+		border-radius: 999px;
+		background: #8cd8c1;
+		transition:
+			height 0.07s ease-out,
+			opacity 0.09s ease-out,
+			box-shadow 0.12s ease-out;
 	}
 
 	.timer {

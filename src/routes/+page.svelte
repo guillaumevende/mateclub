@@ -58,6 +58,19 @@
 		hasRecordings: boolean;
 	};
 
+	type UnreadPlaylistGroup = {
+		date: string;
+		recordings: Recording[];
+		startIndex: number;
+	};
+
+	type UnreadPlaylistModal = {
+		playlist: DayRecordings;
+		groups: UnreadPlaylistGroup[];
+		totalSeconds: number;
+		count: number;
+	};
+
 	let { data }: { data: PageData & { user?: User; allUsers: UserList[]; threshold: number; unreadStats?: { count: number; totalSeconds: number }; hasMore?: boolean; pendingRegistrationsCount?: number } } = $props();
 	let showTeam = $state(false);
 	let currentPage = $state(1);
@@ -67,9 +80,13 @@
 	let calendarDates = $state<Record<string, DateInfo>>({});
 	let selectedDate = $state<string | null>(null);
 	let selectedDayRecordings = $state<DayRecordings | null>(null);
+	let unreadPlaylistModal = $state<UnreadPlaylistModal | null>(null);
+	let unreadPlaylistSession = $state<UnreadPlaylistModal | null>(null);
 	let loadingDay = $state(false);
 	let calendarMonths = $state<CalendarMonth[] | null>(null);
 	let todayDay = $state<DayRecordings | null>(null);
+	let openingUnreadSummary = $state(false);
+	let syncingUnreadPlaylist = false;
 
 	// Données du calendrier calculées uniquement quand nécessaire
 	let calendarCells = $state<CalendarCell[][]>([]);
@@ -136,15 +153,26 @@
 
 	// Computed: unread recordings count and total duration (from server)
 	let unreadStats = $derived.by(() => {
-		if (data.unreadStats) {
+		if (unreadPlaylistSession) {
+			return {
+				count: unreadPlaylistSession.count,
+				totalSeconds: unreadPlaylistSession.totalSeconds
+			};
+		}
+
+		const allKnownRecordings = [...(todayDay?.recordings || []), ...allDays.flatMap(d => d.recordings)];
+		const dedupedRecordings = Array.from(new Map(allKnownRecordings.map((recording) => [recording.id, recording])).values());
+		const unread = dedupedRecordings.filter((recording) => !isRecordingListened(recording));
+		const totalSeconds = unread.reduce((sum, r) => sum + r.duration_seconds, 0);
+
+		if (unread.length === 0) {
+			return { count: 0, totalSeconds: 0 };
+		}
+
+		if (data.unreadStats && data.unreadStats.count > unread.length) {
 			return data.unreadStats;
 		}
-		// Fallback: calculate from loaded days
-		const allRecordings = [...(todayDay?.recordings || []), ...allDays.flatMap(d => d.recordings)];
-		const unread = allRecordings.filter(r => 
-			!listenedRecordings.has(r.id) && r.listened_by_user !== 1
-		);
-		const totalSeconds = unread.reduce((sum, r) => sum + r.duration_seconds, 0);
+
 		return { count: unread.length, totalSeconds };
 	});
 
@@ -163,7 +191,11 @@
 	// Auto-scroll horizontally within the current day's scroller when playing
 	$effect(() => {
 		if (player.isPlaying && player.currentDay && player.currentRecording) {
-			scrollToCardHorizontal(player.currentDay, player.currentIndex);
+			if (player.currentDay === '__unread_playlist__') {
+				scrollModalCardHorizontal(player.currentIndex);
+			} else {
+				scrollToCardHorizontal(player.currentDay, player.currentIndex);
+			}
 		}
 	});
 
@@ -183,12 +215,13 @@
 		
 		loadingCalendar = true;
 		const months = calendarMonths;
+		const resolvedCalendarDates = getResolvedCalendarDates();
 		
 		setTimeout(() => {
 			if (!months) return;
 			
 			const cells: CalendarCell[][] = [];
-			const isLoaded = Object.keys(calendarDates).length > 0;
+			const isLoaded = Object.keys(resolvedCalendarDates).length > 0;
 			
 			for (const monthData of months) {
 				const monthCells: CalendarCell[] = [];
@@ -198,7 +231,7 @@
 							monthCells.push({ day: -1, key: '', classes: 'cell-day cell-empty', hasRecordings: false });
 						} else {
 							const key = getDateKey(monthData.year, monthData.month, day);
-							const info = calendarDates[key];
+							const info = resolvedCalendarDates[key];
 							const isTodayCell = isToday(monthData.year, monthData.month, day);
 							const hasRecordings = info?.hasRecordings ?? false;
 							const hasUnread = info?.hasUnread ?? false;
@@ -221,9 +254,36 @@
 		}, 0);
 	}
 
+	function getResolvedCalendarDates(): Record<string, DateInfo> {
+		const resolved = { ...calendarDates };
+		const loadedDays = [todayDay, ...allDays].filter(Boolean) as DayRecordings[];
+
+		for (const day of loadedDays) {
+			if (day.recordings.length === 0) {
+				continue;
+			}
+
+			resolved[day.date] = {
+				hasRecordings: true,
+				hasUnread: day.recordings.some((recording) => !isRecordingListened(recording))
+			};
+		}
+
+		return resolved;
+	}
+
+	function getOldestUnreadDate(): string | null {
+		const dates = Object.entries(getResolvedCalendarDates())
+			.filter(([, info]) => info.hasUnread)
+			.map(([date]) => date)
+			.sort((a, b) => a.localeCompare(b));
+
+		return dates[0] ?? null;
+	}
+
 	function handleTouchStart(e: TouchEvent) {
 		// Disable pull-to-refresh when any modal is open
-		if (showTeam || selectedDayRecordings || selectedImageUrl) return;
+		if (showTeam || selectedDayRecordings || unreadPlaylistModal || selectedImageUrl) return;
 		startY = e.touches[0].clientY;
 		if (window.scrollY === 0) {
 			isPulling = true;
@@ -257,6 +317,9 @@
 	onMount(() => {
 		calendarMonths = generateCalendarMonths(3);
 		invalidateAll();
+		if (data.unreadStats?.count) {
+			void syncUnreadPlaylistSession();
+		}
 	});
 
 	// Sync data to component state - only when page changes
@@ -303,6 +366,25 @@
 		}
 	});
 
+	$effect(() => {
+		if (!showCalendar || !calendarMonths || Object.keys(calendarDates).length === 0) return;
+		todayDay;
+		allDays;
+		listenedRecordings;
+		computeCalendarCells();
+	});
+
+	$effect(() => {
+		todayDay;
+		allDays;
+		listenedRecordings;
+
+		if (!data.user || !data.unreadStats?.count) return;
+		if (player.currentDay === '__unread_playlist__') return;
+
+		void syncUnreadPlaylistSession();
+	});
+
 	async function loadMore() {
 		if (loadingMore) return;
 		loadingMore = true;
@@ -345,8 +427,8 @@
 			
 			// Initialize scroll position for modal (scroll to first unread)
 			if (result.day && result.day.recordings.length > 0) {
-				// eslint-disable-next-line no-undef
-				requestAnimationFrame(() => {
+				 
+				window.requestAnimationFrame(() => {
 					const firstUnreadIndex = getFirstUnreadIndex(result.day);
 					scrollToCardWithoutAnimation(result.day.date, firstUnreadIndex);
 				});
@@ -357,9 +439,116 @@
 		loadingDay = false;
 	}
 
+	async function buildUnreadPlaylistSession(): Promise<UnreadPlaylistModal | null> {
+		if (Object.keys(calendarDates).length === 0) {
+			await loadCalendarDates();
+		}
+
+		const unreadDates = Object.entries(getResolvedCalendarDates())
+			.filter(([, info]) => info.hasUnread)
+			.map(([date]) => date)
+			.sort((a, b) => a.localeCompare(b));
+
+		if (unreadDates.length === 0) return null;
+
+		const responses = await Promise.all(
+			unreadDates.map(async (date) => {
+				const response = await fetch(`/api/recordings/by-date?date=${date}`);
+				const result = await response.json();
+				return result.day as DayRecordings | null;
+			})
+		);
+
+		const groups: UnreadPlaylistGroup[] = [];
+		const playlistRecordings: Recording[] = [];
+		let totalSeconds = 0;
+
+		for (const day of responses) {
+			if (!day?.available) continue;
+			const unreadRecordings = day.recordings.filter((recording) => !isRecordingListened(recording));
+			if (unreadRecordings.length === 0) continue;
+
+			groups.push({
+				date: day.date,
+				recordings: unreadRecordings,
+				startIndex: playlistRecordings.length
+			});
+
+			playlistRecordings.push(...unreadRecordings);
+			totalSeconds += unreadRecordings.reduce((sum, recording) => sum + recording.duration_seconds, 0);
+		}
+
+		if (playlistRecordings.length === 0) return null;
+
+		return {
+			playlist: {
+				date: '__unread_playlist__',
+				recordings: playlistRecordings,
+				available: true
+			},
+			groups,
+			totalSeconds,
+			count: playlistRecordings.length
+		};
+	}
+
+	async function syncUnreadPlaylistSession() {
+		if (syncingUnreadPlaylist) return;
+		syncingUnreadPlaylist = true;
+		try {
+			unreadPlaylistSession = await buildUnreadPlaylistSession();
+		} finally {
+			syncingUnreadPlaylist = false;
+		}
+	}
+
+	async function openUnreadPlaylist() {
+		if (unreadStats.count === 0 || openingUnreadSummary) return;
+
+		openingUnreadSummary = true;
+		try {
+			if (unreadPlaylistSession) {
+				const session = unreadPlaylistSession;
+				unreadPlaylistModal = session;
+
+				window.requestAnimationFrame(() => {
+					const targetIndex = player.currentDay === '__unread_playlist__'
+						? player.currentIndex
+						: getFirstUnreadIndex(session.playlist);
+					scrollModalCardWithoutAnimation(targetIndex, '.unread-playlist-modal .recordings-scroller');
+				});
+
+				if (player.currentDay !== '__unread_playlist__' || !player.currentRecording) {
+					const startIndex = getFirstUnreadIndex(session.playlist);
+					if (session.playlist.recordings[startIndex]) {
+						playFromRecording(session.playlist, startIndex);
+					}
+				}
+				return;
+			}
+
+			const session = await buildUnreadPlaylistSession();
+			if (!session) return;
+			unreadPlaylistSession = session;
+			unreadPlaylistModal = session;
+
+			playFromRecording(session.playlist, 0);
+
+			window.requestAnimationFrame(() => {
+				scrollModalCardWithoutAnimation(0, '.unread-playlist-modal .recordings-scroller');
+			});
+		} finally {
+			openingUnreadSummary = false;
+		}
+	}
+
 	function closeDayModal() {
 		selectedDate = null;
 		selectedDayRecordings = null;
+	}
+
+	function closeUnreadPlaylistModal() {
+		unreadPlaylistModal = null;
 	}
 
 	// Player helper functions
@@ -420,6 +609,32 @@
 			if (cards[index]) {
 				cards[index].scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
 			}
+		}
+	}
+
+	function scrollModalCardWithoutAnimation(index: number, selector = '.day-modal .recordings-scroller') {
+		const scroller = document.querySelector(selector);
+		if (!scroller) return;
+
+		const cards = scroller.querySelectorAll('.recording-card');
+		if (cards[index]) {
+			const cardRect = cards[index].getBoundingClientRect();
+			const scrollerRect = scroller.getBoundingClientRect();
+			const scrollLeft = cardRect.left - scrollerRect.left + scroller.scrollLeft - 16;
+			scroller.scrollTo({ left: Math.max(0, scrollLeft), behavior: 'auto' });
+		}
+	}
+
+	function scrollModalCardHorizontal(index: number, selector = '.unread-playlist-modal .recordings-scroller') {
+		const scroller = document.querySelector(selector);
+		if (!scroller) return;
+
+		const cards = scroller.querySelectorAll('.recording-card');
+		if (cards[index]) {
+			const cardRect = cards[index].getBoundingClientRect();
+			const scrollerRect = scroller.getBoundingClientRect();
+			const scrollLeft = cardRect.left - scrollerRect.left + scroller.scrollLeft - (scrollerRect.width / 2) + (cardRect.width / 2);
+			scroller.scrollTo({ left: scrollLeft, behavior: 'smooth' });
 		}
 	}
 
@@ -603,6 +818,29 @@
 		return `${mins}:${secs.toString().padStart(2, '0')}`;
 	}
 
+	function formatDurationLabel(totalSeconds: number): string {
+		const hours = Math.floor(totalSeconds / 3600);
+		const mins = Math.floor((totalSeconds % 3600) / 60);
+		const secs = totalSeconds % 60;
+
+		if (hours > 0) {
+			if (mins === 0) {
+				return `${hours} heure${hours > 1 ? 's' : ''}`;
+			}
+			return `${hours} heure${hours > 1 ? 's' : ''} et ${mins} minute${mins > 1 ? 's' : ''}`;
+		}
+
+		if (mins === 0) {
+			return `${secs} seconde${secs > 1 ? 's' : ''}`;
+		}
+
+		if (secs === 0) {
+			return `${mins} minute${mins > 1 ? 's' : ''}`;
+		}
+
+		return `${mins} minute${mins > 1 ? 's' : ''} et ${secs} seconde${secs > 1 ? 's' : ''}`;
+	}
+
 	function formatDate(dateStr: string): string {
 		// Forcer l'interprétation UTC en ajoutant 'Z' si pas de timezone
 		let dateString: string;
@@ -696,17 +934,23 @@
 		<p class="date">{getTodayDate()}</p>
 		<p class="welcome">Bienvenue, {data.user?.pseudo} !</p>
 		{#if unreadStats.count > 0}
-			{@const hours = Math.floor(unreadStats.totalSeconds / 3600)}
-			{@const mins = Math.floor((unreadStats.totalSeconds % 3600) / 60)}
-			{@const secs = unreadStats.totalSeconds % 60}
-			<p class="unread-stats">
-				{unreadStats.count} capsule{unreadStats.count !== 1 ? 's' : ''} audio non lue{unreadStats.count !== 1 ? 's' : ''}<br />
-				({#if hours > 0}
-					{hours} heure{hours !== 1 ? 's' : ''} et {mins} minute{mins !== 1 ? 's' : ''}
-				{:else}
-					{mins} minute{mins !== 1 ? 's' : ''} et {secs} seconde{secs !== 1 ? 's' : ''}
-				{/if})
-			</p>
+			<button class="unread-summary-pill" onclick={openUnreadPlaylist} disabled={openingUnreadSummary}>
+				<span class="pill-icon" aria-hidden="true">
+					<svg viewBox="0 0 24 24" class="pill-play-icon">
+						<circle cx="12" cy="12" r="11"></circle>
+						<path d="M10 8.5v7l5.8-3.5z"></path>
+					</svg>
+				</span>
+				<span class="pill-copy">
+					<span class="pill-title">
+						{openingUnreadSummary
+							? 'Ouverture...'
+							: `${unreadStats.count} capsule${unreadStats.count !== 1 ? 's' : ''} non lue${unreadStats.count !== 1 ? 's' : ''}`}
+					</span>
+					<span class="pill-duration">{formatDurationLabel(unreadStats.totalSeconds)}</span>
+				</span>
+				<span class="pill-spacer" aria-hidden="true"></span>
+			</button>
 		{/if}
 		<button class="team-button" onclick={() => showTeam = true}>
 			👥
@@ -714,6 +958,76 @@
 	</header>
 
 	<TeamList allUsers={data.allUsers} bind:showTeam />
+
+	{#if unreadPlaylistModal}
+		<div
+			class="modal-overlay"
+			use:scrollLock={unreadPlaylistModal !== null}
+			onclick={closeUnreadPlaylistModal}
+			onkeydown={(e) => e.key === 'Escape' && closeUnreadPlaylistModal()}
+			role="button"
+			tabindex="0"
+			aria-label="Fermer la file d'écoute"
+		>
+			<div
+				class="modal day-modal unread-playlist-modal"
+				onclick={(e) => e.stopPropagation()}
+				onkeydown={(e) => e.key === 'Escape' && closeUnreadPlaylistModal()}
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="unread-playlist-title"
+				tabindex="-1"
+			>
+				<button class="close-btn modal-close-outer" onclick={closeUnreadPlaylistModal}>✕</button>
+
+				<div class="day-header-new modal-header">
+					<div class="day-header-left">
+						<h2 class="day-title" id="unread-playlist-title">À écouter</h2>
+						<span class="day-count">{unreadPlaylistModal.count} capsule{unreadPlaylistModal.count !== 1 ? 's' : ''}</span>
+					</div>
+
+					<div class="day-header-right">
+						<span class="day-duration">{formatDurationFull(unreadPlaylistModal.totalSeconds)}</span>
+					</div>
+				</div>
+
+				<div class="recordings-scroller">
+					<div class="recordings-row unread-playlist-row">
+						{#each unreadPlaylistModal.groups as group, groupIndex}
+							{#if groupIndex > 0}
+								<div class="playlist-divider" aria-hidden="true">
+									<span class="playlist-divider-line"></span>
+									<span class="playlist-divider-label">{formatDateHeader(group.date, group.recordings)}</span>
+								</div>
+							{/if}
+
+							{#each group.recordings as recording, index}
+								{@const playlistIndex = group.startIndex + index}
+								<RecordingCard
+									{recording}
+									index={playlistIndex}
+									available={true}
+									{cardSwiped}
+									{player}
+									threshold={data.threshold}
+									{isRecordingListened}
+									{isCurrentPlaying}
+									{isCurrentRecording}
+									onplay={(i) => unreadPlaylistModal && playFromRecording(unreadPlaylistModal.playlist, i)}
+									ontouchstart={handleCardTouchStart}
+									ontouchend={(e) => unreadPlaylistModal && handleCardTouchEnd(e, unreadPlaylistModal.playlist, playlistIndex)}
+									onimageclick={(url) => selectedImageUrl = url}
+									{formatTime}
+									{formatDuration}
+									{formatTimeSeconds}
+								/>
+							{/each}
+						{/each}
+					</div>
+				</div>
+			</div>
+		</div>
+	{/if}
 
 	{#if selectedDayRecordings}
 		<div
@@ -1145,10 +1459,94 @@
 		color: #888;
 	}
 
-	.unread-stats {
-		color: #e94560;
-		font-size: 0.875rem;
-		margin-top: 0.25rem;
+	.unread-summary-pill {
+		margin: 0.6rem auto 0;
+		padding: 0.8rem 1rem 0.85rem;
+		display: grid;
+		grid-template-columns: 42px minmax(0, 1fr) 42px;
+		align-items: center;
+		column-gap: 0.15rem;
+		width: min(100%, 290px);
+		border-radius: 999px;
+		border: 1px solid rgba(233, 69, 96, 0.28);
+		background:
+			linear-gradient(180deg, rgba(233, 69, 96, 0.18) 0%, rgba(233, 69, 96, 0.08) 100%),
+			rgba(42, 42, 78, 0.9);
+		color: #fff4f6;
+		cursor: pointer;
+		transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+		box-shadow: 0 14px 32px rgba(11, 11, 24, 0.24);
+		appearance: none;
+		font: inherit;
+		text-align: center;
+	}
+
+	.unread-summary-pill:hover:not(:disabled) {
+		transform: translateY(-1px);
+		border-color: rgba(233, 69, 96, 0.45);
+		box-shadow: 0 18px 38px rgba(11, 11, 24, 0.32);
+	}
+
+	.unread-summary-pill:disabled {
+		opacity: 0.8;
+		cursor: wait;
+	}
+
+	.unread-summary-pill .pill-icon {
+		grid-column: 1;
+		width: 34px;
+		height: 34px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		filter: drop-shadow(0 6px 14px rgba(11, 11, 24, 0.28));
+		justify-self: start;
+	}
+
+	.unread-summary-pill .pill-play-icon {
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+
+	.unread-summary-pill .pill-play-icon circle {
+		fill: rgba(233, 69, 96, 0.22);
+		stroke: rgba(255, 199, 210, 0.42);
+		stroke-width: 1.25;
+	}
+
+	.unread-summary-pill .pill-play-icon path {
+		fill: #fff4f6;
+	}
+
+	.unread-summary-pill .pill-copy {
+		grid-column: 2;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.12rem;
+		width: 100%;
+		padding: 0;
+		min-width: 0;
+	}
+
+	.unread-summary-pill .pill-spacer {
+		grid-column: 3;
+		width: 34px;
+		height: 34px;
+		justify-self: end;
+	}
+
+	.unread-summary-pill .pill-title {
+		font-size: 0.98rem;
+		font-weight: 700;
+		color: #ffffff;
+	}
+
+	.unread-summary-pill .pill-duration {
+		font-size: 0.82rem;
+		font-weight: 500;
+		color: #ffd7df;
 	}
 
 	.date {
@@ -1316,6 +1714,38 @@
 	.recordings-row {
 		display: flex;
 		gap: 0.75rem;
+	}
+
+	.unread-playlist-row {
+		align-items: stretch;
+	}
+
+	.playlist-divider {
+		flex: 0 0 76px;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.85rem;
+		padding: 0.5rem 0 0.5rem 0.15rem;
+	}
+
+	.playlist-divider-line {
+		width: 2px;
+		height: 160px;
+		border-radius: 999px;
+		background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.48) 50%, rgba(255, 255, 255, 0.04) 100%);
+	}
+
+	.playlist-divider-label {
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: rgba(255, 255, 255, 0.82);
+		writing-mode: vertical-rl;
+		transform: rotate(180deg);
+		text-align: center;
 	}
 
 
