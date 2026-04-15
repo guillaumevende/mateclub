@@ -242,6 +242,36 @@ function stopGuardian() {
   }
 }
 
+async function resumePlayback(source: 'ui' | 'media-session' = 'ui') {
+  const audio = getAudioElement();
+  const state = get(playerStore);
+
+  if (!state.currentRecording) {
+    logDebug(`▶️ Reprise ${source} ignorée : aucune capsule active`);
+    return;
+  }
+
+  if (!audio.src) {
+    audio.src = `/api/recordings/${state.currentRecording.id}`;
+  }
+
+  playerStore.update((s) => ({ ...s, isLoading: true }));
+
+  try {
+    await audio.play();
+    logDebug(`▶️ Reprise ${source} OK`);
+  } catch (error) {
+    logDebug(`❌ Reprise ${source} impossible: ${error instanceof Error ? error.message : error}`);
+    playerStore.update((s) => ({ ...s, isLoading: false, isPlaying: false }));
+  }
+}
+
+function pausePlayback(source: 'ui' | 'media-session' = 'ui') {
+  const audio = getAudioElement();
+  audio.pause();
+  logDebug(`⏸ Pause ${source}`);
+}
+
 function initAudioElement() {
   if (isInitialized) return;
   
@@ -252,11 +282,13 @@ function initAudioElement() {
     
     if (typeof navigator !== 'undefined' && 'mediaSession' in navigator && navigator.mediaSession) {
       const dur = isFinite(audio.duration) ? audio.duration : 0;
-      navigator.mediaSession.setPositionState({
-        duration: dur,
-        playbackRate: audio.playbackRate || 1,
-        position: audio.currentTime
-      });
+      if (dur > 0) {
+        navigator.mediaSession.setPositionState({
+          duration: dur,
+          playbackRate: audio.playbackRate || 1,
+          position: Math.min(audio.currentTime, dur)
+        });
+      }
     }
   });
   
@@ -338,6 +370,9 @@ function initAudioElement() {
   audio.addEventListener('play', () => {
     logDebug('▶ Event PLAY détecté');
     playerStore.update(s => ({ ...s, isPlaying: true }));
+    if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'playing';
+    }
     startGuardian();
     // Resume jingle if it was playing before pause
     const jingle = getJingleElement();
@@ -365,6 +400,9 @@ function initAudioElement() {
   
   audio.addEventListener('pause', () => {
     playerStore.update(s => ({ ...s, isPlaying: false }));
+    if (typeof navigator !== 'undefined' && 'mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = 'paused';
+    }
     // Also pause jingle when voice pauses
     const jingle = getJingleElement();
     if (!jingle.paused) {
@@ -407,16 +445,12 @@ function setupMediaSession() {
   
   navigator.mediaSession.setActionHandler('play', () => {
     logDebug('▶️ MediaSession PLAY pressed');
-    const audio = getAudioElement();
-    audio.play();
-    startGuardian();
+    void resumePlayback('media-session');
   });
   
   navigator.mediaSession.setActionHandler('pause', () => {
     logDebug('⏸️ MediaSession PAUSE pressed');
-    const audio = getAudioElement();
-    audio.pause();
-    stopGuardian();
+    pausePlayback('media-session');
   });
   
   navigator.mediaSession.setActionHandler('previoustrack', () => {
@@ -554,9 +588,9 @@ export async function playNext() {
 export function togglePlayPause() {
   const audio = getAudioElement();
   if (audio.paused) {
-    audio.play();
+    void resumePlayback('ui');
   } else {
-    audio.pause();
+    pausePlayback('ui');
   }
 }
 

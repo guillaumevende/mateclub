@@ -22,6 +22,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		const stmt = db.prepare(`
 			SELECT 
 				r.recorded_at,
+				r.user_id,
 				l.id as listened_id
 			FROM recordings r 
 			LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
@@ -29,7 +30,11 @@ export const GET: RequestHandler = async ({ locals }) => {
 			ORDER BY r.recorded_at ASC
 		`);
 
-		const results = stmt.all(locals.user.id, oneYearAgo.toISOString()) as { recorded_at: string; listened_id: number | null }[];
+		const results = stmt.all(locals.user.id, oneYearAgo.toISOString()) as {
+			recorded_at: string;
+			user_id: number;
+			listened_id: number | null;
+		}[];
 
 		// Formatter pour la date et l'heure dans le fuseau utilisateur
 		const dateFormatter = new Intl.DateTimeFormat('en-CA', {
@@ -49,7 +54,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 		const today = dateFormatter.format(new Date());
 		
 		// Grouper par date et vérifier si disponible
-		const grouped: Record<string, { total_count: number; listened_count: number; has_available: boolean }> = {};
+		const grouped: Record<string, { total_count: number; unread_count: number; has_available: boolean }> = {};
 		
 		for (const row of results) {
 			// Extraire l'heure et minute de l'enregistrement en minutes depuis minuit
@@ -67,11 +72,14 @@ export const GET: RequestHandler = async ({ locals }) => {
 			}
 			
 			if (!grouped[effectiveDate]) {
-				grouped[effectiveDate] = { total_count: 0, listened_count: 0, has_available: false };
+				grouped[effectiveDate] = { total_count: 0, unread_count: 0, has_available: false };
 			}
 			
 			grouped[effectiveDate].total_count += 1;
-			if (row.listened_id) grouped[effectiveDate].listened_count += 1;
+			const isOwnRecording = row.user_id === locals.user.id;
+			if (!isOwnRecording && !row.listened_id) {
+				grouped[effectiveDate].unread_count += 1;
+			}
 			
 			// Vérifier si cet enregistrement est disponible (basé sur la date effective)
 			const yesterday = new Date();
@@ -98,7 +106,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 			if (info.has_available) {
 				datesInfo[date] = {
 					hasRecordings: info.total_count > 0,
-					hasUnread: info.total_count > info.listened_count
+					hasUnread: info.unread_count > 0
 				};
 			}
 		}

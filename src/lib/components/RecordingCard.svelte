@@ -62,18 +62,29 @@
 	onkeydown={(e) => e.key === 'Enter' && onplay(index)}
 >
 	<div class="card-top">
-		<div class="card-time">{formatTime(recording.recorded_at)}</div>
-		<div class="card-author">
-			<Avatar avatar={recording.avatar} size="small" />
-			<span class="pseudo">{recording.pseudo}</span>
+		<div class="card-meta">
+			<div class="card-author">
+				<Avatar avatar={recording.avatar} size="medium" />
+				<span class="pseudo" class:unread={!isListened}>{recording.pseudo}</span>
+			</div>
+		</div>
+		<div class="card-status-column"></div>
+		<div class="card-time-column">
+			<div class="card-time" class:unread={!isListened}>{formatTime(recording.recorded_at)}</div>
 		</div>
 	</div>
 	{#if available}
 		<div class="card-center-duration">
+			{#if !isListened}
+				<div class="card-read-status unread" aria-label="Capsule nouvelle">
+					<span class="status-dot" aria-hidden="true"></span>
+					<span class="status-label">nouveau</span>
+				</div>
+			{/if}
 			{#if isCurrent && player.isPlaying}
 				<span class="duration current-time">{formatTimeSeconds(player.progress)}</span>
 			{:else}
-				<span class="duration">{formatDuration(recording.duration_seconds)}</span>
+				<span class="duration" class:unread={!isListened}>{formatDuration(recording.duration_seconds)}</span>
 			{/if}
 			{#if isPlaying}
 				<span class="status-indicator playing">▶ En cours</span>
@@ -145,7 +156,7 @@
 		left: 0;
 		right: 0;
 		bottom: 0;
-		background: rgba(0, 0, 0, 0.5);
+		background: rgba(0, 0, 0, 0.6);
 		border-radius: 12px;
 		z-index: 0;
 	}
@@ -195,18 +206,31 @@
 	}
 
 	.recording-card:not(.listened):not(.locked):not(.playing) {
-		border: 2px solid white;
+		border: 2px solid #e94560;
 	}
 
 	.card-top {
 		display: flex;
-		justify-content: space-between;
+		justify-content: flex-start;
 		align-items: flex-start;
+		gap: 0.75rem;
+	}
+
+	.card-meta {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.2rem;
 	}
 
 	.card-time {
-		font-size: 1.4rem;
+		font-size: 1.15rem;
 		font-weight: 600;
+		color: #fff4f6;
+		text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.95);
+	}
+
+	.card-time.unread {
 		color: #e94560;
 	}
 
@@ -214,17 +238,80 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 0.25rem;
+		gap: 0.45rem;
 	}
 
 	.card-author .pseudo {
-		font-size: 0.75rem;
-		color: #e94560;
+		font-size: 0.92rem;
+		color: #fff4f6;
 		font-weight: 600;
-		white-space: nowrap;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		max-width: 60px;
+		line-height: 1.2;
+		max-width: 92px;
+		text-align: center;
+		text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9), 0 1px 2px rgba(0, 0, 0, 0.95);
+	}
+
+	.card-author .pseudo.unread {
+		color: #e94560;
+	}
+
+	.card-status-column {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		width: 0;
+	}
+
+	.card-time-column {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		min-width: 64px;
+		padding-top: 0.25rem;
+		margin-left: auto;
+	}
+
+	.card-read-status {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.5rem;
+		padding: 0.4rem 0.65rem;
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.1);
+		backdrop-filter: blur(10px);
+		-webkit-backdrop-filter: blur(10px);
+		border: 1px solid rgba(255, 255, 255, 0.12);
+	}
+
+	.card-read-status.unread {
+		background: rgba(233, 69, 96, 0.14);
+		border-color: rgba(233, 69, 96, 0.26);
+	}
+
+	.status-dot {
+		width: 22px;
+		height: 22px;
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.96);
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		flex-shrink: 0;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+	}
+
+	.card-read-status.unread .status-dot {
+		background: #e94560;
+		box-shadow: 0 6px 16px rgba(233, 69, 96, 0.28);
+	}
+
+	.status-label {
+		font-size: 0.8rem;
+		font-weight: 700;
+		color: #ffd7df;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
 	}
 
 	.card-center-duration {
@@ -233,12 +320,17 @@
 		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		gap: 0.25rem;
+		gap: 0.45rem;
 	}
 
 	.card-center-duration .duration {
 		font-size: 2rem;
 		font-weight: 600;
+		color: #fff4f6;
+		text-shadow: 0 3px 12px rgba(0, 0, 0, 0.95), 0 1px 2px rgba(0, 0, 0, 0.95);
+	}
+
+	.card-center-duration .duration.unread {
 		color: #e94560;
 	}
 
