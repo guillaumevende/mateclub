@@ -72,11 +72,27 @@
 	};
 
 	let { data }: { data: PageData & { user?: User; allUsers: UserList[]; threshold: number; unreadStats?: { count: number; totalSeconds: number }; hasMore?: boolean; pendingRegistrationsCount?: number } } = $props();
+
+	function getInitialHomeState() {
+		const initialPage = data.page ?? 1;
+		const initialTodayDate = getUserToday();
+		const initialDays = data.days ?? [];
+
+		return {
+			initialPage,
+			initialTodayDate,
+			initialDays,
+			initialTodayDay: initialDays.find((day) => day.date === initialTodayDate) || null,
+			initialPastDays: initialDays.filter((day) => day.date !== initialTodayDate)
+		};
+	}
+
+	const initialHomeState = getInitialHomeState();
 	let showTeam = $state(false);
-	let currentPage = $state(1);
-	let allDays = $state<DayRecordings[]>([]);
+	let currentPage = $state(initialHomeState.initialPage);
+	let allDays = $state<DayRecordings[]>(initialHomeState.initialPastDays);
 	let loadingMore = $state(false);
-	let showCalendar = $state(false);
+	let showCalendar = $state(initialHomeState.initialPage >= 2);
 	let calendarDates = $state<Record<string, DateInfo>>({});
 	let selectedDate = $state<string | null>(null);
 	let selectedDayRecordings = $state<DayRecordings | null>(null);
@@ -84,7 +100,7 @@
 	let unreadPlaylistSession = $state<UnreadPlaylistModal | null>(null);
 	let loadingDay = $state(false);
 	let calendarMonths = $state<CalendarMonth[] | null>(null);
-	let todayDay = $state<DayRecordings | null>(null);
+	let todayDay = $state<DayRecordings | null>(initialHomeState.initialTodayDay);
 	let openingUnreadSummary = $state(false);
 	let syncingUnreadPlaylist = false;
 

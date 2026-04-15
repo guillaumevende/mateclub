@@ -2,6 +2,25 @@
 
 ---
 
+## v0.30.4 (2026-04-15) - Rendu SSR de l'accueil corrigé
+
+### 🐛 Corrections
+
+#### Accueil
+- **Initialisation SSR fiable** : la page d'accueil est maintenant initialisée directement à partir de `data.days` et `data.page` dès le rendu serveur
+- **Fin de l'état vide fantôme** : la home ne rend plus `Pas encore de capsule à écouter` alors que des capsules et statistiques sont déjà présentes dans les données de la page
+- **Rendu prod aligné sur le dev** : la pastille des non lus et les sections de jours s'affichent correctement dès le premier rendu en production
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+- `npm run build`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.30.4`
+
+---
+
 ## v0.30.3 (2026-04-15) - Pastille des non lus et lecture disponible
 
 ### 🐛 Corrections
