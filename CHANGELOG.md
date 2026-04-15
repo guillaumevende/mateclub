@@ -2,6 +2,24 @@
 
 ---
 
+## v0.30.3 (2026-04-15) - Pastille des non lus et lecture disponible
+
+### 🐛 Corrections
+
+#### Accueil
+- **Synthèse fidèle** : la pastille des non lus continue d'afficher le total complet des capsules non lues, y compris lorsqu'une partie est encore verrouillée
+- **Lecture disponible uniquement** : le clic sur la pastille ne lance désormais que les capsules non lues déjà déverrouillées et réellement écoutables
+- **État passif clarifié** : si toutes les capsules non lues sont verrouillées, la pastille n'affiche plus le picto lecture et n'essaie plus de démarrer la lecture
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.30.3`
+
+---
+
 ## v0.30.2 (2026-04-15) - File d'écoute continue et interface affinée
 
 ### ✨ Améliorations

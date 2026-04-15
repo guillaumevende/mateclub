@@ -151,15 +151,8 @@
 	// Track listened recordings locally (for immediate UI updates)
 	let listenedRecordings = $state<Set<number>>(new Set());
 
-	// Computed: unread recordings count and total duration (from server)
+	// Computed: unread recordings count and total duration (from server/local UI state)
 	let unreadStats = $derived.by(() => {
-		if (unreadPlaylistSession) {
-			return {
-				count: unreadPlaylistSession.count,
-				totalSeconds: unreadPlaylistSession.totalSeconds
-			};
-		}
-
 		const allKnownRecordings = [...(todayDay?.recordings || []), ...allDays.flatMap(d => d.recordings)];
 		const dedupedRecordings = Array.from(new Map(allKnownRecordings.map((recording) => [recording.id, recording])).values());
 		const unread = dedupedRecordings.filter((recording) => !isRecordingListened(recording));
@@ -175,6 +168,8 @@
 
 		return { count: unread.length, totalSeconds };
 	});
+
+	let canPlayUnreadSummary = $derived((unreadPlaylistSession?.count ?? 0) > 0);
 
 	// Subscribe to player store outside of $effect to avoid infinite loops
 	playerStore.subscribe(state => {
@@ -934,13 +929,22 @@
 		<p class="date">{getTodayDate()}</p>
 		<p class="welcome">Bienvenue, {data.user?.pseudo} !</p>
 		{#if unreadStats.count > 0}
-			<button class="unread-summary-pill" onclick={openUnreadPlaylist} disabled={openingUnreadSummary}>
-				<span class="pill-icon" aria-hidden="true">
-					<svg viewBox="0 0 24 24" class="pill-play-icon">
-						<circle cx="12" cy="12" r="11"></circle>
-						<path d="M10 8.5v7l5.8-3.5z"></path>
-					</svg>
-				</span>
+			<button
+				class="unread-summary-pill"
+				class:is-passive={!canPlayUnreadSummary}
+				onclick={openUnreadPlaylist}
+				disabled={openingUnreadSummary || !canPlayUnreadSummary}
+			>
+				{#if canPlayUnreadSummary}
+					<span class="pill-icon" aria-hidden="true">
+						<svg viewBox="0 0 24 24" class="pill-play-icon">
+							<circle cx="12" cy="12" r="11"></circle>
+							<path d="M10 8.5v7l5.8-3.5z"></path>
+						</svg>
+					</span>
+				{:else}
+					<span class="pill-spacer" aria-hidden="true"></span>
+				{/if}
 				<span class="pill-copy">
 					<span class="pill-title">
 						{openingUnreadSummary
@@ -1488,8 +1492,21 @@
 	}
 
 	.unread-summary-pill:disabled {
+		cursor: default;
+	}
+
+	.unread-summary-pill:disabled:not(.is-passive) {
 		opacity: 0.8;
 		cursor: wait;
+	}
+
+	.unread-summary-pill.is-passive {
+		box-shadow: 0 12px 28px rgba(11, 11, 24, 0.18);
+	}
+
+	.unread-summary-pill.is-passive .pill-title,
+	.unread-summary-pill.is-passive .pill-duration {
+		opacity: 0.92;
 	}
 
 	.unread-summary-pill .pill-icon {
