@@ -2,6 +2,25 @@
 
 ---
 
+## v0.30.5 (2026-04-15) - Pastille des non lus clarifiée
+
+### 🐛 Corrections
+
+#### Accueil
+- **États verrouillés explicites** : quand toutes les capsules non lues sont verrouillées, la pastille affiche désormais `N capsule(s) pour [heure de mise à dispo]`
+- **Picto cohérent** : le bouton play est remplacé par un cadenas SVG quand aucune capsule non lue n'est encore disponible
+- **Cas mixte corrigé** : si certaines capsules non lues sont disponibles et d'autres encore verrouillées, la pastille n'affiche plus que le nombre et la durée des capsules réellement écoutables
+- **Forme stabilisée** : la géométrie de la pastille reste identique avec ou sans icône à gauche
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.30.5`
+
+---
+
 ## v0.30.4 (2026-04-15) - Rendu SSR de l'accueil corrigé
 
 ### 🐛 Corrections

@@ -98,6 +98,7 @@
 	let selectedDayRecordings = $state<DayRecordings | null>(null);
 	let unreadPlaylistModal = $state<UnreadPlaylistModal | null>(null);
 	let unreadPlaylistSession = $state<UnreadPlaylistModal | null>(null);
+	let unreadPlaylistResolved = $state(false);
 	let loadingDay = $state(false);
 	let calendarMonths = $state<CalendarMonth[] | null>(null);
 	let todayDay = $state<DayRecordings | null>(initialHomeState.initialTodayDay);
@@ -186,6 +187,42 @@
 	});
 
 	let canPlayUnreadSummary = $derived((unreadPlaylistSession?.count ?? 0) > 0);
+
+	let unreadSummaryPresentation = $derived.by(() => {
+		const totalCount = unreadStats.count;
+		const totalSeconds = unreadStats.totalSeconds;
+		const playableCount = unreadPlaylistSession?.count ?? 0;
+		const playableSeconds = unreadPlaylistSession?.totalSeconds ?? 0;
+		const hasResolvedPlayableState = unreadPlaylistResolved || totalCount === 0;
+		const hasPlayableUnread = playableCount > 0;
+		const hasOnlyLockedUnread = hasResolvedPlayableState && totalCount > 0 && playableCount === 0;
+		const hasMixedUnread = hasResolvedPlayableState && playableCount > 0 && playableCount < totalCount;
+
+		if (hasOnlyLockedUnread) {
+			return {
+				title: `${totalCount} capsule${totalCount !== 1 ? 's' : ''} pour ${data.threshold}`,
+				duration: formatDurationLabel(totalSeconds),
+				showPlayIcon: false,
+				showLockIcon: true
+			};
+		}
+
+		if (hasMixedUnread) {
+			return {
+				title: `${playableCount} capsule${playableCount !== 1 ? 's' : ''} non lue${playableCount !== 1 ? 's' : ''}`,
+				duration: formatDurationLabel(playableSeconds),
+				showPlayIcon: true,
+				showLockIcon: false
+			};
+		}
+
+		return {
+			title: `${totalCount} capsule${totalCount !== 1 ? 's' : ''} non lue${totalCount !== 1 ? 's' : ''}`,
+			duration: formatDurationLabel(totalSeconds),
+			showPlayIcon: hasPlayableUnread,
+			showLockIcon: hasOnlyLockedUnread
+		};
+	});
 
 	// Subscribe to player store outside of $effect to avoid infinite loops
 	playerStore.subscribe(state => {
@@ -328,6 +365,7 @@
 	onMount(() => {
 		calendarMonths = generateCalendarMonths(3);
 		invalidateAll();
+		unreadPlaylistResolved = data.unreadStats?.count ? false : true;
 		if (data.unreadStats?.count) {
 			void syncUnreadPlaylistSession();
 		}
@@ -390,7 +428,10 @@
 		allDays;
 		listenedRecordings;
 
-		if (!data.user || !data.unreadStats?.count) return;
+		if (!data.user || !data.unreadStats?.count) {
+			unreadPlaylistResolved = true;
+			return;
+		}
 		if (player.currentDay === '__unread_playlist__') return;
 
 		void syncUnreadPlaylistSession();
@@ -506,10 +547,12 @@
 	async function syncUnreadPlaylistSession() {
 		if (syncingUnreadPlaylist) return;
 		syncingUnreadPlaylist = true;
+		unreadPlaylistResolved = false;
 		try {
 			unreadPlaylistSession = await buildUnreadPlaylistSession();
 		} finally {
 			syncingUnreadPlaylist = false;
+			unreadPlaylistResolved = true;
 		}
 	}
 
@@ -951,25 +994,24 @@
 				onclick={openUnreadPlaylist}
 				disabled={openingUnreadSummary || !canPlayUnreadSummary}
 			>
-				{#if canPlayUnreadSummary}
-					<span class="pill-icon" aria-hidden="true">
+				<span class="pill-leading-slot" aria-hidden="true">
+					{#if unreadSummaryPresentation.showPlayIcon}
 						<svg viewBox="0 0 24 24" class="pill-play-icon">
 							<circle cx="12" cy="12" r="11"></circle>
 							<path d="M10 8.5v7l5.8-3.5z"></path>
 						</svg>
-					</span>
-				{:else}
-					<span class="pill-spacer" aria-hidden="true"></span>
-				{/if}
-				<span class="pill-copy">
-					<span class="pill-title">
-						{openingUnreadSummary
-							? 'Ouverture...'
-							: `${unreadStats.count} capsule${unreadStats.count !== 1 ? 's' : ''} non lue${unreadStats.count !== 1 ? 's' : ''}`}
-					</span>
-					<span class="pill-duration">{formatDurationLabel(unreadStats.totalSeconds)}</span>
+					{:else if unreadSummaryPresentation.showLockIcon}
+						<svg viewBox="0 0 24 24" class="pill-lock-icon">
+							<rect x="6.25" y="10.25" width="11.5" height="9" rx="2.4"></rect>
+							<path d="M8.75 10.25V8.1a3.25 3.25 0 0 1 6.5 0v2.15"></path>
+						</svg>
+					{/if}
 				</span>
-				<span class="pill-spacer" aria-hidden="true"></span>
+				<span class="pill-copy">
+					<span class="pill-title">{openingUnreadSummary ? 'Ouverture...' : unreadSummaryPresentation.title}</span>
+					<span class="pill-duration">{unreadSummaryPresentation.duration}</span>
+				</span>
+				<span class="pill-trailing-slot" aria-hidden="true"></span>
 			</button>
 		{/if}
 		<button class="team-button" onclick={() => showTeam = true}>
@@ -1525,18 +1567,33 @@
 		opacity: 0.92;
 	}
 
-	.unread-summary-pill .pill-icon {
-		grid-column: 1;
+	.unread-summary-pill .pill-leading-slot,
+	.unread-summary-pill .pill-trailing-slot {
 		width: 34px;
 		height: 34px;
 		display: flex;
 		align-items: center;
+	}
+
+	.unread-summary-pill .pill-leading-slot {
+		grid-column: 1;
 		justify-content: center;
 		filter: drop-shadow(0 6px 14px rgba(11, 11, 24, 0.28));
 		justify-self: start;
 	}
 
+	.unread-summary-pill .pill-trailing-slot {
+		grid-column: 3;
+		justify-self: end;
+	}
+
 	.unread-summary-pill .pill-play-icon {
+		width: 100%;
+		height: 100%;
+		display: block;
+	}
+
+	.unread-summary-pill .pill-lock-icon {
 		width: 100%;
 		height: 100%;
 		display: block;
@@ -1552,6 +1609,15 @@
 		fill: #fff4f6;
 	}
 
+	.unread-summary-pill .pill-lock-icon rect,
+	.unread-summary-pill .pill-lock-icon path {
+		fill: none;
+		stroke: #fff4f6;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-width: 1.7;
+	}
+
 	.unread-summary-pill .pill-copy {
 		grid-column: 2;
 		display: flex;
@@ -1561,13 +1627,6 @@
 		width: 100%;
 		padding: 0;
 		min-width: 0;
-	}
-
-	.unread-summary-pill .pill-spacer {
-		grid-column: 3;
-		width: 34px;
-		height: 34px;
-		justify-self: end;
 	}
 
 	.unread-summary-pill .pill-title {
