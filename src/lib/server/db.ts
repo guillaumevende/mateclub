@@ -546,7 +546,7 @@ export function getAllUsers(): UserWithCount[] {
 	
 	const stmt = db.prepare(`
 		SELECT 
-			u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login,
+			u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled,
 			COALESCE((
 				SELECT COUNT(*) 
 				FROM recordings r 
@@ -659,6 +659,11 @@ export function toggleSuperPowers(userId: number, enabled: boolean): void {
 
 export function toggleLogsEnabled(userId: number, enabled: boolean): void {
 	const stmt = db.prepare('UPDATE users SET logs_enabled = ? WHERE id = ?');
+	stmt.run(enabled ? 1 : 0, userId);
+}
+
+export function setUserAdmin(userId: number, enabled: boolean): void {
+	const stmt = db.prepare('UPDATE users SET is_admin = ? WHERE id = ?');
 	stmt.run(enabled ? 1 : 0, userId);
 }
 
@@ -1049,7 +1054,7 @@ export function isPseudoAvailableForRegistration(pseudo: string): boolean {
 	return !userExists && !pendingExists;
 }
 
-export function approveRegistration(id: number): User {
+export function approveRegistration(id: number, isAdmin: boolean = false): User {
 	// Récupère la demande
 	const getStmt = db.prepare('SELECT * FROM pending_registrations WHERE id = ? AND status = ?');
 	const registration = getStmt.get(id, 'pending') as PendingRegistration | undefined;
@@ -1061,14 +1066,15 @@ export function approveRegistration(id: number): User {
 	// Crée l'utilisateur avec le même hash de mot de passe
 	const insertUserStmt = db.prepare(`
 		INSERT INTO users (pseudo, password_hash, avatar, timezone, is_admin, super_powers)
-		VALUES (?, ?, ?, ?, 0, 0)
+		VALUES (?, ?, ?, ?, ?, 0)
 		RETURNING id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, logs_enabled, jingles_enabled
 	`);
 	const user = insertUserStmt.get(
 		registration.pseudo, 
 		registration.password_hash, 
 		registration.avatar, 
-		registration.timezone
+		registration.timezone,
+		isAdmin ? 1 : 0
 	) as User;
 	
 	// Met à jour le statut de la demande

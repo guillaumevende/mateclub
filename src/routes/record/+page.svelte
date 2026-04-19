@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { playerStore, getAudioElement, updateMediaSessionMetadata, closePlayer, type Recording, type DayRecordings } from '$lib/stores/player';
+	import { get } from 'svelte/store';
+	import { playerStore, getAudioElement, updateMediaSessionMetadata, closePlayer, debugLogs, logsEnabled, type Recording, type DayRecordings } from '$lib/stores/player';
 	import ImageViewer from '$lib/components/ImageViewer.svelte';
 	import ImageUpload from '$lib/components/ImageUpload.svelte';
 	import { scrollLock } from '$lib/actions/scrollLock';
@@ -133,6 +134,7 @@
 	}
 
 	function handleVisibilityChange() {
+		logMic(`Visibility -> ${document.visibilityState}`);
 		if (document.visibilityState === 'visible' && isRecording && wakeLockSupported) {
 			acquireWakeLock();
 		}
@@ -145,9 +147,43 @@
 		return isSafari || isIOS;
 	}
 
+	function logMic(message: string) {
+		if (!get(logsEnabled)) return;
+
+		const timestamp = new Date().toLocaleTimeString();
+		debugLogs.update((logs) => [...logs, `[${timestamp}] 🎙️ ${message}`].slice(-30));
+	}
+
+	async function reportMicError(message: string, extra: Record<string, unknown> = {}) {
+		try {
+			await fetch('/api/debug', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					message,
+					context: {
+						url: window.location.href,
+						userAgent: navigator.userAgent,
+						timestamp: new Date().toISOString(),
+						standalone: window.matchMedia('(display-mode: standalone)').matches,
+						visibilityState: document.visibilityState,
+						micPermissionState,
+						...extra
+					}
+				})
+			});
+		} catch (err) {
+			debug.recording.error('Impossible de remonter le log micro', err);
+		}
+	}
+
 	async function checkMicPermission() {
+		const standalone = window.matchMedia('(display-mode: standalone)').matches;
+		logMic(`Vérification micro (standalone=${standalone ? 'oui' : 'non'}, secure=${window.isSecureContext ? 'oui' : 'non'})`);
+
 		if (!navigator.permissions || !navigator.permissions.query) {
 			micPermissionState = 'unknown';
+			logMic('Permissions API indisponible');
 			return;
 		}
 		
@@ -155,24 +191,33 @@
 			const result = await navigator.permissions.query({ name: 'microphone' as PermissionName });
 			micPermissionState = result.state;
 			showMicPrompt = result.state === 'prompt';
+			logMic(`Permissions API -> ${result.state}`);
 			
 			result.addEventListener('change', () => {
 				micPermissionState = result.state;
 				showMicPrompt = result.state === 'prompt';
+				logMic(`Permission micro modifiée -> ${result.state}`);
 			});
-		} catch {
+		} catch (err) {
 			micPermissionState = 'unknown';
+			logMic(`Erreur Permissions API: ${err instanceof Error ? err.name : 'unknown'}`);
 		}
 	}
 
 	async function requestMicAccess() {
 		try {
+			logMic('Demande explicite d’accès micro');
 			await navigator.mediaDevices.getUserMedia({ audio: true });
 			micPermissionState = 'granted';
 			showMicPrompt = false;
+			logMic('Accès micro accordé');
 		} catch (err) {
 			console.error('Mic access denied:', err);
 			micPermissionState = 'denied';
+			const errorName = err instanceof Error ? err.name : 'UnknownError';
+			const errorMessage = err instanceof Error ? err.message : String(err);
+			logMic(`Accès micro refusé (${errorName})`);
+			await reportMicError('Mic access denied', { errorName, errorMessage });
 		}
 	}
 
@@ -356,7 +401,9 @@
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 		
 		try {
+			logMic(`Début enregistrement (permission=${micPermissionState}, visibility=${document.visibilityState})`);
 			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+			logMic('getUserMedia OK pour démarrer l’enregistrement');
 			
 			let mimeType = 'audio/mp4';
 			if (!MediaRecorder.isTypeSupported(mimeType)) {
@@ -431,6 +478,10 @@
 			};
 		} catch (e) {
 			error = 'Impossible d\'accéder au micro';
+			const errorName = e instanceof Error ? e.name : 'UnknownError';
+			const errorMessage = e instanceof Error ? e.message : String(e);
+			logMic(`Échec démarrage enregistrement (${errorName})`);
+			await reportMicError('Recording start failed', { errorName, errorMessage });
 		}
 	}
 
