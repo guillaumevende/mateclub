@@ -45,8 +45,6 @@
 	let pseudo = $state('');
 	let password = $state('');
 
-	let adminCount = $derived(data.users.filter(u => u.is_admin).length);
-	
 	// Modal de confirmation de suppression
 	let showDeleteModal = $state(false);
 	let userToDelete: User | null = $state(null);
@@ -422,9 +420,9 @@
 		<h2>Utilisateurs</h2>
 		<div class="users">
 			{#each data.users as user}
-				{@const isLastAdmin = user.is_admin && adminCount === 1}
+				{@const isAdmin = user.is_admin === 1}
 				{@const isSelf = user.id === data.currentUser?.id}
-				{@const canDelete = !isLastAdmin && !isSelf}
+				{@const canDelete = !isAdmin && !isSelf}
 				{@const createdAt = user.created_at.includes('T') || user.created_at.includes('Z') ? new Date(user.created_at) : new Date(user.created_at.replace(' ', 'T') + 'Z')}
 				{@const lastLogin = user.last_login ? (user.last_login.includes('T') || user.last_login.includes('Z') ? new Date(user.last_login) : new Date(user.last_login.replace(' ', 'T') + 'Z')) : null}
 				<div class="user-card">
@@ -458,6 +456,33 @@
 					</div>
 					{/if}
 					<div class="user-row user-actions">
+						<form method="POST" action="?/toggleUserLogs" use:enhance={() => {
+							return async ({ result }) => {
+								if (result.type === 'success') {
+									window.location.reload();
+								}
+							};
+						}}>
+							<input type="hidden" name="csrf_token" value={data.csrfToken} />
+							<input type="hidden" name="user_id" value={user.id} />
+							<input type="hidden" name="enabled" value={user.logs_enabled === 1 ? 'false' : 'true'} />
+							<button type="submit" class="user-action-btn">
+								{user.logs_enabled === 1 ? '🪵 Désactiver logs' : '🪵 Activer logs'}
+							</button>
+						</form>
+						{#if !isAdmin}
+							<form method="POST" action="?/promoteToAdmin" use:enhance={() => {
+								return async ({ result }) => {
+									if (result.type === 'success') {
+										window.location.reload();
+									}
+								};
+							}}>
+								<input type="hidden" name="csrf_token" value={data.csrfToken} />
+								<input type="hidden" name="user_id" value={user.id} />
+								<button type="submit" class="user-action-btn user-action-btn--admin">👑 Rendre admin</button>
+							</form>
+						{/if}
 						<form method="POST" action="?/delete" style="display: none" data-user-id={user.id}>
 							<input type="hidden" name="csrf_token" value={data.csrfToken} />
 							<input type="hidden" name="user_id" value={user.id} />
@@ -467,7 +492,7 @@
 							class="delete"
 							class:disabled={!canDelete}
 							disabled={!canDelete}
-							title={isSelf ? 'Vous ne pouvez pas vous supprimer vous-même' : (isLastAdmin ? 'Impossible de supprimer le dernier admin' : '')}
+							title={isSelf ? 'Vous ne pouvez pas vous supprimer vous-même' : (isAdmin ? 'Impossible de supprimer un administrateur pour le moment' : '')}
 							onclick={() => canDelete && openDeleteModal(user)}
 						>
 							🗑️ Supprimer
@@ -606,7 +631,31 @@
 
 	.user-actions {
 		justify-content: flex-end;
+		flex-wrap: wrap;
+		gap: 0.5rem;
 		margin-top: 0.5rem;
+	}
+
+	.user-actions form {
+		margin: 0;
+	}
+
+	.user-action-btn {
+		background: #2f4b7c;
+		padding: 0.5rem 0.85rem;
+		font-size: 0.8rem;
+	}
+
+	.user-action-btn:hover {
+		background: #3a5b94;
+	}
+
+	.user-action-btn--admin {
+		background: #5b3cc4;
+	}
+
+	.user-action-btn--admin:hover {
+		background: #6948dc;
 	}
 
 	button[type="submit"]:disabled {
