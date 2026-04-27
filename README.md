@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.30.5-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.32.0-blue?style=for-the-badge)
 
 </div>
 
@@ -73,6 +73,12 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 
 ### Audio & Lecture
 - **Enregistrement audio** - Durée max 3 minutes avec compression WebM
+- **Pause / reprise** - Une capsule peut être mise en pause puis reprise avant validation finale
+- **Brouillons locaux** - Chaque capsule terminée est conservée localement pour pouvoir en enregistrer plusieurs avant l’envoi
+- **Rail de brouillons** - Les capsules prêtes à envoyer sont pilotées depuis un rail horizontal compact avec une capsule active détaillée
+- **Envoi groupé** - Une ou plusieurs capsules peuvent être envoyées d’un coup avec photo et URL propres à chacune
+- **Progression d’upload** - Une barre indique l’avancement de l’envoi en cours, capsule par capsule
+- **Alertes de fin d’enregistrement** - Un son et un retour haptique préviennent à 15, 10 et 5 secondes de la fin
 - **Visualiseur rééquilibré** - Waveform d'enregistrement plus doux, plus bas et mieux réparti sur la voix
 - **Compatibilité Safari renforcée** - Les capsules Android WebM/OGG sont converties côté serveur en AAC/M4A si nécessaire pour rester lisibles dans Safari
 - **Screen Wake Lock** - Anti-veille pendant l'enregistrement (empêche le smartphone de se verrouiller)
@@ -95,6 +101,7 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 ### Interface & UX
 - **Authentification** - Login par pseudo/mot de passe (pas d'email requis)
 - **PWA installable** - Installation sur mobile via manifest
+- **Tuto PWA désactivable** - Chaque utilisateur peut masquer les popups d’installation PWA depuis ses réglages
 - **Pull-to-refresh** - Rechargement de la page d'accueil (désactivé sur modales)
 - **Scroll lock** - Empêche le scroll arrière-plan quand une modale est ouverte
 - **Navigation tactile** - Swipe horizontal pour changer de capsule
@@ -102,7 +109,8 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 - **Pastille "À écouter"** - Le résumé des capsules non lues ouvre une modale dédiée et lance immédiatement la lecture continue des capsules non lues
 - **Cartouches plus lisibles** - Avatar, pseudo, horaire, durée et badge `nouveau` sont réorganisés pour mieux distinguer lu / non lu
 - **Confirmation de suppression** - Modal avec countdown avant suppression
-- **UI de succès** - Choix de rester sur la page ou retourner à l'accueil après envoi
+- **Brouillons restaurés** - Les capsules locales réapparaissent automatiquement si l’envoi a échoué ou a été interrompu
+- **Fermetures uniformisées** - Les boutons de fermeture ronds utilisent désormais le même composant visuel
 - **Durées plus naturelles** - Le mini-player et la pastille des non lus affichent des libellés `N secondes` / `N minutes et S secondes` / `N heures et M minutes`
 - **Logs de debug** - Envoi automatique des erreurs côté client vers le serveur
 
@@ -131,11 +139,13 @@ L'application gère automatiquement les conversions de fuseaux horaires pour gar
 - Si Bob change son seuil à 11h, la capsule passe dans le groupe "hier" (car 2h30 < 11h)
 
 ### Panel Admin
-- **Gestion des utilisateurs** - Liste, création, suppression
+- **Gestion des utilisateurs** - Liste, création, suppression des non-admins
 - **Modification des seuils** - Heure de mise à disposition par utilisateur
 - **Super pouvoirs** - Attribution de privileges de lecture anticipée
-- **Logs de debug** - Activation des logs audio pour diagnostic
+- **Promotion admin** - Un membre existant peut être promu administrateur
+- **Logs de debug** - Activation des logs audio / micro pour diagnostic, y compris pour un autre utilisateur
 - **Jingle d'intro** - Activation/désactivation du jingle musical
+- **Validation mobile clarifiée** - Les inscriptions en attente sont plus lisibles sur smartphone avec actions `Valider` / `Refuser` et la case `Admin` est respectée
 
 ### Sécurité & Technique
 - **Headers de sécurité** - CSP, HSTS, X-Content-Type-Options, COOP, CORP
@@ -154,7 +164,7 @@ L'application gère automatiquement les conversions de fuseaux horaires pour gar
 - **Anti-cache** - Headers pour éviter le cache sur pages et API
 
 ### Tests
-- **Framework** : Vitest avec 63+ tests
+- **Framework** : Vitest avec 68+ tests
 - **Couverture** : Auth, DB, validation fichiers, path traversal
 - **Commande** : `npm test` pour exécuter tous les tests
 
@@ -581,8 +591,9 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 - Liste des utilisateurs avec compteurs
 - Création de nouveaux utilisateurs
 - Modification de l'heure de seuil quotidien
+- Promotion d'un utilisateur existant en admin
 - Attribution des super_powers
-- Activation des logs de debug audio
+- Activation des logs de debug audio / micro, y compris pour un autre utilisateur
 - Activation du jingle d'intro
 
 ## Librairies externes

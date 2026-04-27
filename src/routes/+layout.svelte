@@ -7,14 +7,33 @@
 	import { onMount, onDestroy } from 'svelte';
 	import '@khmyznikov/pwa-install';
 
-	let { children, data }: { children: Snippet, data: { user?: { avatar: string; is_admin: number; pseudo: string; logs_enabled?: number; jingles_enabled?: number } } } = $props();
+	let { children, data }: { children: Snippet, data: { user?: { avatar: string; is_admin: number; pseudo: string; logs_enabled?: number; jingles_enabled?: number; pwa_tutorial_enabled?: number } } } = $props();
 
 	let debugVisible = $state(false);
 	let logsEnabledValue = $state(false);
 
+	function updateViewportBottomOffset() {
+		if (typeof window === 'undefined') return;
+
+		const visualViewport = window.visualViewport;
+		const viewportHeight = visualViewport?.height ?? window.innerHeight;
+		const viewportOffsetTop = visualViewport?.offsetTop ?? 0;
+		const bottomOffset = Math.max(0, window.innerHeight - (viewportHeight + viewportOffsetTop));
+
+		document.documentElement.style.setProperty('--viewport-bottom-offset', `${bottomOffset}px`);
+	}
+
+	function refreshViewportBottomOffset() {
+		updateViewportBottomOffset();
+		window.requestAnimationFrame(() => updateViewportBottomOffset());
+		window.setTimeout(() => updateViewportBottomOffset(), 120);
+		window.setTimeout(() => updateViewportBottomOffset(), 420);
+	}
+
 	onMount(() => {
 		initPlayer();
 		initHaptics();
+		refreshViewportBottomOffset();
 		
 		// Initialize logsEnabled from user data
 		if (data.user?.logs_enabled === 1) {
@@ -47,11 +66,39 @@
 				pwaInstall.styles = { '--tint-color': '#e94560' };
 				
 				// Afficher le dialog si éligible
-				if (!pwaInstall.isUnderStandaloneMode && pwaInstall.isInstallAvailable) {
+				if (data.user?.pwa_tutorial_enabled !== 0 && !pwaInstall.isUnderStandaloneMode && pwaInstall.isInstallAvailable) {
 					pwaInstall.showDialog();
 				}
 			}
 		}, 5000);
+
+		const handleVisibilityChange = () => {
+			if (!document.hidden) {
+				refreshViewportBottomOffset();
+			}
+		};
+
+		const handleViewportChange = () => {
+			refreshViewportBottomOffset();
+		};
+
+		window.addEventListener('resize', handleViewportChange);
+		window.addEventListener('orientationchange', handleViewportChange);
+		window.addEventListener('focus', handleViewportChange);
+		window.addEventListener('pageshow', handleViewportChange);
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+		window.visualViewport?.addEventListener('resize', handleViewportChange);
+		window.visualViewport?.addEventListener('scroll', handleViewportChange);
+
+		return () => {
+			window.removeEventListener('resize', handleViewportChange);
+			window.removeEventListener('orientationchange', handleViewportChange);
+			window.removeEventListener('focus', handleViewportChange);
+			window.removeEventListener('pageshow', handleViewportChange);
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+			window.visualViewport?.removeEventListener('resize', handleViewportChange);
+			window.visualViewport?.removeEventListener('scroll', handleViewportChange);
+		};
 	});
 
 	function closeDebug() {
@@ -145,11 +192,13 @@
 	</div>
 </nav>
 
-<pwa-install
-	manifest-url="/manifest.json"
-	use-local-storage
-	install-description="Installez Maté Club sur votre écran d'accueil pour accéder rapidement à vos capsules audio"
-></pwa-install>
+{#if data.user?.pwa_tutorial_enabled !== 0}
+	<pwa-install
+		manifest-url="/manifest.json"
+		use-local-storage
+		install-description="Installez Maté Club sur votre écran d'accueil pour accéder rapidement à vos capsules audio"
+	></pwa-install>
+{/if}
 
 <main class:logged-in={!!data.user} class:with-player={showPlayer}>
 	{@render children()}
@@ -167,6 +216,11 @@
 		background: #1a1a2e;
 		color: #eee;
 		min-height: 100vh;
+	}
+
+	:global(html) {
+		scrollbar-gutter: stable;
+		--viewport-bottom-offset: 0px;
 	}
 
 	:global(input), :global(button), :global(select) {
@@ -209,7 +263,7 @@
 
 	nav {
 		position: fixed;
-		bottom: 0;
+		bottom: calc(var(--viewport-bottom-offset) + env(safe-area-inset-bottom, 0px));
 		left: 0;
 		right: 0;
 		background: #16213e;
@@ -218,6 +272,8 @@
 		justify-content: flex-end;
 		border-top: 1px solid #2a2a4e;
 		z-index: 1100;
+		transform: translateZ(0);
+		will-change: bottom;
 	}
 
 	nav.with-player {
@@ -235,8 +291,11 @@
 	}
 
 	.nav-items {
-		display: flex;
-		justify-content: space-around;
+		display: grid;
+		grid-auto-flow: column;
+		grid-auto-columns: minmax(0, 1fr);
+		align-items: stretch;
+		gap: 0.25rem;
 		padding: 0.5rem 0.25rem;
 	}
 
@@ -251,7 +310,8 @@
 		text-decoration: none;
 		padding: 1rem 0.75rem;
 		border-radius: 12px;
-		min-width: 70px;
+		width: 100%;
+		min-width: 0;
 		min-height: 60px;
 		transition: color 0.2s, background 0.2s;
 	}
@@ -272,7 +332,8 @@
 		text-decoration: none;
 		padding: 1rem 0.75rem;
 		border-radius: 12px;
-		min-width: 70px;
+		width: 100%;
+		min-width: 0;
 		min-height: 60px;
 		transition: color 0.2s, background 0.2s;
 		background: transparent;

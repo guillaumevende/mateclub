@@ -2,6 +2,87 @@
 
 ---
 
+## v0.32.0 (2026-04-27) - Réglages PWA, rail de brouillons et diagnostics iOS
+
+### ✨ Nouvelles fonctionnalités
+
+#### Réglages & PWA
+- **Tuto PWA désactivable** : chaque utilisateur peut désormais masquer individuellement les popups d’installation PWA depuis `Réglages`, puis les réactiver plus tard si besoin
+
+#### Enregistrement
+- **Rail latéral de brouillons** : l’interface d’enregistrement multi-capsules adopte un rail horizontal compact avec une capsule active détaillée
+- **Ajout direct** : la vignette `Ajouter` lance immédiatement un nouvel enregistrement sans scroll parasite
+- **Brouillons plus discrets** : les messages transitoires de restauration et d’ajout local ont été retirés pour alléger l’écran
+- **Avertissements de fin** : un son d’alerte est maintenant joué à 15, 10 et 5 secondes de la fin d’enregistrement
+- **Retours haptiques synchronisés** : ces mêmes seuils déclenchent désormais des vibrations progressives et plus marquées
+
+#### Admin & diagnostic
+- **Logs micro/audio pilotables** : les logs de diagnostic peuvent être activés ou désactivés pour un utilisateur donné depuis le panel admin
+
+### 🐛 Corrections
+
+#### Enregistrement & médias
+- **Prévisualisation image cohérente** : le visuel de la capsule active suit correctement la vignette sélectionnée
+- **Photo Android clarifiée** : l’ajout d’image propose explicitement `Prendre une photo` ou `Choisir une photo` sur Android, sans afficher ce double choix sur desktop
+- **Boutons harmonisés** : `Tout envoyer`, `Envoyer` et `Supprimer` utilisent maintenant un rendu plus cohérent avec le reste de l’app
+- **Bouton `Tout envoyer` recentré** : l’icône et le libellé ont été réalignés pour un centrage optique plus propre
+
+#### Accueil & lecture
+- **Pastille non lus stabilisée** : le résumé d’accueil ne clignote plus entre plusieurs états contradictoires pendant la lecture continue
+- **Dates seuil cohérentes** : un jour cliqué depuis l’accueil ou le calendrier retrouve maintenant correctement les capsules rattachées par seuil horaire
+
+#### Navigation & iOS
+- **Navigation basse stabilisée** : la barre d’onglets utilise désormais une répartition plus robuste
+- **Recollage iOS après overlay système** : un ajustement `visualViewport` recale la nav en bas après certains retours PWA iOS, notamment après Temps d’écran
+
+#### Réglages & setup
+- **Libellé mot de passe corrigé** : l’interface de setup affiche bien la contrainte réelle de 12 caractères
+- **Placement du réglage PWA** : l’option est maintenant intégrée dans le flux naturel des préférences, juste avant `Sauvegarder`
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.0`
+- README.md : ajout du réglage individuel du tuto PWA, du rail de brouillons et des alertes d’enregistrement
+
+---
+
+## v0.31.0 (2026-04-16) - Brouillons locaux multi-capsules
+
+### ✨ Nouvelles fonctionnalités
+
+#### Enregistrement
+- **Pause / reprise** : une capsule peut désormais être mise en pause puis reprise avant validation finale
+- **Brouillons locaux multiples** : chaque capsule terminée est sauvegardée localement sur l’appareil pour permettre d’en enregistrer plusieurs avant l’envoi
+- **Métadonnées par capsule** : chaque brouillon peut recevoir sa propre photo et sa propre URL avant publication
+- **Envoi unitaire ou groupé** : il est possible d’envoyer une capsule seule ou toute la file de brouillons d’un coup
+- **Restauration automatique** : les brouillons locaux sont restaurés à l’ouverture de la page d’enregistrement si un envoi précédent a échoué ou a été interrompu
+- **Progression d’upload** : une barre de progression indique l’état de l’envoi pour chaque capsule et pour l’envoi groupé
+
+### 🐛 Corrections
+
+#### Interface
+- **Croix mutualisées** : les boutons de fermeture utilisent maintenant un composant partagé avec croix SVG et géométrie ronde stable
+- **Aperçu image corrigé** : la fermeture de la photo associée à un enregistrement n’est plus déformée
+- **Admin mobile clarifié** : les cartes d’inscriptions en attente ont été simplifiées sur mobile avec actions plus lisibles et libellé `Refuser`
+- **Logs pilotables par admin** : un administrateur peut désormais activer les logs de diagnostic micro pour un autre utilisateur
+- **Validation admin fidèle** : la case `Admin` des inscriptions en attente est maintenant réellement prise en compte lors de la validation
+- **Promotion admin** : un membre existant peut être promu administrateur depuis le panel admin
+- **Suppression d’admin bloquée** : le flux admin empêche désormais la suppression d’un administrateur
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+- `npm run build`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.31.0`
+- README.md : description du nouveau flux de brouillons locaux et de l’envoi groupé
+
+---
+
 ## v0.30.5 (2026-04-15) - Pastille des non lus clarifiée
 
 ### 🐛 Corrections
