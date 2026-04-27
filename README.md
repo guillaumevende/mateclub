@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.30.5-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.30.6-blue?style=for-the-badge)
 
 </div>
 
@@ -131,10 +131,12 @@ L'application gère automatiquement les conversions de fuseaux horaires pour gar
 - Si Bob change son seuil à 11h, la capsule passe dans le groupe "hier" (car 2h30 < 11h)
 
 ### Panel Admin
-- **Gestion des utilisateurs** - Liste, création, suppression
+- **Gestion des utilisateurs** - Liste, création, suppression des comptes non-admin
+- **Promotion admin** - Un membre existant peut être promu administrateur depuis le panel
+- **Validation d'inscription** - La validation d'une demande peut réellement créer un admin si l'option est cochée
 - **Modification des seuils** - Heure de mise à disposition par utilisateur
 - **Super pouvoirs** - Attribution de privileges de lecture anticipée
-- **Logs de debug** - Activation des logs audio pour diagnostic
+- **Logs de debug** - Activation des logs audio et micro pour un utilisateur précis afin de diagnostiquer un problème
 - **Jingle d'intro** - Activation/désactivation du jingle musical
 
 ### Sécurité & Technique

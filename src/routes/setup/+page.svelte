@@ -31,7 +31,7 @@
 			<input 
 				type="password" 
 				name="password" 
-				placeholder="Mot de passe (min. 10 caractères)" 
+				placeholder="Mot de passe (min. 12 caractères)" 
 				required 
 				autocomplete="new-password"
 				minlength="10"

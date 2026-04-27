@@ -2,6 +2,36 @@
 
 ---
 
+## v0.30.6 (2026-04-27) - Diagnostic micro pilotable
+
+### ✨ Améliorations
+
+#### Administration
+- **Logs par utilisateur** : un admin peut désormais activer ou désactiver les logs de debug pour un utilisateur existant depuis le panel admin
+- **Promotion ciblée** : un utilisateur existant peut être promu admin depuis le panel admin
+- **Validation cohérente** : la case `Admin` des inscriptions en attente est maintenant réellement prise en compte au moment de la validation
+
+#### Enregistrement
+- **Diagnostic micro enrichi** : la page d'enregistrement trace désormais l'état des permissions micro, le mode standalone, la visibilité du document et les échecs `getUserMedia`
+- **Remontée d'erreurs micro** : les échecs d'accès au micro et de démarrage d'enregistrement sont envoyés au backend de debug avec davantage de contexte
+
+### 🐛 Corrections
+
+#### Interface
+- **Bouton logs admin** : le changement d'état `Activer logs` / `Désactiver logs` reflète maintenant correctement la valeur enregistrée
+- **Suppression d'admin verrouillée** : le flux admin refuse explicitement la suppression d'un administrateur
+- **Setup cohérent** : le placeholder du mot de passe indique maintenant bien `12 caractères`
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.30.6`
+- README.md : section admin complétée avec les logs par utilisateur et le diagnostic micro
+
+---
+
 ## v0.30.5 (2026-04-15) - Pastille des non lus clarifiée
 
 ### 🐛 Corrections

@@ -14,7 +14,8 @@ import {
 	approveRegistration,
 	rejectRegistration,
 	isRegistrationAllowed,
-	setAppConfig
+	setAppConfig,
+	setUserAdmin
 } from '$lib/server/db';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -71,6 +72,15 @@ export const actions: Actions = {
 		const userId = data.get('user_id')?.toString();
 
 		if (userId) {
+			const targetUser = getUserById(parseInt(userId, 10));
+			if (!targetUser) {
+				return fail(404, { error: 'Utilisateur introuvable' });
+			}
+
+			if (targetUser.is_admin) {
+				return fail(400, { error: 'Impossible de supprimer un administrateur' });
+			}
+
 			deleteUser(parseInt(userId, 10));
 		}
 		return { success: true };
@@ -111,6 +121,23 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
+	toggleUserLogs: async ({ request, locals }) => {
+		if (!locals.user?.is_admin) {
+			return fail(403, { error: 'Non autorisé' });
+		}
+
+		const data = await request.formData();
+		const userId = data.get('user_id')?.toString();
+		const enabled = data.get('enabled') === 'true';
+
+		if (!userId) {
+			return fail(400, { error: 'Utilisateur manquant' });
+		}
+
+		toggleLogsEnabled(parseInt(userId, 10), enabled);
+		return { success: true };
+	},
+
 		toggleJingles: async ({ request, locals }) => {
 		const data = await request.formData();
 		const enabled = data.get('enabled') === 'true';
@@ -128,16 +155,41 @@ export const actions: Actions = {
 		
 		const data = await request.formData();
 		const registrationId = data.get('registration_id')?.toString();
+		const isAdmin = data.get('is_admin') === 'on';
 
 		if (registrationId) {
 			try {
-				const user = approveRegistration(parseInt(registrationId, 10));
+				const user = approveRegistration(parseInt(registrationId, 10), isAdmin);
 				return { success: true, message: `Utilisateur "${user.pseudo}" validé avec succès` };
 			} catch (e) {
 				return fail(400, { error: 'Erreur lors de la validation' });
 			}
 		}
 		return { success: false };
+	},
+
+	promoteToAdmin: async ({ request, locals }) => {
+		if (!locals.user?.is_admin) {
+			return fail(403, { error: 'Non autorisé' });
+		}
+
+		const data = await request.formData();
+		const userId = data.get('user_id')?.toString();
+
+		if (!userId) {
+			return fail(400, { error: 'Utilisateur manquant' });
+		}
+
+		const targetUser = getUserById(parseInt(userId, 10));
+		if (!targetUser) {
+			return fail(404, { error: 'Utilisateur introuvable' });
+		}
+
+		if (!targetUser.is_admin) {
+			setUserAdmin(targetUser.id, true);
+		}
+
+		return { success: true };
 	},
 
 	rejectRegistration: async ({ request, locals }) => {
