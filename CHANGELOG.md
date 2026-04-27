@@ -2,6 +2,26 @@
 
 ---
 
+## v0.32.1 (2026-04-27) - Pastille d’accueil plus compacte
+
+### 🐛 Corrections
+
+#### Accueil
+- **Durée raccourcie dans la pastille non lus** : les durées de la capsule d’accueil utilisent maintenant un format compact (`20 min 28 s`, `1 h 05 min`) pour éviter les retours à la ligne trop longs
+- **Pastille limitée à deux lignes** : le résumé `capsules + durée` reste visuellement plus stable et n’étire plus la pastille sur trois lignes avec les longues durées
+
+#### Enregistrement
+- **Sons de test iOS/PWA inclus dans la release** : `start.mp3` est joué au démarrage réel d’un enregistrement et `achievement.mp3` est préchargé/amorcé dès le clic sur `Enregistrer`
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.1`
+
+---
+
 ## v0.32.0 (2026-04-27) - Réglages PWA, rail de brouillons et diagnostics iOS
 
 ### ✨ Nouvelles fonctionnalités

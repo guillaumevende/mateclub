@@ -204,7 +204,7 @@
 		if (hasOnlyLockedUnread) {
 			return {
 				title: `${totalCount} capsule${totalCount !== 1 ? 's' : ''} pour ${data.threshold}`,
-				duration: formatDurationLabel(totalSeconds),
+				duration: formatCompactDurationLabel(totalSeconds),
 				showPlayIcon: false,
 				showLockIcon: true
 			};
@@ -213,7 +213,7 @@
 		if (hasMixedUnread) {
 			return {
 				title: `${playableCount} capsule${playableCount !== 1 ? 's' : ''} non lue${playableCount !== 1 ? 's' : ''}`,
-				duration: formatDurationLabel(playableSeconds),
+				duration: formatCompactDurationLabel(playableSeconds),
 				showPlayIcon: true,
 				showLockIcon: false
 			};
@@ -221,7 +221,7 @@
 
 		return {
 			title: `${totalCount} capsule${totalCount !== 1 ? 's' : ''} non lue${totalCount !== 1 ? 's' : ''}`,
-			duration: formatDurationLabel(totalSeconds),
+			duration: formatCompactDurationLabel(totalSeconds),
 			showPlayIcon: hasPlayableUnread,
 			showLockIcon: hasOnlyLockedUnread
 		};
@@ -896,6 +896,30 @@
 		}
 
 		return `${mins} minute${mins > 1 ? 's' : ''} et ${secs} seconde${secs > 1 ? 's' : ''}`;
+	}
+
+	function formatCompactDurationLabel(totalSeconds: number): string {
+		const hours = Math.floor(totalSeconds / 3600);
+		const mins = Math.floor((totalSeconds % 3600) / 60);
+		const secs = totalSeconds % 60;
+
+		if (hours > 0) {
+			if (mins === 0) {
+				return `${hours} h`;
+			}
+
+			return `${hours} h ${mins} min`;
+		}
+
+		if (mins === 0) {
+			return `${secs} s`;
+		}
+
+		if (secs === 0) {
+			return `${mins} min`;
+		}
+
+		return `${mins} min ${secs} s`;
 	}
 
 	function formatDate(dateStr: string): string {
@@ -1621,12 +1645,17 @@
 		font-size: 0.98rem;
 		font-weight: 700;
 		color: #ffffff;
+		max-width: 100%;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.unread-summary-pill .pill-duration {
 		font-size: 0.82rem;
 		font-weight: 500;
 		color: #ffd7df;
+		white-space: nowrap;
 	}
 
 	.date {
