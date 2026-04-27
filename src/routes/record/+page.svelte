@@ -106,6 +106,7 @@
 	// Recording stop flag to prevent recursive calls
 	let isStopping = false;
 	let warningAudio: HTMLAudioElement | null = null;
+	let startAudio: HTMLAudioElement | null = null;
 	let playedRecordingWarnings = new Set<number>();
 
 	// Audio visualizer state
@@ -603,7 +604,6 @@
 
 		playedRecordingWarnings.add(warningOffset);
 		playRecordingWarningSound();
-		playRecordingWarningHaptic(warningOffset);
 	}
 
 	function playRecordingWarningSound() {
@@ -618,25 +618,57 @@
 		});
 	}
 
-	function playRecordingWarningHaptic(warningOffset: (typeof RECORDING_WARNING_OFFSETS)[number]) {
-		if (warningOffset === 5) {
-			triggerHaptic('success');
-			window.setTimeout(() => triggerHaptic('success'), 120);
-			window.setTimeout(() => triggerHaptic('nudge'), 240);
-			return;
+	function ensureWarningAudio() {
+		if (!warningAudio) {
+			warningAudio = new window.Audio('/achievement.mp3');
+			warningAudio.preload = 'auto';
 		}
 
-		if (warningOffset === 10) {
-			triggerHaptic('success');
-			window.setTimeout(() => triggerHaptic('nudge'), 140);
-			return;
+		return warningAudio;
+	}
+
+	function ensureStartAudio() {
+		if (!startAudio) {
+			startAudio = new window.Audio('/start.mp3');
+			startAudio.preload = 'auto';
 		}
 
-		triggerHaptic('success');
+		return startAudio;
+	}
+
+	async function primeRecordingCueAudio() {
+		const warning = ensureWarningAudio();
+		warning.load();
+
+		const start = ensureStartAudio();
+		start.load();
+
+		try {
+			warning.muted = true;
+			warning.currentTime = 0;
+			await warning.play();
+			warning.pause();
+			warning.currentTime = 0;
+			warning.muted = false;
+			debug.recording.log('Achievement audio primed');
+		} catch (err) {
+			warning.muted = false;
+			debug.recording.error('Impossible de pré-activer le son d’avertissement:', err);
+		}
+	}
+
+	function playRecordingStartSound() {
+		const start = ensureStartAudio();
+		start.currentTime = 0;
+
+		void start.play().catch((err) => {
+			debug.recording.error('Impossible de jouer le son de démarrage:', err);
+		});
 	}
 
 	async function startRecording() {
 		triggerHaptic('success');
+		await primeRecordingCueAudio();
 		
 		// Fermer le player s'il est ouvert
 		closePlayer();
@@ -668,6 +700,7 @@
 
 			mediaRecorder.onstart = () => {
 				debug.recording.log('MediaRecorder démarré');
+				playRecordingStartSound();
 			};
 
 			mediaRecorder.start(1000);
