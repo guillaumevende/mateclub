@@ -12,27 +12,15 @@
 	let debugVisible = $state(false);
 	let logsEnabledValue = $state(false);
 
-	function isEditableElement(element: HTMLElement | null): boolean {
-		return !!element && (
-			element.tagName === 'INPUT' ||
-			element.tagName === 'TEXTAREA' ||
-			element.isContentEditable
-		);
-	}
-
 	function updateViewportBottomOffset() {
 		if (typeof window === 'undefined') return;
 
 		const visualViewport = window.visualViewport;
 		const viewportHeight = visualViewport?.height ?? window.innerHeight;
 		const viewportOffsetTop = visualViewport?.offsetTop ?? 0;
-		const activeElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-		const scrollTop = Math.max(window.scrollY, document.documentElement.scrollTop, document.body.scrollTop);
-		const isPullToRefreshBounce = !isEditableElement(activeElement) && scrollTop <= 0 && viewportOffsetTop > 0;
 		const rawBottomOffset = Math.max(0, window.innerHeight - (viewportHeight + viewportOffsetTop));
-		const bottomOffset = isPullToRefreshBounce ? 0 : rawBottomOffset;
 
-		document.documentElement.style.setProperty('--viewport-bottom-offset', `${bottomOffset}px`);
+		document.documentElement.style.setProperty('--viewport-bottom-offset', `${rawBottomOffset}px`);
 	}
 
 	function refreshViewportBottomOffset() {
@@ -100,7 +88,6 @@
 		window.addEventListener('pageshow', handleViewportChange);
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 		window.visualViewport?.addEventListener('resize', handleViewportChange);
-		window.visualViewport?.addEventListener('scroll', handleViewportChange);
 
 		return () => {
 			window.removeEventListener('resize', handleViewportChange);
@@ -109,7 +96,6 @@
 			window.removeEventListener('pageshow', handleViewportChange);
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
 			window.visualViewport?.removeEventListener('resize', handleViewportChange);
-			window.visualViewport?.removeEventListener('scroll', handleViewportChange);
 		};
 	});
 
