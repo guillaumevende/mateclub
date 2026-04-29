@@ -49,6 +49,12 @@
 
 	const MAX_DURATION = 180;
 	const RECORDING_WARNING_OFFSETS = [15, 10, 5] as const;
+	type RecordingWarningOffset = typeof RECORDING_WARNING_OFFSETS[number];
+	const RECORDING_WARNING_SOUNDS: Record<RecordingWarningOffset, string> = {
+		15: '/achievement1.mp3',
+		10: '/achievement2.mp3',
+		5: '/achievement3.mp3'
+	};
 	const RECORDINGS_LIMIT = 5;
 	const VISUALIZER_BAR_COUNT = 8;
 	const VISUALIZER_MIN_HEIGHT = 12;
@@ -105,7 +111,7 @@
 
 	// Recording stop flag to prevent recursive calls
 	let isStopping = false;
-	let warningAudio: HTMLAudioElement | null = null;
+	let warningAudios: Partial<Record<RecordingWarningOffset, HTMLAudioElement>> = {};
 	let startAudio: HTMLAudioElement | null = null;
 	let playedRecordingWarnings = new Set<number>();
 
@@ -603,14 +609,11 @@
 		if (!warningOffset) return;
 
 		playedRecordingWarnings.add(warningOffset);
-		playRecordingWarningSound();
+		playRecordingWarningSound(warningOffset);
 	}
 
-	function playRecordingWarningSound() {
-		if (!warningAudio) {
-			warningAudio = new window.Audio('/achievement.mp3');
-			warningAudio.preload = 'auto';
-		}
+	function playRecordingWarningSound(offset: RecordingWarningOffset) {
+		const warningAudio = ensureWarningAudio(offset);
 
 		warningAudio.currentTime = 0;
 		void warningAudio.play().catch((err) => {
@@ -618,13 +621,13 @@
 		});
 	}
 
-	function ensureWarningAudio() {
-		if (!warningAudio) {
-			warningAudio = new window.Audio('/achievement.mp3');
-			warningAudio.preload = 'auto';
+	function ensureWarningAudio(offset: RecordingWarningOffset) {
+		if (!warningAudios[offset]) {
+			warningAudios[offset] = new window.Audio(RECORDING_WARNING_SOUNDS[offset]);
+			warningAudios[offset].preload = 'auto';
 		}
 
-		return warningAudio;
+		return warningAudios[offset];
 	}
 
 	function ensureStartAudio() {
@@ -637,24 +640,29 @@
 	}
 
 	async function primeRecordingCueAudio() {
-		const warning = ensureWarningAudio();
-		warning.load();
+		const warnings = RECORDING_WARNING_OFFSETS.map((offset) => ensureWarningAudio(offset));
+		for (const warning of warnings) {
+			warning.load();
+		}
 
 		const start = ensureStartAudio();
 		start.load();
 
-		try {
-			warning.muted = true;
-			warning.currentTime = 0;
-			await warning.play();
-			warning.pause();
-			warning.currentTime = 0;
-			warning.muted = false;
-			debug.recording.log('Achievement audio primed');
-		} catch (err) {
-			warning.muted = false;
-			debug.recording.error('Impossible de pré-activer le son d’avertissement:', err);
+		for (const warning of warnings) {
+			try {
+				warning.muted = true;
+				warning.currentTime = 0;
+				await warning.play();
+				warning.pause();
+				warning.currentTime = 0;
+				warning.muted = false;
+			} catch (err) {
+				warning.muted = false;
+				debug.recording.error('Impossible de pré-activer un son d’avertissement:', err);
+			}
 		}
+
+		debug.recording.log('Achievement audios primed');
 	}
 
 	function playRecordingStartSound() {

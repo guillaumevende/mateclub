@@ -13,7 +13,7 @@
 - **Modales d’écoute au-dessus du player** : les modales de lecture recouvrent maintenant toute la page et ne sont plus masquées par le player ou la navigation basse
 
 #### Enregistrement
-- **Sons de test iOS/PWA inclus dans la release** : `start.mp3` est joué au démarrage réel d’un enregistrement et `achievement.mp3` est préchargé/amorcé dès le clic sur `Enregistrer`
+- **Sons de test iOS/PWA inclus dans la release** : `start.mp3` est joué au démarrage réel d’un enregistrement et les alertes de fin utilisent désormais `achievement1.mp3`, `achievement2.mp3` puis `achievement3.mp3`
 
 ### 🧪 Tests
 - `npm run check`
