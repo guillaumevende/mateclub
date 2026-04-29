@@ -1499,8 +1499,8 @@
 		display: flex;
 		align-items: flex-start;
 		justify-content: center;
-		z-index: 1300;
-		padding: calc(5rem + env(safe-area-inset-top, 0px)) 1rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
+		z-index: 1050;
+		padding: calc(5rem + env(safe-area-inset-top, 0px)) 1rem calc(15rem + env(safe-area-inset-bottom, 0px));
 		overflow-y: auto;
 		overscroll-behavior: contain;
 		-webkit-overflow-scrolling: touch;
