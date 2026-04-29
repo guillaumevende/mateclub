@@ -1492,16 +1492,18 @@
 
 	.modal-overlay {
 		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background: rgba(0, 0, 0, 0.8);
+		inset: 0;
+		min-height: 100vh;
+		min-height: 100dvh;
+		background: rgba(0, 0, 0, 0.88);
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		justify-content: center;
-		z-index: 1000;
-		padding: 4rem 1rem 1rem;
+		z-index: 1300;
+		padding: calc(5rem + env(safe-area-inset-top, 0px)) 1rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		-webkit-overflow-scrolling: touch;
 	}
 
 	.modal {

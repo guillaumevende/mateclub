@@ -10,6 +10,7 @@
 - **Durée raccourcie dans la pastille non lus** : les durées de la capsule d’accueil utilisent maintenant un format compact (`20 min 28 s`, `1 h 05 min`) pour éviter les retours à la ligne trop longs
 - **Pastille limitée à deux lignes** : le résumé `capsules + durée` reste visuellement plus stable et n’étire plus la pastille sur trois lignes avec les longues durées
 - **Navigation stabilisée pendant le pull-to-refresh iOS** : la barre fixe du bas ne remonte plus verticalement pendant le geste d’actualisation
+- **Modales d’écoute au-dessus du player** : les modales de lecture recouvrent maintenant toute la page et ne sont plus masquées par le player ou la navigation basse
 
 #### Enregistrement
 - **Sons de test iOS/PWA inclus dans la release** : `start.mp3` est joué au démarrage réel d’un enregistrement et `achievement.mp3` est préchargé/amorcé dès le clic sur `Enregistrer`
