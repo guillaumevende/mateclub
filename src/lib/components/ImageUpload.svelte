@@ -1,20 +1,34 @@
 <script lang="ts">
 	import imageCompression from 'browser-image-compression';
+	import CloseIconButton from '$lib/components/CloseIconButton.svelte';
 	import { debug } from '$lib/debug';
 
 	interface Props {
 		onImageChange: (blob: Blob | null, preview: string | null) => void;
 		onWarning: (warning: string | null) => void;
+		initialPreview?: string | null;
 	}
 
-	let { onImageChange, onWarning }: Props = $props();
+	let {
+		onImageChange,
+		onWarning,
+		initialPreview = null
+	}: Props = $props();
 
-	let imageBlob = $state<Blob | null>(null);
-	let imagePreview = $state<string | null>(null);
+	let imagePreview = $state<string | null>(initialPreview);
 	let imageWarning = $state<string | null>(null);
 	let isCompressingImage = $state(false);
 	let compressionProgress = $state(0);
 	let isDragging = $state(false);
+	let photoInput = $state<HTMLInputElement | null>(null);
+	let galleryInput = $state<HTMLInputElement | null>(null);
+	const showAndroidCameraOptions = $derived.by(() => {
+		if (typeof navigator === 'undefined') {
+			return false;
+		}
+
+		return /Android/i.test(navigator.userAgent);
+	});
 
 	const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 
@@ -58,9 +72,8 @@
 		onWarning(null);
 		
 		if (isHeic) {
-			imageBlob = file;
 			imagePreview = URL.createObjectURL(file);
-			onImageChange(file, URL.createObjectURL(file));
+			onImageChange(file, imagePreview);
 			return;
 		}
 		
@@ -77,9 +90,8 @@
 				}
 			};
 			const compressedFile = await imageCompression(file, options);
-			imageBlob = compressedFile;
 			imagePreview = URL.createObjectURL(compressedFile);
-			onImageChange(compressedFile, URL.createObjectURL(compressedFile));
+			onImageChange(compressedFile, imagePreview);
 		} catch (err) {
 			debug.upload.error('Erreur compression:', err);
 			imageWarning = 'Erreur lors du traitement de l\'image';
@@ -91,10 +103,19 @@
 	}
 
 	function removeImage() {
-		imageBlob = null;
 		imagePreview = null;
 		imageWarning = null;
 		onImageChange(null, null);
+	}
+
+	function openPhotoCapture() {
+		if (isCompressingImage) return;
+		photoInput?.click();
+	}
+
+	function openPhotoLibrary() {
+		if (isCompressingImage) return;
+		galleryInput?.click();
 	}
 </script>
 
@@ -102,7 +123,12 @@
 	{#if imagePreview}
 		<div class="image-preview">
 			<img src={imagePreview} alt="Preview" />
-			<button class="remove-image" onclick={removeImage} aria-label="Supprimer l'image">✕</button>
+			<CloseIconButton
+				onclick={removeImage}
+				ariaLabel="Supprimer l'image"
+				size="sm"
+				extraClass="remove-image-btn"
+			/>
 		</div>
 	{:else}
 		{#if isCompressingImage}
@@ -113,14 +139,34 @@
 				<span class="progress-text">Compression... {compressionProgress}%</span>
 			</div>
 		{/if}
-		<label class="image-upload" class:disabled={isCompressingImage} class:dragging={isDragging}
+		<div
+			class="image-upload"
+			class:disabled={isCompressingImage}
+			class:dragging={isDragging}
+			role="group"
+			aria-label="Ajout d'une photo à la capsule"
 			ondragover={handleDragOver}
 			ondragleave={handleDragLeave}
 			ondrop={handleDrop}
 		>
-			<input type="file" accept="image/*" onchange={handleImageSelect} disabled={isCompressingImage} />
-			<span>📷 Ajouter une photo</span>
-		</label>
+			<input bind:this={galleryInput} type="file" accept="image/*" onchange={handleImageSelect} disabled={isCompressingImage} />
+			{#if showAndroidCameraOptions}
+				<input bind:this={photoInput} type="file" accept="image/*" capture="environment" onchange={handleImageSelect} disabled={isCompressingImage} />
+				<span class="image-upload-title">📷 Ajouter une photo</span>
+				<div class="image-upload-actions">
+					<button type="button" class="image-action-btn image-action-primary" onclick={openPhotoCapture} disabled={isCompressingImage}>
+						Prendre une photo
+					</button>
+					<button type="button" class="image-action-btn image-action-secondary" onclick={openPhotoLibrary} disabled={isCompressingImage}>
+						Choisir une photo
+					</button>
+				</div>
+			{:else}
+				<button type="button" class="image-action-btn image-action-primary image-action-single" onclick={openPhotoLibrary} disabled={isCompressingImage}>
+					📷 Ajouter une photo
+				</button>
+			{/if}
+		</div>
 	{/if}
 	
 	{#if imageWarning}
@@ -145,21 +191,10 @@
 		border-radius: 8px;
 	}
 
-	.remove-image {
+	:global(.remove-image-btn) {
 		position: absolute;
-		top: -10px;
-		right: -10px;
-		width: 28px;
-		height: 28px;
-		border-radius: 50%;
-		background: #ff6b6b;
-		color: white;
-		border: none;
-		cursor: pointer;
-		font-size: 1rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
+		top: -12px;
+		right: -12px;
 	}
 
 	.compression-progress {
@@ -219,9 +254,52 @@
 		display: none;
 	}
 
-	.image-upload span {
+	.image-upload-title {
 		font-size: 1rem;
 		color: #888;
+		margin-bottom: 1rem;
+	}
+
+	.image-upload-actions {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.75rem;
+		width: 100%;
+	}
+
+	.image-action-btn {
+		border: none;
+		border-radius: 999px;
+		padding: 0.8rem 1.2rem;
+		font-size: 0.95rem;
+		font-weight: 700;
+		cursor: pointer;
+		transition: transform 0.2s ease, opacity 0.2s ease, background 0.2s ease;
+	}
+
+	.image-action-btn:disabled {
+		opacity: 0.65;
+		cursor: not-allowed;
+	}
+
+	.image-action-primary {
+		background: #e94560;
+		color: white;
+	}
+
+	.image-action-single {
+		min-width: 220px;
+	}
+
+	.image-action-secondary {
+		background: rgba(255, 255, 255, 0.08);
+		color: #f4f4f8;
+		border: 1px solid rgba(255, 255, 255, 0.1);
+	}
+
+	.image-action-btn:not(:disabled):hover {
+		transform: translateY(-1px);
 	}
 
 	.image-warning {

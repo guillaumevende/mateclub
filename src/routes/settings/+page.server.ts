@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { redirect, fail } from '@sveltejs/kit';
 import { hashSync } from 'bcrypt';
-import { updateUserAvatar, updateUserHour, updateUserTimezone, getUserById, updateUserPassword, updateUserPseudo, isPseudoAvailable, deleteUserSessions } from '$lib/server/db';
+import { updateUserAvatar, updateUserHour, updateUserTimezone, getUserById, updateUserPassword, updateUserPseudo, isPseudoAvailable, deleteUserSessions, togglePwaTutorialEnabled } from '$lib/server/db';
 import { readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { version } from '../../../package.json';
@@ -72,6 +72,18 @@ export const load: PageServerLoad = async ({ locals }) => {
 	export const actions: Actions = {
 	default: async ({ request, locals, cookies }) => {
 		const data = await request.formData();
+		const intent = data.get('intent')?.toString();
+
+		if (!locals.user) {
+			throw redirect(303, '/login');
+		}
+
+		if (intent === 'togglePwaTutorial') {
+			const enabled = data.get('enabled') === 'true';
+			togglePwaTutorialEnabled(locals.user.id, enabled);
+			return { success: true };
+		}
+
 		const avatar = data.get('avatar')?.toString() || '☕';
 		const avatarImage = data.get('avatarImage')?.toString();
 		
@@ -96,81 +108,80 @@ export const load: PageServerLoad = async ({ locals }) => {
 		const confirmPassword = data.get('confirmPassword')?.toString();
 		const pseudo = data.get('pseudo')?.toString();
 		
-		if (locals.user) {
-			// Validation et mise à jour du pseudo
-			if (pseudo && pseudo.length > 0) {
-				if (pseudo.length < 3) {
-					return fail(400, { 
-						success: false, 
-						error: 'Le pseudo doit contenir au moins 3 caractères' 
-					});
-				}
-				if (pseudo.length > 22) {
-					return fail(400, { 
-						success: false, 
-						error: 'Le pseudo ne doit pas dépasser 22 caractères' 
-					});
-				}
-				if (!PSEUDO_REGEX.test(pseudo)) {
-					return fail(400, { 
-						success: false, 
-						error: 'Le pseudo contient des caractères non autorisés' 
-					});
-				}
-				// Vérifier si le pseudo est déjà utilisé par un autre utilisateur
-				if (!isPseudoAvailable(pseudo, locals.user.id)) {
-					return fail(400, { 
-						success: false, 
-						error: 'Un autre utilisateur a déjà ce nom. Veuillez mettre un autre nom.' 
-					});
-				}
-				updateUserPseudo(locals.user.id, pseudo);
+		// Validation et mise à jour du pseudo
+		if (pseudo && pseudo.length > 0) {
+			if (pseudo.length < 3) {
+				return fail(400, { 
+					success: false, 
+					error: 'Le pseudo doit contenir au moins 3 caractères' 
+				});
 			}
-			
-			// Mise à jour du mot de passe si fourni
-			if (password && password.length > 0) {
-				if (password.length < 12) {
-					return fail(400, { 
-						success: false, 
-						passwordError: 'Le mot de passe doit contenir au moins 12 caractères' 
-					});
-				}
-				if (password !== confirmPassword) {
-					return fail(400, { 
-						success: false, 
-						passwordError: 'Les mots de passe ne correspondent pas' 
-					});
-				}
-				const hashedPassword = hashSync(password, 10);
-				updateUserPassword(locals.user.id, hashedPassword);
+			if (pseudo.length > 22) {
+				return fail(400, { 
+					success: false, 
+					error: 'Le pseudo ne doit pas dépasser 22 caractères' 
+				});
+			}
+			if (!PSEUDO_REGEX.test(pseudo)) {
+				return fail(400, { 
+					success: false, 
+					error: 'Le pseudo contient des caractères non autorisés' 
+				});
+			}
+			// Vérifier si le pseudo est déjà utilisé par un autre utilisateur
+			if (!isPseudoAvailable(pseudo, locals.user.id)) {
+				return fail(400, { 
+					success: false, 
+					error: 'Un autre utilisateur a déjà ce nom. Veuillez mettre un autre nom.' 
+				});
+			}
+			updateUserPseudo(locals.user.id, pseudo);
+		}
+		
+		// Mise à jour du mot de passe si fourni
+		if (password && password.length > 0) {
+			if (password.length < 12) {
+				return fail(400, { 
+					success: false, 
+					passwordError: 'Le mot de passe doit contenir au moins 12 caractères' 
+				});
+			}
+			if (password !== confirmPassword) {
+				return fail(400, { 
+					success: false, 
+					passwordError: 'Les mots de passe ne correspondent pas' 
+				});
+			}
+			const hashedPassword = hashSync(password, 10);
+			updateUserPassword(locals.user.id, hashedPassword);
 
-				// Invalider toutes les autres sessions (sécurité)
-				const sessionId = cookies.get('session');
-				if (sessionId) {
-					deleteUserSessions(locals.user.id, sessionId);
-				}
-			}
-			
-			// Si l'avatar est un emoji (pas une image avec chemin)
-			if (avatar && !avatar.includes('/') && !avatar.startsWith('avatar_')) {
-				updateUserAvatar(locals.user.id, avatar);
-			}
-			
-			// Si une nouvelle image a été uploadée
-			if (avatarImage && avatarImage.length > 0) {
-				updateUserAvatar(locals.user.id, avatarImage);
-			}
-			
-			// Mise à jour de l'heure de disponibilité (en minutes depuis minuit)
-			if (minutesFromMidnight >= 0 && minutesFromMidnight <= 1439) {
-				updateUserHour(locals.user.id, minutesFromMidnight);
-			}
-			
-			// Mise à jour du fuseau horaire (seulement si fourni et non vide)
-			if (timezone && timezone.length > 0) {
-				updateUserTimezone(locals.user.id, timezone);
+			// Invalider toutes les autres sessions (sécurité)
+			const sessionId = cookies.get('session');
+			if (sessionId) {
+				deleteUserSessions(locals.user.id, sessionId);
 			}
 		}
+		
+		// Si l'avatar est un emoji (pas une image avec chemin)
+		if (avatar && !avatar.includes('/') && !avatar.startsWith('avatar_')) {
+			updateUserAvatar(locals.user.id, avatar);
+		}
+		
+		// Si une nouvelle image a été uploadée
+		if (avatarImage && avatarImage.length > 0) {
+			updateUserAvatar(locals.user.id, avatarImage);
+		}
+		
+		// Mise à jour de l'heure de disponibilité (en minutes depuis minuit)
+		if (minutesFromMidnight >= 0 && minutesFromMidnight <= 1439) {
+			updateUserHour(locals.user.id, minutesFromMidnight);
+		}
+		
+		// Mise à jour du fuseau horaire (seulement si fourni et non vide)
+		if (timezone && timezone.length > 0) {
+			updateUserTimezone(locals.user.id, timezone);
+		}
+
 		return { success: true };
 	}
 };

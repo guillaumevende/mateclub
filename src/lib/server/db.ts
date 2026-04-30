@@ -122,6 +122,12 @@ try {
 }
 
 try {
+	db.exec('ALTER TABLE users ADD COLUMN pwa_tutorial_enabled INTEGER DEFAULT 1');
+} catch (e) {
+	// Colonne déjà existante
+}
+
+try {
 	db.exec(`
 		CREATE TABLE IF NOT EXISTS login_attempts (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -178,6 +184,7 @@ export type User = {
 	last_login: string | null;
 	logs_enabled?: number;
 	jingles_enabled?: number;
+	pwa_tutorial_enabled?: number;
 };
 
 export type Recording = {
@@ -281,29 +288,34 @@ export function getRecordingsByDate(userId: number, date: string): DayRecordings
 	if (!user) return null;
 
 	const timezone = user.timezone || 'Europe/Paris';
+	const threeMonthsAgo = new Date();
+	threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 	const stmt = db.prepare(`
 		SELECT 
-			r.id, r.user_id, r.filename, r.image_filename, r.duration_seconds, r.recorded_at,
+			r.id, r.user_id, r.filename, r.image_filename, r.url, r.duration_seconds, r.recorded_at,
 			u.pseudo, u.avatar,
 			CASE WHEN l.id IS NOT NULL THEN 1 ELSE 0 END as listened_by_user
 		FROM recordings r 
 		JOIN users u ON r.user_id = u.id 
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
-		WHERE date(r.recorded_at) = ?
+		WHERE r.recorded_at >= ?
 		ORDER BY r.recorded_at ASC
 	`);
-	const results = stmt.all(userId, date) as Recording[];
+	const results = stmt.all(userId, threeMonthsAgo.toISOString()) as Recording[];
+	const filteredResults = results.filter(
+		(recording) => getDateWithThreshold(recording.recorded_at, user.daily_notification_hour, timezone) === date
+	);
 
-	if (results.length === 0) return null;
+	if (filteredResults.length === 0) return null;
 
 	// Vérifier chaque enregistrement individuellement
-	const isAvailable = results.some(r => 
+	const isAvailable = filteredResults.some(r => 
 		isDateAvailable(r.recorded_at, user.super_powers === 1, user.daily_notification_hour, timezone)
 	);
 
 	return {
 		date,
-		recordings: results,
+		recordings: filteredResults,
 		available: isAvailable
 	};
 }
@@ -529,7 +541,7 @@ export function hasAdmin(): boolean {
 }
 
 export function getUserById(id: number): User | undefined {
-	const stmt = db.prepare('SELECT id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, last_login, logs_enabled, jingles_enabled FROM users WHERE id = ?');
+	const stmt = db.prepare('SELECT id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, last_login, logs_enabled, jingles_enabled, pwa_tutorial_enabled FROM users WHERE id = ?');
 	return stmt.get(id) as User | undefined;
 }
 
@@ -546,7 +558,7 @@ export function getAllUsers(): UserWithCount[] {
 	
 	const stmt = db.prepare(`
 		SELECT 
-			u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled,
+			u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled,
 			COALESCE((
 				SELECT COUNT(*) 
 				FROM recordings r 
@@ -662,14 +674,19 @@ export function toggleLogsEnabled(userId: number, enabled: boolean): void {
 	stmt.run(enabled ? 1 : 0, userId);
 }
 
-export function setUserAdmin(userId: number, enabled: boolean): void {
-	const stmt = db.prepare('UPDATE users SET is_admin = ? WHERE id = ?');
-	stmt.run(enabled ? 1 : 0, userId);
-}
-
 export function toggleJinglesEnabled(userId: number, enabled: boolean): void {
 	const stmt = db.prepare('UPDATE users SET jingles_enabled = ? WHERE id = ?');
 	stmt.run(enabled ? 1 : 0, userId);
+}
+
+export function togglePwaTutorialEnabled(userId: number, enabled: boolean): void {
+	const stmt = db.prepare('UPDATE users SET pwa_tutorial_enabled = ? WHERE id = ?');
+	stmt.run(enabled ? 1 : 0, userId);
+}
+
+export function setUserAdmin(userId: number, isAdmin: boolean): void {
+	const stmt = db.prepare('UPDATE users SET is_admin = ? WHERE id = ?');
+	stmt.run(isAdmin ? 1 : 0, userId);
 }
 
 export function createSession(userId: number): string {
@@ -687,7 +704,7 @@ export function updateLastLogin(userId: number): void {
 
 export function getSession(sessionId: string): User | undefined {
 	const stmt = db.prepare(`
-		SELECT u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled
+		SELECT u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled
 		FROM sessions s 
 		JOIN users u ON s.user_id = u.id 
 		WHERE s.id = ? AND s.expires_at > datetime('now')

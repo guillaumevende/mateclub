@@ -1,13 +1,20 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import '$lib/shared.css';
+	import CloseIconButton from '$lib/components/CloseIconButton.svelte';
 	import imageCompression from 'browser-image-compression';
 	import { scrollLock } from '$lib/actions/scrollLock';
 
 	type Timezone = { value: string; label: string };
 	let { data, form }: { 
 		data: { 
-			user?: { pseudo: string; avatar: string; daily_notification_hour: number; timezone: string } 
+			user?: {
+				pseudo: string;
+				avatar: string;
+				daily_notification_hour: number;
+				timezone: string;
+				pwa_tutorial_enabled?: number;
+			}
 			timezones: Timezone[]
 			savedImage: string | null
 			version: string
@@ -282,7 +289,12 @@
 				tabindex="-1"
 			>
 				<h2 id="success-modal-title">Succès !</h2>
-				<button class="close-btn" onclick={closeSuccessModal}>✕</button>
+				<CloseIconButton
+					onclick={closeSuccessModal}
+					ariaLabel="Fermer"
+					size="sm"
+					extraClass="settings-success-close-btn"
+				/>
 				<p class="success-message">Paramètres sauvegardés avec succès !</p>
 			</div>
 		</div>
@@ -302,7 +314,7 @@
 		{/if}
 	</div>
 
-	<form method="POST" use:enhance={() => {
+	<form id="settings-form" method="POST" use:enhance={() => {
 		// Réinitialiser les erreurs avant soumission
 		serverError = null;
 		hourError = null;
@@ -497,9 +509,23 @@
 				<p class="hour-feedback error">{hourError}</p>
 			{/if}
 		</section>
-
-		<button type="submit">Sauvegarder</button>
 	</form>
+
+	<section class="settings-toggle-card">
+		<h2>Tuto PWA</h2>
+		<p class="description">Masque ou réactive les popups qui expliquent comment installer Maté Club en app.</p>
+
+		<form method="POST" class="toggle-form">
+			<input type="hidden" name="intent" value="togglePwaTutorial" />
+			<input type="hidden" name="enabled" value={data.user?.pwa_tutorial_enabled === 0 ? 'true' : 'false'} />
+			<input type="hidden" name="csrf_token" value={(data as any)?.csrfToken ?? ''} />
+			<button type="submit" class="toggle-button">
+				{data.user?.pwa_tutorial_enabled === 0 ? 'Activer le tuto PWA' : 'Désactiver le tuto PWA'}
+			</button>
+		</form>
+	</section>
+
+	<button type="submit" form="settings-form">Sauvegarder</button>
 
 	<a href="/logout" class="btn" data-sveltekit-reload>Déconnexion</a>
 
@@ -746,6 +772,18 @@
 		margin-top: 1.5rem;
 	}
 
+	.settings-toggle-card {
+		margin-top: 1.5rem;
+	}
+
+	.toggle-form {
+		margin-top: 1rem;
+	}
+
+	.toggle-button {
+		width: 100%;
+	}
+
 	.btn {
 		display: block;
 		width: 100%;
@@ -794,27 +832,10 @@
 		text-align: center;
 	}
 
-	.close-btn {
+	:global(.settings-success-close-btn) {
 		position: absolute;
 		top: 1rem;
 		right: 1rem;
-		width: 32px;
-		height: 32px;
-		border-radius: 50%;
-		background: #2a2a4e;
-		border: none;
-		color: #fff;
-		cursor: pointer;
-		font-size: 1rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		margin: 0;
-		padding: 0;
-	}
-
-	.close-btn:hover {
-		background: #e94560;
 	}
 
 	.success-message {

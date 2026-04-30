@@ -245,38 +245,23 @@
 			{#each data.pendingRegistrations as registration}
 			<div class="pending-item">
 				<div class="pending-info">
-					<div class="pending-line-1">
+					<div class="pending-header">
 						<span class="pending-avatar">{registration.avatar}</span>
-						<span class="pending-pseudo">{registration.pseudo}</span>
+						<div class="pending-identity">
+							<span class="pending-pseudo">{registration.pseudo}</span>
+							{#if registration.is_admin}
+								<span class="badge admin">Admin</span>
+							{/if}
+						</div>
 					</div>
-					<div class="pending-line-2">
-						<span class="badge" class:admin={registration.is_admin} class:member={!registration.is_admin}>
-							{registration.is_admin ? 'Admin' : 'Membre'}
-						</span>
-					</div>
-					<div class="pending-line-3">
+					<div class="pending-meta">
 						<span class="pending-timezone">🌍 {registration.timezone}</span>
-					</div>
-					<div class="pending-line-4">
 						<span class="pending-date">
 							📅 Inscrit(e) le {(registration.requested_at.includes('T') || registration.requested_at.includes('Z') ? new Date(registration.requested_at) : new Date(registration.requested_at.replace(' ', 'T') + 'Z')).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })} à {(registration.requested_at.includes('T') || registration.requested_at.includes('Z') ? new Date(registration.requested_at) : new Date(registration.requested_at.replace(' ', 'T') + 'Z')).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
 						</span>
 					</div>
-					<div class="pending-line-5">
-						<form method="POST" action="?/rejectRegistration" use:enhance={() => {
-							return async ({ result }) => {
-								if (result.type === 'success') {
-									window.location.reload();
-								}
-							};
-						}}>
-							<input type="hidden" name="csrf_token" value={data.csrfToken} />
-							<input type="hidden" name="registration_id" value={registration.id} />
-							<button type="submit" class="reject-btn">🗑️ Supprimer</button>
-						</form>
-					</div>
 				</div>
-				<div class="pending-actions">
+				<div class="pending-decision">
 					<form method="POST" action="?/approveRegistration" use:enhance={() => {
 						return async ({ result }) => {
 							if (result.type === 'success') {
@@ -288,9 +273,20 @@
 						<input type="hidden" name="registration_id" value={registration.id} />
 						<label class="checkbox-inline">
 							<input type="checkbox" name="is_admin" checked={registration.is_admin === 1} />
-							Admin
+							Valider comme admin
 						</label>
-						<button type="submit" class="approve-btn">✅ Valider</button>
+						<button type="submit" class="decision-btn approve-btn">Valider</button>
+					</form>
+					<form method="POST" action="?/rejectRegistration" use:enhance={() => {
+						return async ({ result }) => {
+							if (result.type === 'success') {
+								window.location.reload();
+							}
+						};
+					}} class="reject-form">
+						<input type="hidden" name="csrf_token" value={data.csrfToken} />
+						<input type="hidden" name="registration_id" value={registration.id} />
+						<button type="submit" class="decision-btn reject-btn">Refuser</button>
 					</form>
 				</div>
 			</div>
@@ -420,9 +416,8 @@
 		<h2>Utilisateurs</h2>
 		<div class="users">
 			{#each data.users as user}
-				{@const isAdmin = user.is_admin === 1}
 				{@const isSelf = user.id === data.currentUser?.id}
-				{@const canDelete = !isAdmin && !isSelf}
+				{@const canDelete = !user.is_admin && !isSelf}
 				{@const createdAt = user.created_at.includes('T') || user.created_at.includes('Z') ? new Date(user.created_at) : new Date(user.created_at.replace(' ', 'T') + 'Z')}
 				{@const lastLogin = user.last_login ? (user.last_login.includes('T') || user.last_login.includes('Z') ? new Date(user.last_login) : new Date(user.last_login.replace(' ', 'T') + 'Z')) : null}
 				<div class="user-card">
@@ -456,21 +451,27 @@
 					</div>
 					{/if}
 					<div class="user-row user-actions">
-						<form method="POST" action="?/toggleUserLogs" use:enhance={() => {
-							return async ({ result }) => {
-								if (result.type === 'success') {
-									window.location.reload();
-								}
-							};
-						}}>
+						<form method="POST" action="?/delete" style="display: none" data-user-id={user.id}>
 							<input type="hidden" name="csrf_token" value={data.csrfToken} />
 							<input type="hidden" name="user_id" value={user.id} />
-							<input type="hidden" name="enabled" value={user.logs_enabled === 1 ? 'false' : 'true'} />
-							<button type="submit" class="user-action-btn">
-								{user.logs_enabled === 1 ? '🪵 Désactiver logs' : '🪵 Activer logs'}
-							</button>
 						</form>
-						{#if !isAdmin}
+						{#if !isSelf}
+							<form method="POST" action="?/toggleUserLogs" use:enhance={() => {
+								return async ({ result }) => {
+									if (result.type === 'success') {
+										window.location.reload();
+									}
+								};
+							}}>
+								<input type="hidden" name="csrf_token" value={data.csrfToken} />
+								<input type="hidden" name="user_id" value={user.id} />
+								<input type="hidden" name="enabled" value={user.logs_enabled === 1 ? 'false' : 'true'} />
+								<button type="submit" class="logs-toggle-user">
+									{user.logs_enabled === 1 ? '🪵 Désactiver logs' : '🪵 Activer logs'}
+								</button>
+							</form>
+						{/if}
+						{#if !user.is_admin}
 							<form method="POST" action="?/promoteToAdmin" use:enhance={() => {
 								return async ({ result }) => {
 									if (result.type === 'success') {
@@ -480,19 +481,17 @@
 							}}>
 								<input type="hidden" name="csrf_token" value={data.csrfToken} />
 								<input type="hidden" name="user_id" value={user.id} />
-								<button type="submit" class="user-action-btn user-action-btn--admin">👑 Rendre admin</button>
+								<button type="submit" class="promote-admin">
+									👑 Rendre admin
+								</button>
 							</form>
 						{/if}
-						<form method="POST" action="?/delete" style="display: none" data-user-id={user.id}>
-							<input type="hidden" name="csrf_token" value={data.csrfToken} />
-							<input type="hidden" name="user_id" value={user.id} />
-						</form>
 						<button 
 							type="button" 
 							class="delete"
 							class:disabled={!canDelete}
 							disabled={!canDelete}
-							title={isSelf ? 'Vous ne pouvez pas vous supprimer vous-même' : (isAdmin ? 'Impossible de supprimer un administrateur pour le moment' : '')}
+							title={isSelf ? 'Vous ne pouvez pas vous supprimer vous-même' : (user.is_admin ? 'Impossible de supprimer un administrateur' : '')}
 							onclick={() => canDelete && openDeleteModal(user)}
 						>
 							🗑️ Supprimer
@@ -631,37 +630,29 @@
 
 	.user-actions {
 		justify-content: flex-end;
+		margin-top: 0.5rem;
 		flex-wrap: wrap;
 		gap: 0.5rem;
-		margin-top: 0.5rem;
-	}
-
-	.user-actions form {
-		margin: 0;
-	}
-
-	.user-action-btn {
-		background: #2f4b7c;
-		padding: 0.5rem 0.85rem;
-		font-size: 0.8rem;
-	}
-
-	.user-action-btn:hover {
-		background: #3a5b94;
-	}
-
-	.user-action-btn--admin {
-		background: #5b3cc4;
-	}
-
-	.user-action-btn--admin:hover {
-		background: #6948dc;
 	}
 
 	button[type="submit"]:disabled {
 		opacity: 0.6;
 		cursor: not-allowed;
 		background: #666;
+	}
+
+	.logs-toggle-user,
+	.promote-admin {
+		padding: 0.5rem 1rem;
+		font-size: 0.875rem;
+	}
+
+	.logs-toggle-user {
+		background: #2e6bd9;
+	}
+
+	.promote-admin {
+		background: #9b59b6;
 	}
 
 	.delete {
@@ -883,64 +874,86 @@
 
 	.pending-item {
 		display: flex;
-		justify-content: space-between;
-		align-items: center;
+		flex-direction: column;
+		align-items: stretch;
 		background: #1a1a2e;
 		padding: 1rem;
 		border-radius: 8px;
-		flex-wrap: wrap;
 		gap: 1rem;
 	}
 
 	.pending-info {
 		display: flex;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0.75rem;
+	}
+
+	.pending-header {
+		display: flex;
 		align-items: center;
 		gap: 0.75rem;
-		flex: 1;
+		min-width: 0;
 	}
 
 	.pending-avatar {
 		font-size: 1.5rem;
+		flex-shrink: 0;
+	}
+
+	.pending-identity {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+		min-width: 0;
 	}
 
 	.pending-pseudo {
 		font-weight: 600;
 		color: #eee;
+		min-width: 0;
+		overflow-wrap: anywhere;
 	}
 
 	.pending-date {
-		color: #888;
+		color: #a9a8bd;
 		font-size: 0.75rem;
+		line-height: 1.4;
+		overflow-wrap: anywhere;
 	}
 
 	.pending-timezone {
-		color: #666;
+		color: #a9a8bd;
 		font-size: 0.75rem;
+		overflow-wrap: anywhere;
 	}
 
-	.pending-actions {
+	.pending-meta {
 		display: flex;
-		gap: 0.5rem;
-		width: 100%;
+		flex-direction: column;
+		gap: 0.35rem;
 	}
 
-	.pending-actions form {
-		flex: 1;
+	.pending-decision {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
 	}
 
-	.pending-actions button {
+	.decision-btn {
+		border: none;
+		padding: 0.75rem 1rem;
+		border-radius: 6px;
+		cursor: pointer;
+		font-weight: 600;
+		font-size: 0.875rem;
 		width: 100%;
 	}
 
 	.approve-btn {
 		background: #22c55e;
 		color: white;
-		border: none;
-		padding: 0.5rem 1rem;
-		border-radius: 6px;
-		cursor: pointer;
-		font-weight: 600;
-		font-size: 0.875rem;
 	}
 
 	.approve-btn:hover {
@@ -948,17 +961,37 @@
 	}
 
 	.reject-btn {
-		background: #ef4444;
-		color: white;
-		border: none;
-		padding: 0.5rem 1rem;
-		border-radius: 6px;
-		cursor: pointer;
-		font-weight: 600;
-		font-size: 0.875rem;
+		background: rgba(239, 68, 68, 0.16);
+		color: #ffd5d5;
+		border: 1px solid rgba(239, 68, 68, 0.4);
 	}
 
 	.reject-btn:hover {
-		background: #dc2626;
+		background: rgba(239, 68, 68, 0.22);
+	}
+
+	.approve-form {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.reject-form {
+		display: block;
+	}
+
+	.checkbox-inline {
+		display: flex;
+		align-items: center;
+		gap: 0.45rem;
+		color: #ccc;
+		font-size: 0.9rem;
+		padding: 0.1rem 0;
+	}
+
+	@media (max-width: 520px) {
+		.pending-section {
+			padding: 1rem;
+		}
 	}
 </style>

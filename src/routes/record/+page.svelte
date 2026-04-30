@@ -1,9 +1,16 @@
-<script lang="ts">
+	<script lang="ts">
+	import { beforeNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
-	import { playerStore, getAudioElement, updateMediaSessionMetadata, closePlayer, debugLogs, logsEnabled, type Recording, type DayRecordings } from '$lib/stores/player';
+	import { playerStore, getAudioElement, updateMediaSessionMetadata, closePlayer, debugLogs, logsEnabled, type DayRecordings } from '$lib/stores/player';
 	import ImageViewer from '$lib/components/ImageViewer.svelte';
 	import ImageUpload from '$lib/components/ImageUpload.svelte';
+	import {
+		clearRecordingDraftQueue,
+		loadRecordingDraftQueue,
+		saveRecordingDraftQueue,
+		type StoredRecordingDraft
+	} from '$lib/client/recordingDraftQueue';
 	import { scrollLock } from '$lib/actions/scrollLock';
 	import { triggerHaptic } from '$lib/utils/haptics';
 	import { debug } from '$lib/debug';
@@ -25,9 +32,30 @@
 		style: string;
 	};
 
+	type RecordingDraft = {
+		id: string;
+		audioBlob: Blob;
+		audioUrl: string;
+		audioMimeType: string;
+		durationSeconds: number;
+		imageBlob: Blob | null;
+		imagePreview: string | null;
+		recordingUrl: string;
+		createdAt: string;
+		error: string | null;
+		isUploading: boolean;
+		uploadProgress: number;
+	};
+
 	const MAX_DURATION = 180;
+	const RECORDING_WARNING_OFFSETS = [15, 10, 5] as const;
+	type RecordingWarningOffset = typeof RECORDING_WARNING_OFFSETS[number];
+	const RECORDING_WARNING_SOUNDS: Record<RecordingWarningOffset, string> = {
+		15: '/achievement1.mp3',
+		10: '/achievement2.mp3',
+		5: '/achievement3.mp3'
+	};
 	const RECORDINGS_LIMIT = 5;
-	const RECORDINGS_LOAD_MORE = 10;
 	const VISUALIZER_BAR_COUNT = 8;
 	const VISUALIZER_MIN_HEIGHT = 12;
 	const VISUALIZER_MAX_HEIGHT = 82;
@@ -38,21 +66,22 @@
 	const VISUALIZER_HOT_THRESHOLD = 0.87;
 
 	let isRecording = $state(false);
+	let isPaused = $state(false);
 	let isProcessing = $state(false); // Indique que l'enregistrement est en cours de finalisation
 	let mediaRecorder: MediaRecorder | null = $state(null);
 	let chunks: Blob[] = []; // Non-réactif : évite les problèmes de closure
 	let timer = $state(0);
 	let timerInterval: ReturnType<typeof setInterval> | null = $state(null);
-	let audioUrl: string | null = $state(null);
-	let recordedBlob: Blob | null = $state(null);
-	let imageBlob: Blob | null = $state(null);
-	let imagePreview: string | null = $state(null);
-	let recordingUrl: string = $state('');
-	let isSending = $state(false);
 	let error = $state<string | null>(null);
-	let urlError = $state<string | null>(null);
-	let imageWarning = $state<string | null>(null);
-	let success = $state(false);
+	let queueNotice = $state<string | null>(null);
+	let isRestoringDrafts = $state(true);
+	let isSending = $state(false);
+	let sendAllProgress = $state<{ current: number; total: number; percent: number } | null>(null);
+	let draftQueue = $state<RecordingDraft[]>([]);
+	let selectedDraftId = $state<string | null>(null);
+	let draftPersistenceReady = false;
+	let draftPersistenceTimeout: ReturnType<typeof setTimeout> | null = null;
+	let recorderSection: HTMLDivElement | null = null;
 
 	// Recordings list state
 	let userRecordings = $state<UserRecording[]>([]);
@@ -82,12 +111,16 @@
 
 	// Recording stop flag to prevent recursive calls
 	let isStopping = false;
+	let warningAudios: Partial<Record<RecordingWarningOffset, HTMLAudioElement>> = {};
+	let startAudio: HTMLAudioElement | null = null;
+	let playedRecordingWarnings = new Set<number>();
 
 	// Audio visualizer state
 	let audioContext: globalThis.AudioContext | null = $state(null);
 	let audioAnalyser: globalThis.AnalyserNode | null = $state(null);
 	let visualizerData = $state<VisualizerBar[]>(createIdleVisualizerData());
 	let animationFrameId: ReturnType<typeof window.requestAnimationFrame> | null = null;
+	let selectedDraft = $derived(draftQueue.find((draft) => draft.id === selectedDraftId) ?? draftQueue.at(-1) ?? null);
 
 	$effect(() => {
 		const unsubscribe = playerStore.subscribe(state => {
@@ -96,12 +129,80 @@
 		return unsubscribe;
 	});
 
+	$effect(() => {
+		if (draftQueue.length === 0) {
+			selectedDraftId = null;
+			return;
+		}
+
+		if (!selectedDraftId || !draftQueue.some((draft) => draft.id === selectedDraftId)) {
+			selectedDraftId = draftQueue.at(-1)?.id ?? null;
+		}
+	});
+
 	// Load recordings on mount
 	onMount(() => {
 		loadRecordings();
 		checkMicPermission();
 		checkWakeLockSupport();
+		void restoreDraftQueue();
+
+		const flushDrafts = () => {
+			void persistDraftQueueNow();
+		};
+		window.addEventListener('pagehide', flushDrafts);
+		window.addEventListener('beforeunload', flushDrafts);
+
+		return () => {
+			window.removeEventListener('pagehide', flushDrafts);
+			window.removeEventListener('beforeunload', flushDrafts);
+			void persistDraftQueueNow();
+			for (const draft of draftQueue) {
+				revokeDraftUrls(draft);
+			}
+		};
 	});
+
+	$effect(() => {
+		if (!draftPersistenceReady) return;
+		if (isSending) return;
+
+		const persistedDrafts = getPersistedDrafts();
+
+		if (draftPersistenceTimeout) {
+			clearTimeout(draftPersistenceTimeout);
+		}
+
+		draftPersistenceTimeout = setTimeout(() => {
+			void saveRecordingDraftQueue(persistedDrafts);
+		}, 180);
+
+		return () => {
+			if (draftPersistenceTimeout) {
+				clearTimeout(draftPersistenceTimeout);
+				draftPersistenceTimeout = null;
+			}
+		};
+	});
+
+	beforeNavigate(() => {
+		void persistDraftQueueNow();
+	});
+
+	function getPersistedDrafts(): StoredRecordingDraft[] {
+		return draftQueue.map(({ audioUrl: _audioUrl, imagePreview: _imagePreview, error: _error, isUploading: _isUploading, uploadProgress: _uploadProgress, ...draft }) => draft);
+	}
+
+	async function persistDraftQueueNow() {
+		if (!draftPersistenceReady || isSending) return;
+
+		if (draftPersistenceTimeout) {
+			clearTimeout(draftPersistenceTimeout);
+			draftPersistenceTimeout = null;
+		}
+
+		await saveRecordingDraftQueue(getPersistedDrafts());
+	}
 
 	function checkWakeLockSupport() {
 		wakeLockSupported = 'wakeLock' in navigator && navigator.wakeLock !== null;
@@ -138,13 +239,6 @@
 		if (document.visibilityState === 'visible' && isRecording && wakeLockSupported) {
 			acquireWakeLock();
 		}
-	}
-
-	function canDisplayHeic(): boolean {
-		const ua = navigator.userAgent;
-		const isSafari = ua.includes('Safari') && !ua.includes('Chrome') && !ua.includes('Edg');
-		const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-		return isSafari || isIOS;
 	}
 
 	function logMic(message: string) {
@@ -301,6 +395,104 @@
 		return `${mins}:${secs.toString().padStart(2, '0')}`;
 	}
 
+	function getAudioFilename(mimeType: string) {
+		if (mimeType.includes('mp4') || mimeType.includes('m4a')) return 'recording.m4a';
+		if (mimeType.includes('ogg')) return 'recording.ogg';
+		if (mimeType.includes('mpeg') || mimeType.includes('mp3')) return 'recording.mp3';
+		return 'recording.webm';
+	}
+
+	function getImageFilename(blob: Blob) {
+		if (blob.type.includes('png')) return 'image.png';
+		if (blob.type.includes('webp')) return 'image.webp';
+		if (blob.type.includes('heic') || blob.type.includes('heif')) return 'image.heic';
+		return 'image.jpg';
+	}
+
+	function createDraftId() {
+		if (typeof globalThis.crypto !== 'undefined' && 'randomUUID' in globalThis.crypto) {
+			return globalThis.crypto.randomUUID();
+		}
+		return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+	}
+
+	function createDraftFromStored(draft: StoredRecordingDraft): RecordingDraft {
+		return {
+			...draft,
+			audioUrl: URL.createObjectURL(draft.audioBlob),
+			imagePreview: draft.imageBlob ? URL.createObjectURL(draft.imageBlob) : null,
+			error: null,
+			isUploading: false,
+			uploadProgress: 0
+		};
+	}
+
+	function revokeDraftUrls(draft: RecordingDraft) {
+		URL.revokeObjectURL(draft.audioUrl);
+		if (draft.imagePreview) {
+			URL.revokeObjectURL(draft.imagePreview);
+		}
+	}
+
+	function updateDraft(id: string, updater: (draft: RecordingDraft) => RecordingDraft) {
+		draftQueue = draftQueue.map((draft) => (draft.id === id ? updater(draft) : draft));
+	}
+
+	function setDraftImage(id: string, blob: Blob | null, preview: string | null) {
+		draftQueue = draftQueue.map((draft) => {
+			if (draft.id !== id) return draft;
+			if (draft.imagePreview && draft.imagePreview !== preview) {
+				URL.revokeObjectURL(draft.imagePreview);
+			}
+			return {
+				...draft,
+				imageBlob: blob,
+				imagePreview: preview,
+				error: null
+			};
+		});
+	}
+
+	function updateDraftUrl(id: string, value: string) {
+		draftQueue = draftQueue.map((draft) => (draft.id === id ? { ...draft, recordingUrl: value, error: null } : draft));
+	}
+
+	function selectDraft(id: string) {
+		selectedDraftId = id;
+	}
+
+	function scrollToRecorder() {
+		recorderSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+	}
+
+	async function handleAddDraftClick() {
+		if (isRecording || isProcessing || isSending) return;
+
+		await startRecording();
+	}
+
+	function removeDraft(id: string) {
+		const draft = draftQueue.find((item) => item.id === id);
+		if (draft) {
+			revokeDraftUrls(draft);
+		}
+		draftQueue = draftQueue.filter((item) => item.id !== id);
+	}
+
+	async function restoreDraftQueue() {
+		try {
+			const storedDrafts = await loadRecordingDraftQueue();
+			draftQueue = storedDrafts.map(createDraftFromStored);
+			queueNotice = null;
+		} catch (err) {
+			debug.recording.error('Impossible de restaurer les brouillons locaux:', err);
+			queueNotice = 'Impossible de restaurer les brouillons locaux sur cet appareil.';
+		} finally {
+			isRestoringDrafts = false;
+			draftPersistenceReady = true;
+		}
+	}
+
 	function createIdleVisualizerData(): VisualizerBar[] {
 		return Array.from({ length: VISUALIZER_BAR_COUNT }, () => ({
 			style: buildVisualizerBarStyle(0.12)
@@ -385,8 +577,106 @@
 		});
 	}
 
+	function startTimer() {
+		if (timerInterval) clearInterval(timerInterval);
+		timerInterval = setInterval(() => {
+			timer++;
+			maybePlayRecordingWarning();
+			if (timer >= getRecordingDurationLimit() && !isStopping) {
+				isStopping = true;
+				stopRecording();
+			}
+		}, 1000);
+	}
+
+	function stopTimer() {
+		if (timerInterval) {
+			clearInterval(timerInterval);
+			timerInterval = null;
+		}
+	}
+
+	function getRecordingDurationLimit() {
+		return MAX_DURATION;
+	}
+
+	function maybePlayRecordingWarning() {
+		const remainingSeconds = Math.max(0, getRecordingDurationLimit() - timer);
+		const warningOffset = RECORDING_WARNING_OFFSETS.find(
+			(offset) => remainingSeconds === offset && !playedRecordingWarnings.has(offset)
+		);
+
+		if (!warningOffset) return;
+
+		playedRecordingWarnings.add(warningOffset);
+		playRecordingWarningSound(warningOffset);
+	}
+
+	function playRecordingWarningSound(offset: RecordingWarningOffset) {
+		const warningAudio = ensureWarningAudio(offset);
+
+		warningAudio.currentTime = 0;
+		void warningAudio.play().catch((err) => {
+			debug.recording.error('Impossible de jouer le son d’avertissement:', err);
+		});
+	}
+
+	function ensureWarningAudio(offset: RecordingWarningOffset) {
+		if (!warningAudios[offset]) {
+			warningAudios[offset] = new window.Audio(RECORDING_WARNING_SOUNDS[offset]);
+			warningAudios[offset].preload = 'auto';
+		}
+
+		return warningAudios[offset];
+	}
+
+	function ensureStartAudio() {
+		if (!startAudio) {
+			startAudio = new window.Audio('/start.mp3');
+			startAudio.preload = 'auto';
+		}
+
+		return startAudio;
+	}
+
+	async function primeRecordingCueAudio() {
+		const warnings = RECORDING_WARNING_OFFSETS.map((offset) => ensureWarningAudio(offset));
+		for (const warning of warnings) {
+			warning.load();
+		}
+
+		const start = ensureStartAudio();
+		start.load();
+
+		for (const warning of warnings) {
+			try {
+				warning.muted = true;
+				warning.currentTime = 0;
+				await warning.play();
+				warning.pause();
+				warning.currentTime = 0;
+				warning.muted = false;
+			} catch (err) {
+				warning.muted = false;
+				debug.recording.error('Impossible de pré-activer un son d’avertissement:', err);
+			}
+		}
+
+		debug.recording.log('Achievement audios primed');
+	}
+
+	function playRecordingStartSound() {
+		const start = ensureStartAudio();
+		start.currentTime = 0;
+
+		void start.play().catch((err) => {
+			debug.recording.error('Impossible de jouer le son de démarrage:', err);
+		});
+	}
+
 	async function startRecording() {
 		triggerHaptic('success');
+		await primeRecordingCueAudio();
 		
 		// Fermer le player s'il est ouvert
 		closePlayer();
@@ -401,9 +691,9 @@
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 		
 		try {
-			logMic(`Début enregistrement (permission=${micPermissionState}, visibility=${document.visibilityState})`);
+			logMic('Démarrage enregistrement : getUserMedia');
 			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-			logMic('getUserMedia OK pour démarrer l’enregistrement');
+			logMic('getUserMedia OK');
 			
 			let mimeType = 'audio/mp4';
 			if (!MediaRecorder.isTypeSupported(mimeType)) {
@@ -418,12 +708,17 @@
 
 			mediaRecorder.onstart = () => {
 				debug.recording.log('MediaRecorder démarré');
+				playRecordingStartSound();
 			};
 
 			mediaRecorder.start(1000);
 			isRecording = true;
+			isPaused = false;
 			showRecordingsList = false;
 			timer = 0;
+			playedRecordingWarnings = new Set<number>();
+			error = null;
+			queueNotice = null;
 
 			// Initialize audio visualizer
 			try {
@@ -443,13 +738,7 @@
 				debug.recording.error('Erreur initialisation visualiseur:', err);
 			}
 			
-			timerInterval = setInterval(() => {
-				timer++;
-				if (timer >= MAX_DURATION && !isStopping) {
-					isStopping = true;
-					stopRecording();
-				}
-			}, 1000);
+			startTimer();
 
 			mediaRecorder.ondataavailable = (e) => {
 				if (e.data.size > 0) {
@@ -466,38 +755,67 @@
 					debug.recording.error('Aucun chunk audio collecté');
 					error = 'Erreur d\'enregistrement - veuillez réessayer';
 					isRecording = false;
+					isPaused = false;
 					isProcessing = false;
 					return;
 				}
 				
-				recordedBlob = new Blob(chunks, { type });
-				audioUrl = URL.createObjectURL(recordedBlob);
+				const recordedBlob = new Blob(chunks, { type });
+				addDraftToQueue(recordedBlob, type, timer);
 				stream.getTracks().forEach(track => track.stop());
 				isRecording = false;
+				isPaused = false;
 				isProcessing = false;
 			};
-		} catch (e) {
+		} catch (err) {
 			error = 'Impossible d\'accéder au micro';
-			const errorName = e instanceof Error ? e.name : 'UnknownError';
-			const errorMessage = e instanceof Error ? e.message : String(e);
+			const errorName = err instanceof Error ? err.name : 'UnknownError';
+			const errorMessage = err instanceof Error ? err.message : String(err);
 			logMic(`Échec démarrage enregistrement (${errorName})`);
 			await reportMicError('Recording start failed', { errorName, errorMessage });
 		}
 	}
 
+	function pauseRecording() {
+		if (!mediaRecorder || mediaRecorder.state !== 'recording') return;
+
+		mediaRecorder.pause();
+		isPaused = true;
+		stopTimer();
+
+		if (animationFrameId) {
+			window.cancelAnimationFrame(animationFrameId);
+			animationFrameId = null;
+		}
+	}
+
+	async function resumeRecording() {
+		if (!mediaRecorder || mediaRecorder.state !== 'paused') return;
+
+		mediaRecorder.resume();
+		isPaused = false;
+		startTimer();
+
+		if (audioContext?.state === 'suspended') {
+			await audioContext.resume().catch(() => {});
+		}
+		startVisualizerAnimation();
+	}
+
 	function stopRecording() {
 		debug.recording.log('stopRecording appelé - state:', mediaRecorder?.state, 'chunks:', chunks.length);
 		isProcessing = true;
+		playedRecordingWarnings = new Set<number>();
 		
 		releaseWakeLock();
 		document.removeEventListener('visibilitychange', handleVisibilityChange);
-	
-	if (timerInterval) {
-		clearInterval(timerInterval);
-		timerInterval = null;
-	}
+		stopTimer();
 	
 	if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+		if (mediaRecorder.state === 'paused') {
+			mediaRecorder.resume();
+		}
+
 		mediaRecorder.requestData();
 		debug.recording.log('requestData() appelé');
 		
@@ -507,13 +825,14 @@
 			if (mediaRecorder && mediaRecorder.state !== 'inactive') {
 				try {
 					mediaRecorder.stop();
-				} catch (e) {
+				} catch {
 					// Ignorer l'erreur si déjà arrêté
 				}
 			}
 			// Forcer la réinitialisation si onstop n'a pas été appelé
 			if (isRecording) {
 				isRecording = false;
+				isPaused = false;
 				isStopping = false;
 				isProcessing = false;
 				if (chunks.length === 0) {
@@ -534,6 +853,7 @@
 		// MediaRecorder déjà inactif ou inexistant
 		debug.recording.log('MediaRecorder déjà inactif - réinitialisation forcée');
 		isRecording = false;
+		isPaused = false;
 		isStopping = false;
 		isProcessing = false;
 		if (chunks.length === 0) {
@@ -563,7 +883,7 @@
 		const timeDomainData = new Uint8Array(audioAnalyser.fftSize);
 		
 		function updateVisualizer() {
-			if (!audioAnalyser || !isRecording) return;
+			if (!audioAnalyser || !isRecording || isPaused) return;
 			
 			audioAnalyser.getByteFrequencyData(frequencyData);
 			audioAnalyser.getByteTimeDomainData(timeDomainData);
@@ -578,29 +898,29 @@
 		updateVisualizer();
 	}
 
+	function addDraftToQueue(audioBlob: Blob, audioMimeType: string, durationSeconds: number) {
+		const draft: RecordingDraft = {
+			id: createDraftId(),
+			audioBlob,
+			audioUrl: URL.createObjectURL(audioBlob),
+			audioMimeType,
+			durationSeconds,
+			imageBlob: null,
+			imagePreview: null,
+			recordingUrl: '',
+			createdAt: new Date().toISOString(),
+			error: null,
+			isUploading: false,
+			uploadProgress: 0
+		};
 
-	function reset() {
-		audioUrl = null;
-		recordedBlob = null;
-		imageBlob = null;
-		imagePreview = null;
+		draftQueue = [...draftQueue, draft];
+		selectedDraftId = draft.id;
+		queueNotice = null;
 		timer = 0;
-		success = false;
-		error = null;
 		showRecordingsList = true;
-		loadRecordings();
-	}
-
-	function stayOnPage() {
-		recordedBlob = null;
-		audioUrl = null;
-		imageBlob = null;
-		imagePreview = null;
-		timer = 0;
-		success = false;
-		error = null;
-		recordingUrl = '';
-		isSending = false;
+		triggerHaptic('success');
+		void loadRecordings();
 	}
 
 	function formatTimeSeconds(seconds: number): string {
@@ -609,110 +929,151 @@
 		return `${mins}:${secs.toString().padStart(2, '0')}`;
 	}
 
-	async function sendRecording() {
-		if (!recordedBlob) {
-			debug.send.error('ERREUR: recordedBlob est null!');
-			return;
+	function validateDraftUrl(value: string): string | null {
+		if (!value.trim()) return null;
+
+		try {
+			const parsed = new URL(value.trim());
+			if (parsed.protocol !== 'https:') {
+				return 'L\'URL doit commencer par https://';
+			}
+		} catch {
+			return 'URL invalide';
 		}
-		
-		debug.send.log('Début sendRecording - recordedBlob size:', recordedBlob.size, 'type:', recordedBlob.type, 'URL:', recordingUrl);
-		
-		isSending = true;
-		error = null;
-		urlError = null;
-		
-		if (recordingUrl.trim()) {
-			try {
-				const parsed = new URL(recordingUrl);
-				debug.send.log('URL parsée:', parsed.protocol, parsed.hostname);
-				if (parsed.protocol !== 'https:') {
-					urlError = 'L\'URL doit commencer par https://';
-					debug.send.log('Erreur URL: protocole non https');
-					isSending = false;
+
+		return null;
+	}
+
+	async function uploadDraft(draft: RecordingDraft, progress?: (percent: number) => void) {
+		const urlErrorMessage = validateDraftUrl(draft.recordingUrl);
+		if (urlErrorMessage) {
+			throw new Error(urlErrorMessage);
+		}
+
+		const formData = new FormData();
+		formData.append('audio', draft.audioBlob, getAudioFilename(draft.audioMimeType));
+		formData.append('duration', draft.durationSeconds.toString());
+
+		if (draft.imageBlob) {
+			formData.append('image', draft.imageBlob, getImageFilename(draft.imageBlob));
+		}
+
+		if (draft.recordingUrl.trim()) {
+			formData.append('url', draft.recordingUrl.trim());
+		}
+
+		return await new Promise<{ duplicate?: boolean; error?: string }>((resolve, reject) => {
+			const xhr = new globalThis.XMLHttpRequest();
+			xhr.open('POST', '/api/recordings');
+			xhr.responseType = 'json';
+			xhr.timeout = 60000;
+
+			xhr.upload.onprogress = (event) => {
+				if (!event.lengthComputable || !progress) return;
+				progress(Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100))));
+			};
+
+			xhr.onload = () => {
+				const data = xhr.response && typeof xhr.response === 'object'
+					? xhr.response
+					: JSON.parse(xhr.responseText || '{}');
+
+				if (xhr.status >= 200 && xhr.status < 300) {
+					resolve(data);
 					return;
 				}
-			} catch (err) {
-				urlError = 'URL invalide';
-				debug.send.log('Erreur URL:', err instanceof Error ? err.message : err);
-				isSending = false;
-				return;
-			}
-		}
-		
-		debug.send.log('Validation OK, envoi de la requête...');
-		
+
+				reject(new Error(data?.error || 'Erreur lors de l\'envoi'));
+			};
+
+			xhr.onerror = () => reject(new Error('Erreur réseau lors de l\'envoi'));
+			xhr.ontimeout = () => reject(new Error('Le serveur met trop de temps à répondre. Veuillez réessayer.'));
+			xhr.onabort = () => reject(new Error('Envoi interrompu.'));
+			xhr.send(formData);
+		});
+	}
+
+	async function sendDraftById(id: string, queuePosition?: { current: number; total: number }) {
+		const draft = draftQueue.find((item) => item.id === id);
+		if (!draft) return false;
+
+		updateDraft(id, (item) => ({ ...item, isUploading: true, uploadProgress: 0, error: null }));
+
 		try {
-			const formData = new FormData();
-			formData.append('audio', recordedBlob, 'recording.m4a');
-			formData.append('duration', timer.toString());
-			
-			if (imageBlob) {
-				formData.append('image', imageBlob, 'image.jpg');
-			}
-
-			if (recordingUrl.trim()) {
-				formData.append('url', recordingUrl.trim());
-			}
-
-			const controller = new AbortController();
-			const timeoutId = setTimeout(() => {
-				debug.send.log('Timeout déclenché après 60s');
-				controller.abort();
-			}, 60000);
-
-			const res = await fetch('/api/recordings', {
-				method: 'POST',
-				body: formData,
-				signal: controller.signal
+			const response = await uploadDraft(draft, (percent) => {
+				updateDraft(id, (item) => ({ ...item, uploadProgress: percent }));
+				if (queuePosition) {
+					sendAllProgress = { ...queuePosition, percent };
+				}
 			});
-			
-			clearTimeout(timeoutId);
 
-			const data = await res.json();
-
-			if (data.duplicate) {
-				error = 'Enregistrement déjà existant (probablement identique dans les 30 dernières secondes)';
-				isSending = false;
-				return;
+			if (response.duplicate) {
+				queueNotice = 'Une capsule déjà existante a été retirée de la file locale.';
 			}
 
-			if (!res.ok) {
-				const errorMessage = data.error || 'Erreur lors de l\'envoi';
-				debug.send.error('Erreur serveur:', errorMessage);
-				
-				isSending = false;
-				sendErrorToServer('SEND_RECORDING_ERROR', {
-					message: errorMessage,
-					audioSize: recordedBlob?.size,
-					audioType: recordedBlob?.type,
-					duration: timer,
-					url: window.location.href
-				});
-				error = errorMessage;
-				return;
-			}
-
-			success = true;
+			removeDraft(id);
 			triggerHaptic('success');
-		} catch (err: unknown) {
-			const isAbort = err instanceof Error && err.name === 'AbortError';
-			const errorMessage = isAbort 
-				? 'Le serveur met trop de temps à répondre. Veuillez réessayer.' 
-				: 'Erreur lors de l\'envoi';
-			debug.send.error('Erreur envoi:', err);
-			
+			return true;
+		} catch (err) {
+			const message = err instanceof Error ? err.message : 'Erreur lors de l\'envoi';
+			updateDraft(id, (item) => ({ ...item, isUploading: false, uploadProgress: 0, error: message }));
 			sendErrorToServer('SEND_RECORDING_ERROR', {
-				message: errorMessage,
-				audioSize: recordedBlob?.size,
-				audioType: recordedBlob?.type,
-				duration: timer,
-				url: window.location.href,
-				isAbort
+				message,
+				audioSize: draft.audioBlob.size,
+				audioType: draft.audioMimeType,
+				duration: draft.durationSeconds,
+				url: window.location.href
 			});
-			error = errorMessage;
-		} finally {
-			isSending = false;
+			return false;
 		}
+	}
+
+	async function sendSingleDraft(id: string) {
+		isSending = true;
+		queueNotice = null;
+		const succeeded = await sendDraftById(id);
+		if (succeeded) {
+			queueNotice = 'Capsule envoyée avec succès.';
+			await loadRecordings();
+		}
+		isSending = false;
+		sendAllProgress = null;
+	}
+
+	async function sendAllDrafts() {
+		if (draftQueue.length === 0) return;
+
+		isSending = true;
+		queueNotice = null;
+		const ids = draftQueue.map((draft) => draft.id);
+		let successCount = 0;
+
+		for (const [index, id] of ids.entries()) {
+			const succeeded = await sendDraftById(id, {
+				current: index + 1,
+				total: ids.length
+			});
+			if (succeeded) successCount++;
+		}
+
+		if (successCount > 0) {
+			queueNotice = successCount === ids.length
+				? `${successCount} capsule${successCount > 1 ? 's ont' : ' a'} été envoyée${successCount > 1 ? 's' : ''}.`
+				: `${successCount} capsule${successCount > 1 ? 's ont' : ' a'} été envoyée${successCount > 1 ? 's' : ''}. Les autres restent sauvegardées localement.`;
+			await loadRecordings();
+		}
+
+		sendAllProgress = null;
+		isSending = false;
+	}
+
+	async function clearDraftQueue() {
+		for (const draft of draftQueue) {
+			revokeDraftUrls(draft);
+		}
+		draftQueue = [];
+		await clearRecordingDraftQueue();
+		queueNotice = 'Les brouillons locaux ont été supprimés.';
 	}
 
 	async function sendErrorToServer(type: string, context: any) {
@@ -726,7 +1087,7 @@
 					context
 				})
 			});
-		} catch (e) {
+		} catch {
 			// Silencieux - on ne veut pas d'erreur sur l'erreur
 		}
 	}
@@ -776,99 +1137,189 @@
 <div class="container">
 	<h1>Enregistrer</h1>
 
-	{#if success}
-		<div class="success-container">
-			<div class="success-icon">✓</div>
-			<p class="success-title">Enregistrement envoyé !</p>
-			<p class="success-question">Vous avez tout dit ou vous voulez compléter par un autre message ?</p>
-			<div class="success-actions">
-				<button class="primary" onclick={stayOnPage}>Enregistrer un autre</button>
-				<button class="secondary" onclick={() => window.location.href = '/'}>Aller à l'accueil</button>
+	<div class="recorder" bind:this={recorderSection}>
+		{#if showMicPrompt && micPermissionState === 'prompt'}
+			<div class="mic-prompt">
+				<p class="mic-prompt-text">Pour enregistrer un message vocal, j'ai besoin d'accéder à votre microphone.</p>
+				<button class="primary" onclick={requestMicAccess}>
+					Autoriser le micro
+				</button>
 			</div>
-		</div>
-	{:else if audioUrl}
-		<div class="preview">
-		<ImageUpload
-			onImageChange={(blob, preview) => { imageBlob = blob; imagePreview = preview; }}
-			onWarning={(warning) => imageWarning = warning}
-		/>
- 			
- 			<input 
- 				type="url" 
- 				class="url-input" 
- 				placeholder="Lien URL (https://...)" 
- 				bind:value={recordingUrl}
- 				onfocus={() => urlError = null}
- 			/>
- 			{#if urlError}
- 				<p class="url-error">{urlError}</p>
- 			{/if}
+		{:else if micPermissionState === 'denied'}
+			<div class="mic-denied">
+				<p>Accès au microphone refusé. Veuillez l'activer dans les paramètres de votre navigateur pour utiliser cette fonctionnalité.</p>
+			</div>
+		{:else}
+			{#if isRecording && (wakeLock || wakeLockFailed)}
+				<div class="wake-lock-badge">
+					Laissez cet écran actif durant l'enregistrement
+				</div>
+			{/if}
 			
-			<div class="audio-preview">
-			<audio controls preload="auto" src={audioUrl}></audio>
-		</div>
-		<p class="duration">Durée: {formatTimeSeconds(timer)}</p>
-			
+			<div class="timer {isRecording ? 'recording' : ''} {isRecording && timer >= 160 ? 'warning' : ''}">
+				{formatTimeSeconds(timer)} / 3:00
+			</div>
+
+			{#if isPaused}
+				<p class="pause-notice">Enregistrement en pause. Vous pouvez le reprendre ou l’arrêter.</p>
+			{/if}
+
 			{#if error}
 				<p class="error">{error}</p>
 			{/if}
 
-			<div class="actions">
-				<button class="secondary" onclick={reset} disabled={isSending}>Recommencer</button>
-				<button onclick={sendRecording} disabled={isSending || urlError !== null}>
-					{isSending ? 'Envoi...' : 'Envoyer'}
-				</button>
-			</div>
-		</div>
-	{:else}
-		<div class="recorder">
-			{#if showMicPrompt && micPermissionState === 'prompt'}
-				<div class="mic-prompt">
-					<p class="mic-prompt-text">Pour enregistrer un message vocal, j'ai besoin d'accéder à votre microphone.</p>
-					<button class="primary" onclick={requestMicAccess}>
-						Autoriser le micro
-					</button>
+			{#if queueNotice}
+				<p class="queue-notice">{queueNotice}</p>
+			{/if}
+
+			{#if isProcessing}
+				<div class="processing-indicator">
+					<span class="processing-spinner"></span>
+					<span>Ajout de la capsule aux brouillons...</span>
 				</div>
-			{:else if micPermissionState === 'denied'}
-				<div class="mic-denied">
-					<p>Accès au microphone refusé. Veuillez l'activer dans les paramètres de votre navigateur pour utiliser cette fonctionnalité.</p>
+			{:else if isRecording}
+				<div class="recording-actions">
+					{#if isPaused}
+						<button class="resume" onclick={resumeRecording}>Reprendre</button>
+					{:else}
+						<button class="pause" onclick={pauseRecording}>Mettre en pause</button>
+					{/if}
+					<button class="stop" onclick={stopRecording}>Terminer</button>
+				</div>
+
+				<div class="audio-visualizer">
+					{#each visualizerData as bar}
+						<div class="visualizer-bar" style={bar.style}></div>
+					{/each}
 				</div>
 			{:else}
-				{#if isRecording && (wakeLock || wakeLockFailed)}
-					<div class="wake-lock-badge">
-						Laissez cet écran actif durant l'enregistrement
+				<button class="record" onclick={startRecording}>Enregistrer</button>
+			{/if}
+		{/if}
+	</div>
+
+	{#if isRestoringDrafts}
+		<div class="drafts-loading">
+			<span class="processing-spinner"></span>
+			<span>Restauration des brouillons locaux…</span>
+		</div>
+	{:else if draftQueue.length > 0}
+		<div class="drafts-section">
+			<div class="drafts-header">
+				<div class="drafts-header-actions">
+					<button class="draft-action-btn draft-action-btn-primary send-all-btn" onclick={sendAllDrafts} disabled={isSending || draftQueue.length === 0}>
+						<span class="send-all-content">
+							<svg viewBox="3 4 19 19" aria-hidden="true" class="send-icon">
+								<path d="M3.4 11.6 19.9 4.7c.9-.4 1.8.5 1.4 1.4l-6.9 16.5c-.4.9-1.7 1-2.1.1l-2.2-5.2-5.2-2.2c-.9-.4-.8-1.7.1-2.1Z"></path>
+								<path d="M10.6 13.4 21 5"></path>
+							</svg>
+							<span class="send-all-label">{isSending ? 'Envoi en cours…' : 'Tout envoyer'}</span>
+							<span class="send-all-spacer" aria-hidden="true"></span>
+						</span>
+					</button>
+				</div>
+			</div>
+
+			{#if sendAllProgress}
+				<div class="upload-progress-panel">
+					<div class="upload-progress-meta">
+						<span>Envoi {sendAllProgress.current}/{sendAllProgress.total}</span>
+						<span>{sendAllProgress.percent}%</span>
 					</div>
-				{/if}
-				
-				<div class="timer {isRecording ? 'recording' : ''} {isRecording && timer >= 160 ? 'warning' : ''}">
-					{formatTimeSeconds(timer)} / 3:00
+					<div class="progress-bar-container large">
+						<div class="progress-bar-fill" style={`width: ${sendAllProgress.percent}%`}></div>
+					</div>
+				</div>
+			{/if}
+
+			<div class="draft-slider-layout">
+				<div class="draft-slider-side" aria-label="Sélection des capsules prêtes à envoyer">
+					<button class="mini-card add-card" type="button" onclick={handleAddDraftClick}>
+						<span class="add-card-icon">＋</span>
+						<span>Ajouter</span>
+					</button>
+
+					{#each draftQueue as draft, index (draft.id)}
+						<button
+							type="button"
+							class="mini-card media-card"
+							class:active={selectedDraft?.id === draft.id}
+							onclick={() => selectDraft(draft.id)}
+						>
+							<div class="card-index">Capsule {index + 1}</div>
+							<div class="thumb" class:no-media={!draft.imagePreview}>
+								{#if draft.imagePreview}
+									<img src={draft.imagePreview} alt="" />
+								{:else}
+									<span>🎙️</span>
+								{/if}
+							</div>
+							<div class="card-duration">{formatDuration(draft.durationSeconds)}</div>
+							{#if draft.recordingUrl.trim()}
+								<div class="link-badge">Lien</div>
+							{/if}
+						</button>
+					{/each}
+
+					<button class="mini-card delete-all-card" type="button" onclick={clearDraftQueue} disabled={isSending}>
+						<svg viewBox="0 0 24 24" aria-hidden="true" class="trash-icon">
+							<path d="M9 4.5h6"></path>
+							<path d="M5.5 7.5h13"></path>
+							<path d="m8 7.5.8 10.2a1.7 1.7 0 0 0 1.7 1.6h3a1.7 1.7 0 0 0 1.7-1.6L16 7.5"></path>
+							<path d="M10 10.5v5.3"></path>
+							<path d="M14 10.5v5.3"></path>
+						</svg>
+						Tout supprimer
+					</button>
 				</div>
 
-				{#if error}
-					<p class="error">{error}</p>
-				{/if}
+				{#if selectedDraft}
+					<div class="draft-slider-main" class:uploading={selectedDraft.isUploading}>
+						<audio controls preload="auto" src={selectedDraft.audioUrl}></audio>
 
-				{#if isProcessing}
-					<div class="processing-indicator">
-						<span class="processing-spinner"></span>
-						<span>Finalisation de l'enregistrement...</span>
-					</div>
-				{:else if isRecording}
-					<button class="stop" onclick={stopRecording}>Arrêter</button>
+						{#key selectedDraft.id}
+							<ImageUpload
+								initialPreview={selectedDraft.imagePreview}
+								onImageChange={(blob, preview) => setDraftImage(selectedDraft.id, blob, preview)}
+								onWarning={(warning) => updateDraft(selectedDraft.id, (item) => ({ ...item, error: warning }))}
+							/>
+						{/key}
 
-					<!-- Audio Visualizer -->
-					<div class="audio-visualizer">
-						{#each visualizerData as bar}
-						<div
-							class="visualizer-bar"
-							style={bar.style}
-						></div>
-						{/each}
+						<input
+							type="url"
+							class="url-input"
+							placeholder="Lien URL pour cette capsule (https://...)"
+							value={selectedDraft.recordingUrl}
+							oninput={(event) => updateDraftUrl(selectedDraft.id, (event.currentTarget as HTMLInputElement).value)}
+						/>
+
+						{#if selectedDraft.error}
+							<p class="error draft-error">{selectedDraft.error}</p>
+						{/if}
+
+						{#if selectedDraft.isUploading}
+							<div class="upload-progress-panel compact">
+								<div class="upload-progress-meta">
+									<span>Envoi en cours</span>
+									<span>{selectedDraft.uploadProgress}%</span>
+								</div>
+								<div class="progress-bar-container">
+									<div class="progress-bar-fill" style={`width: ${selectedDraft.uploadProgress}%`}></div>
+								</div>
+							</div>
+						{/if}
+
+						<div class="draft-card-actions">
+							<button class="draft-action-btn draft-action-btn-secondary" onclick={() => removeDraft(selectedDraft.id)} disabled={isSending || selectedDraft.isUploading}>
+								Supprimer
+							</button>
+							<button class="draft-action-btn draft-action-btn-primary" onclick={() => sendSingleDraft(selectedDraft.id)} disabled={isSending || selectedDraft.isUploading}>
+								{selectedDraft.isUploading ? 'Envoi…' : 'Envoyer'}
+							</button>
+						</div>
 					</div>
-				{:else}
-					<button class="record" onclick={startRecording}>Commencer l'enregistrement</button>
 				{/if}
-			{/if}
+			</div>
 		</div>
 	{/if}
 </div>
@@ -896,7 +1347,7 @@
 					<span class="recording-date">{formatDate(recording.recorded_at)} ({formatTime(recording.recorded_at)})</span>
 					<span class="recording-duration">{formatDuration(recording.duration_seconds)}</span>
 				</div>
-					<div class="recording-actions">
+					<div class="recording-item-actions">
 						{#if recording.url}
 							<a 
 								href={recording.url}
@@ -1074,13 +1525,6 @@
 		text-align: center;
 	}
 
-	.url-error {
-		color: #ff6b6b;
-		font-size: 0.85rem;
-		margin-top: -0.5rem;
-		margin-bottom: 0.5rem;
-	}
-
 	button {
 		padding: 1rem 2rem;
 		font-size: 1.25rem;
@@ -1093,6 +1537,11 @@
 
 	button.stop {
 		background: #ff6b6b;
+	}
+
+	button.pause,
+	button.resume {
+		background: #2a2a4e;
 	}
 
 	.processing-indicator {
@@ -1123,13 +1572,306 @@
 		}
 	}
 
-	.preview {
-		width: 100%;
-		min-width: 320px;
+	.pause-notice,
+	.queue-notice {
+		max-width: 420px;
+		text-align: center;
+		color: #a0a0c0;
+		margin: 0;
+	}
+
+	.recording-actions {
+		display: flex;
+		justify-content: center;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+	}
+
+	.drafts-loading,
+	.drafts-section {
+		width: min(100%, 760px);
 		box-sizing: border-box;
+	}
+
+	.drafts-loading {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 1rem;
+		color: #a0a0c0;
+	}
+
+	.drafts-section {
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
+		background: #1f2140;
+		border: 1px solid rgba(255, 255, 255, 0.05);
+		border-radius: 20px;
+		padding: 1rem;
+	}
+
+	.drafts-header {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 1rem;
+	}
+
+	.drafts-header-actions,
+	.draft-card-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+	}
+
+	.drafts-header-actions {
+		width: 100%;
+		justify-content: center;
+	}
+
+	.draft-card-actions {
+		justify-content: center;
+	}
+
+	.draft-action-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.65rem;
+		min-height: 52px;
+		padding: 0.9rem 1.35rem;
+		border-radius: 999px;
+		font-size: 1rem;
+		font-weight: 800;
+		line-height: 1;
+		letter-spacing: -0.01em;
+		text-align: center;
+		box-shadow: 0 12px 26px rgba(11, 11, 24, 0.2);
+	}
+
+	.draft-action-btn-primary {
+		background: linear-gradient(135deg, #f05271, #ff667d);
+		color: #fff;
+	}
+
+	.draft-action-btn-secondary {
+		background: #2a2a4e;
+		color: #fff4f6;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+	}
+
+	.send-all-btn {
+		position: relative;
+		min-width: 220px;
+	}
+
+	.send-all-content {
+		display: inline-grid;
+		grid-template-columns: 18px auto 12px;
+		align-items: center;
+		justify-content: center;
+		column-gap: 0.65rem;
+	}
+
+	.send-all-label {
+		display: inline-block;
+		text-align: center;
+	}
+
+	.send-icon {
+		width: 18px;
+		height: 18px;
+		display: block;
+		flex-shrink: 0;
+	}
+
+	.send-all-spacer {
+		display: block;
+		width: 12px;
+		height: 18px;
+	}
+
+	.send-icon path:first-child {
+		fill: currentColor;
+		opacity: 0.18;
+	}
+
+	.send-icon path:last-child {
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 2.1;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+
+	.draft-slider-layout {
+		display: flex;
+		flex-direction: column;
+		gap: 0.95rem;
+	}
+
+	.draft-slider-side {
+		display: flex;
+		flex-direction: row;
+		gap: 0.75rem;
+		overflow-x: auto;
+		padding-bottom: 0.3rem;
+		scroll-snap-type: x proximity;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	.draft-slider-side::-webkit-scrollbar {
+		height: 6px;
+	}
+
+	.draft-slider-side::-webkit-scrollbar-thumb {
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.14);
+	}
+
+	.draft-slider-main {
+		display: flex;
+		flex-direction: column;
+		gap: 0.9rem;
+		background: #15162b;
+		border: 1px solid rgba(255, 255, 255, 0.06);
+		border-radius: 18px;
+		padding: 1rem;
+	}
+
+	.draft-slider-main.uploading {
+		border-color: rgba(74, 222, 128, 0.4);
+		box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.18);
+	}
+
+	.mini-card {
+		min-width: 116px;
+		flex: 0 0 116px;
+		min-height: 138px;
+		padding: 12px 8px 10px;
+		border-radius: 18px;
+		background: rgba(255, 255, 255, 0.05);
+		border: 1px solid rgba(255, 255, 255, 0.06);
+		text-align: center;
+		color: #d8d3e2;
+		font-size: 0.8rem;
+		line-height: 1.35;
+		scroll-snap-align: start;
+	}
+
+	.mini-card.active {
+		background: rgba(240, 82, 113, 0.16);
+		color: white;
+		border-color: rgba(240, 82, 113, 0.35);
+	}
+
+	.mini-card.media-card {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: flex-start;
+		gap: 8px;
+	}
+
+	.card-index {
+		font-size: 0.76rem;
+		font-weight: 700;
+		letter-spacing: 0.02em;
+	}
+
+	.thumb {
+		width: 54px;
+		height: 54px;
+		border-radius: 14px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background:
+			linear-gradient(135deg, rgba(240, 82, 113, 0.4), rgba(255, 160, 122, 0.32)),
+			radial-gradient(circle at 30% 28%, rgba(255, 255, 255, 0.28), transparent 36%),
+			#2f315c;
+		border: 1px solid rgba(255, 255, 255, 0.14);
+		box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+		overflow: hidden;
+	}
+
+	.thumb img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.thumb.no-media {
+		background: #292b4f;
+		border-style: dashed;
+		border-color: rgba(255, 255, 255, 0.12);
+		box-shadow: none;
+	}
+
+	.card-duration {
+		font-size: 0.84rem;
+		font-weight: 800;
+		color: inherit;
+	}
+
+	.link-badge {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0.28rem 0.6rem;
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.08);
+		color: #fff4f6;
+		font-size: 0.68rem;
+		font-weight: 800;
+		letter-spacing: 0.03em;
+		text-transform: uppercase;
+	}
+
+	.add-card {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		background: rgba(255, 255, 255, 0.03);
+		border-style: dashed;
+		color: #d8d3e2;
+	}
+
+	.add-card-icon {
+		font-size: 1.4rem;
+		line-height: 1;
+	}
+
+	.delete-all-card {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.55rem;
+		background: rgba(240, 82, 113, 0.08);
+		border-style: solid;
+		border-color: rgba(240, 82, 113, 0.2);
+		color: #ffd7df;
+		font-weight: 700;
+		line-height: 1.2;
+	}
+
+	.trash-icon {
+		width: 22px;
+		height: 22px;
+		display: block;
+	}
+
+	.trash-icon path {
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.9;
+		stroke-linecap: round;
+		stroke-linejoin: round;
 	}
 
 	.url-input {
@@ -1144,21 +1886,6 @@
 
 	.url-input::placeholder {
 		color: #666;
-	}
-
-	.duration {
-		text-align: center;
-		color: #888;
-	}
-
-	.actions {
-		display: flex;
-		gap: 1rem;
-		justify-content: center;
-	}
-
-	.secondary {
-		background: #2a2a4e;
 	}
 
 	.mic-prompt {
@@ -1185,70 +1912,50 @@
 		font-size: 0.95rem;
 	}
 
-	.actions button:disabled {
+	button:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
 	}
 
-	.success-container {
+	.upload-progress-panel {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 1.5rem;
-		padding: 3rem 1rem;
-		text-align: center;
-		animation: fadeIn 0.3s ease-out;
+		gap: 0.45rem;
+		padding: 0.85rem 1rem;
+		border-radius: 14px;
+		background: rgba(255, 255, 255, 0.04);
 	}
 
-	@keyframes fadeIn {
-		from {
-			opacity: 0;
-			transform: translateY(-10px);
-		}
-		to {
-			opacity: 1;
-			transform: translateY(0);
-		}
+	.upload-progress-panel.compact {
+		padding: 0.65rem 0.8rem;
 	}
 
-	.success-icon {
-		width: 80px;
-		height: 80px;
-		border-radius: 50%;
-		background: linear-gradient(135deg, #4ade80, #22c55e);
+	.upload-progress-meta {
 		display: flex;
 		align-items: center;
-		justify-content: center;
-		font-size: 2.5rem;
-		color: white;
-		box-shadow: 0 8px 32px rgba(74, 222, 128, 0.3);
+		justify-content: space-between;
+		gap: 0.75rem;
+		color: #fff4f6;
+		font-size: 0.9rem;
 	}
 
-	.success-title {
-		color: #4ade80;
-		font-size: 1.75rem;
-		font-weight: 600;
-		margin: 0;
+	.progress-bar-container {
+		width: 100%;
+		height: 8px;
+		background: rgba(255, 255, 255, 0.08);
+		border-radius: 999px;
+		overflow: hidden;
 	}
 
-	.success-question {
-		color: #a0a0c0;
-		font-size: 1.1rem;
-		margin: 0;
-		max-width: 400px;
+	.progress-bar-container.large {
+		height: 10px;
 	}
 
-	.success-actions {
-		display: flex;
-		gap: 1rem;
-		flex-wrap: wrap;
-		justify-content: center;
-		margin-top: 1rem;
-	}
-
-	.success-actions button {
-		min-width: 200px;
+	.progress-bar-fill {
+		height: 100%;
+		background: linear-gradient(90deg, #4ade80, #22c55e);
+		border-radius: 999px;
+		transition: width 0.2s ease;
 	}
 
 	/* Fix curseur audio */
@@ -1371,7 +2078,7 @@
 		font-size: 0.85rem;
 	}
 
-	.recording-actions {
+	.recording-item-actions {
 		display: flex;
 		align-items: center;
 		gap: 0.25rem;
@@ -1520,6 +2227,33 @@
 		to {
 			opacity: 1;
 			transform: translateY(0);
+		}
+	}
+
+	@media (max-width: 640px) {
+		.container {
+			padding-inline: 1rem;
+		}
+
+		.timer {
+			font-size: 2.5rem;
+		}
+
+		.recording-actions,
+		.drafts-header-actions,
+		.draft-card-actions {
+			width: 100%;
+		}
+
+		.recording-actions button,
+		.drafts-header-actions button,
+		.draft-card-actions button {
+			width: 100%;
+		}
+
+		.drafts-header {
+			flex-direction: column;
+			align-items: stretch;
 		}
 	}
 </style>

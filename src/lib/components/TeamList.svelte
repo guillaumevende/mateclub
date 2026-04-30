@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Avatar from './Avatar.svelte';
+	import CloseIconButton from './CloseIconButton.svelte';
 	import { scrollLock } from '$lib/actions/scrollLock';
 
 	interface User {
@@ -36,7 +37,12 @@
 			aria-labelledby="team-title"
 			tabindex="-1"
 		>
-			<button class="close-btn modal-close-outer" onclick={() => showTeam = false}>✕</button>
+			<CloseIconButton
+				onclick={() => showTeam = false}
+				ariaLabel="Fermer la modale"
+				size="md"
+				extraClass="team-modal-close-btn"
+			/>
 			
 			<h2 id="team-title">La team</h2>
 			<ul class="team-list">
@@ -80,29 +86,11 @@
 		overflow: visible;
 	}
 
-	.close-btn {
+	:global(.team-modal-close-btn) {
 		position: absolute;
 		top: 1rem;
 		right: 1rem;
-		width: 40px;
-		height: 40px;
-		border-radius: 50%;
-		background: #2a2a4e;
-		border: 2px solid #e94560;
-		color: #fff;
-		cursor: pointer;
-		font-size: 1.2rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		line-height: 1;
 		z-index: 1001;
-		padding: 0;
-	}
-
-	.close-btn:hover {
-		background: #e94560;
-		transform: scale(1.1);
 	}
 
 	.modal h2 {

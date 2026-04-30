@@ -8,6 +8,7 @@
 	import RecordingCard from '$lib/components/RecordingCard.svelte';
 	import TeamList from '$lib/components/TeamList.svelte';
 	import Calendar from '$lib/components/Calendar.svelte';
+	import CloseIconButton from '$lib/components/CloseIconButton.svelte';
 	import { scrollLock } from '$lib/actions/scrollLock';
 	import { triggerHaptic, triggerLockedHaptic } from '$lib/utils/haptics';
 	import { playerStore, lastListenedRecordingId, type Recording, type DayRecordings, type PlayerState, playRecording, togglePlayPause, closePlayer, playNext } from '$lib/stores/player';
@@ -172,18 +173,20 @@
 	let unreadStats = $derived.by(() => {
 		const allKnownRecordings = [...(todayDay?.recordings || []), ...allDays.flatMap(d => d.recordings)];
 		const dedupedRecordings = Array.from(new Map(allKnownRecordings.map((recording) => [recording.id, recording])).values());
-		const unread = dedupedRecordings.filter((recording) => !isRecordingListened(recording));
-		const totalSeconds = unread.reduce((sum, r) => sum + r.duration_seconds, 0);
+		const serverUnreadCount = data.unreadStats?.count ?? 0;
+		const serverUnreadSeconds = data.unreadStats?.totalSeconds ?? 0;
+		const optimisticallyListenedRecordings = dedupedRecordings.filter((recording) =>
+			recording.user_id !== data.user?.id &&
+			recording.listened_by_user !== 1 &&
+			listenedRecordings.has(recording.id)
+		);
 
-		if (unread.length === 0) {
-			return { count: 0, totalSeconds: 0 };
-		}
+		const optimisticCountReduction = optimisticallyListenedRecordings.length;
+		const optimisticSecondsReduction = optimisticallyListenedRecordings.reduce((sum, recording) => sum + recording.duration_seconds, 0);
+		const adjustedCount = Math.max(0, serverUnreadCount - optimisticCountReduction);
+		const adjustedSeconds = Math.max(0, serverUnreadSeconds - optimisticSecondsReduction);
 
-		if (data.unreadStats && data.unreadStats.count > unread.length) {
-			return data.unreadStats;
-		}
-
-		return { count: unread.length, totalSeconds };
+		return { count: adjustedCount, totalSeconds: adjustedSeconds };
 	});
 
 	let canPlayUnreadSummary = $derived((unreadPlaylistSession?.count ?? 0) > 0);
@@ -201,7 +204,7 @@
 		if (hasOnlyLockedUnread) {
 			return {
 				title: `${totalCount} capsule${totalCount !== 1 ? 's' : ''} pour ${data.threshold}`,
-				duration: formatDurationLabel(totalSeconds),
+				duration: formatCompactDurationLabel(totalSeconds),
 				showPlayIcon: false,
 				showLockIcon: true
 			};
@@ -210,7 +213,7 @@
 		if (hasMixedUnread) {
 			return {
 				title: `${playableCount} capsule${playableCount !== 1 ? 's' : ''} non lue${playableCount !== 1 ? 's' : ''}`,
-				duration: formatDurationLabel(playableSeconds),
+				duration: formatCompactDurationLabel(playableSeconds),
 				showPlayIcon: true,
 				showLockIcon: false
 			};
@@ -218,7 +221,7 @@
 
 		return {
 			title: `${totalCount} capsule${totalCount !== 1 ? 's' : ''} non lue${totalCount !== 1 ? 's' : ''}`,
-			duration: formatDurationLabel(totalSeconds),
+			duration: formatCompactDurationLabel(totalSeconds),
 			showPlayIcon: hasPlayableUnread,
 			showLockIcon: hasOnlyLockedUnread
 		};
@@ -895,6 +898,30 @@
 		return `${mins} minute${mins > 1 ? 's' : ''} et ${secs} seconde${secs > 1 ? 's' : ''}`;
 	}
 
+	function formatCompactDurationLabel(totalSeconds: number): string {
+		const hours = Math.floor(totalSeconds / 3600);
+		const mins = Math.floor((totalSeconds % 3600) / 60);
+		const secs = totalSeconds % 60;
+
+		if (hours > 0) {
+			if (mins === 0) {
+				return `${hours} h`;
+			}
+
+			return `${hours} h ${mins} min`;
+		}
+
+		if (mins === 0) {
+			return `${secs} s`;
+		}
+
+		if (secs === 0) {
+			return `${mins} min`;
+		}
+
+		return `${mins} min ${secs} s`;
+	}
+
 	function formatDate(dateStr: string): string {
 		// Forcer l'interprétation UTC en ajoutant 'Z' si pas de timezone
 		let dateString: string;
@@ -1040,7 +1067,12 @@
 				aria-labelledby="unread-playlist-title"
 				tabindex="-1"
 			>
-				<button class="close-btn modal-close-outer" onclick={closeUnreadPlaylistModal}>✕</button>
+				<CloseIconButton
+					onclick={closeUnreadPlaylistModal}
+					ariaLabel="Fermer la file d'écoute"
+					size="md"
+					extraClass="modal-close-outer-btn"
+				/>
 
 				<div class="day-header-new modal-header">
 					<div class="day-header-left">
@@ -1111,7 +1143,12 @@
 				tabindex="-1"
 			>
 				<!-- Croix de fermeture au-dessus de la modale -->
-				<button class="close-btn modal-close-outer" onclick={closeDayModal}>✕</button>
+				<CloseIconButton
+					onclick={closeDayModal}
+					ariaLabel="Fermer la modale"
+					size="md"
+					extraClass="modal-close-outer-btn"
+				/>
 				
 				<div class="day-header-new modal-header">
 					<div class="day-header-left">
@@ -1455,16 +1492,18 @@
 
 	.modal-overlay {
 		position: fixed;
-		top: 0;
-		left: 0;
-		right: 0;
-		bottom: 0;
-		background: rgba(0, 0, 0, 0.8);
+		inset: 0;
+		min-height: 100vh;
+		min-height: 100dvh;
+		background: rgba(0, 0, 0, 0.88);
 		display: flex;
-		align-items: center;
+		align-items: flex-start;
 		justify-content: center;
-		z-index: 1000;
-		padding: 4rem 1rem 1rem;
+		z-index: 1050;
+		padding: calc(5rem + env(safe-area-inset-top, 0px)) 1rem calc(15rem + env(safe-area-inset-bottom, 0px));
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		-webkit-overflow-scrolling: touch;
 	}
 
 	.modal {
@@ -1490,31 +1529,6 @@
 		color: #e94560;
 		margin-bottom: 1rem;
 		text-align: center;
-	}
-
-	.close-btn {
-		position: absolute;
-		top: 1rem;
-		right: 1rem;
-		width: 40px;
-		height: 40px;
-		border-radius: 50%;
-		background: #2a2a4e;
-		border: 2px solid #e94560;
-		color: #fff;
-		cursor: pointer;
-		font-size: 1.2rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		line-height: 1;
-		z-index: 1001;
-		padding: 0;
-	}
-
-	.close-btn:hover {
-		background: #e94560;
-		transform: scale(1.1);
 	}
 
 	.welcome {
@@ -1633,12 +1647,17 @@
 		font-size: 0.98rem;
 		font-weight: 700;
 		color: #ffffff;
+		max-width: 100%;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 
 	.unread-summary-pill .pill-duration {
 		font-size: 0.82rem;
 		font-weight: 500;
 		color: #ffd7df;
+		white-space: nowrap;
 	}
 
 	.date {
@@ -1726,29 +1745,11 @@
 	}
 
 	/* Croix de fermeture au-dessus de la modale */
-	.close-btn.modal-close-outer {
+	:global(.modal-close-outer-btn) {
 		position: absolute;
 		top: -70px;
 		right: 0;
-		width: 40px;
-		height: 40px;
-		border-radius: 50%;
-		background: #2a2a4e;
-		border: 2px solid #e94560;
-		color: #fff;
-		font-size: 1.2rem;
-		cursor: pointer;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		line-height: 1;
 		z-index: 1001;
-		padding: 0;
-	}
-
-	.close-btn.modal-close-outer:hover {
-		background: #e94560;
-		transform: scale(1.1);
 	}
 
 	/* Avatars avec chevauchement permanent */
