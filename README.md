@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.32.2-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.32.3-blue?style=for-the-badge)
 
 </div>
 
@@ -82,7 +82,7 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 - **Visualiseur rééquilibré** - Waveform d'enregistrement plus doux, plus bas et mieux réparti sur la voix
 - **Compatibilité Safari renforcée** - Les capsules Android WebM/OGG sont converties côté serveur en AAC/M4A si nécessaire pour rester lisibles dans Safari
 - **Streaming audio HTTP Range** - Les capsules répondent aux requêtes partielles `206 Partial Content` pour fiabiliser Safari/iOS et les longues lectures
-- **Screen Wake Lock** - Anti-veille pendant l'enregistrement (empêche le smartphone de se verrouiller)
+- **Screen Wake Lock** - Anti-veille pendant l'enregistrement et l'écoute des capsules (empêche le smartphone de se verrouiller)
 - **Player séquentiel** - Lecture automatique d'une capsule à la suivante
 - **File "À écouter"** - Toutes les capsules non lues disponibles peuvent s'enchaîner dans une seule session de lecture
 - **Jingle d'intro** - Jingle musical au début de la première capsule du jour (activable via admin)

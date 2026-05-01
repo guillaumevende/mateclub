@@ -2,6 +2,26 @@
 
 ---
 
+## v0.32.3 (2026-05-01) - Anti-veille pendant l'écoute
+
+### ✨ Améliorations
+
+#### Lecture audio
+- **Screen Wake Lock pendant l'écoute** : l'application demande désormais le maintien éveillé de l'écran pendant la lecture des capsules, comme elle le faisait déjà pendant l'enregistrement
+- **Réacquisition au retour au premier plan** : si le système libère le Wake Lock lors d'un changement de visibilité, l'app tente de le récupérer quand elle redevient visible et qu'une capsule est toujours en lecture
+- **Libération propre** : le Wake Lock est relâché à la pause utilisateur, à la fermeture du player, à l'échec de reprise et à la fin de playlist
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+- `npm run build`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.3`
+- README.md : précision du support Screen Wake Lock pendant l'écoute
+
+---
+
 ## v0.32.2 (2026-05-01) - Hotfix streaming audio Safari
 
 ### 🐛 Corrections
