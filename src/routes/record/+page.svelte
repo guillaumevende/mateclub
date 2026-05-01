@@ -641,7 +641,7 @@
 		return startAudio;
 	}
 
-	async function primeRecordingCueAudio() {
+	function primeRecordingCueAudio() {
 		const warnings = RECORDING_WARNING_OFFSETS.map((offset) => ensureWarningAudio(offset));
 		for (const warning of warnings) {
 			warning.load();
@@ -650,21 +650,7 @@
 		const start = ensureStartAudio();
 		start.load();
 
-		for (const warning of warnings) {
-			try {
-				warning.muted = true;
-				warning.currentTime = 0;
-				await warning.play();
-				warning.pause();
-				warning.currentTime = 0;
-				warning.muted = false;
-			} catch (err) {
-				warning.muted = false;
-				debug.recording.error('Impossible de pré-activer un son d’avertissement:', err);
-			}
-		}
-
-		debug.recording.log('Achievement audios primed');
+		debug.recording.log('Recording cue audios preloaded');
 	}
 
 	function playRecordingStartSound() {
@@ -680,7 +666,7 @@
 		if (isRecording || isProcessing || (mediaRecorder && mediaRecorder.state !== 'inactive')) return;
 
 		triggerHaptic('success');
-		await primeRecordingCueAudio();
+		primeRecordingCueAudio();
 		
 		// Fermer le player s'il est ouvert
 		closePlayer();

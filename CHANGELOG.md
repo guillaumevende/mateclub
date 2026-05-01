@@ -2,6 +2,24 @@
 
 ---
 
+## v0.32.6 (2026-05-01) - Préchargement silencieux des sons d'enregistrement
+
+### 🐛 Corrections
+
+#### Enregistrement
+- **Avertissement sonore au démarrage supprimé** : les sons `achievement1/2/3.mp3` ne sont plus joués, même en muet, lors du lancement d'un enregistrement
+- **Préchargement conservé** : les sons d'avertissement restent chargés à l'avance, mais ne doivent se déclencher qu'aux seuils de fin d'enregistrement
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+- `npm run build`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.6`
+
+---
+
 ## v0.32.5 (2026-05-01) - Redémarrage d'enregistrement fiabilisé
 
 ### 🐛 Corrections
