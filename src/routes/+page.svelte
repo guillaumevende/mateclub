@@ -258,7 +258,12 @@
 				listened.add(r.id);
 			}
 		});
-		listenedRecordings = listened;
+		// Preserve optimistic local updates while the server catches up.
+		// Replacing the set here can make the unread pill oscillate during playback.
+		const mergedListened = new Set([...listenedRecordings, ...listened]);
+		if (!areSetsEqual(listenedRecordings, mergedListened)) {
+			listenedRecordings = mergedListened;
+		}
 	});
 
 	function computeCalendarCells() {
@@ -330,6 +335,14 @@
 			.sort((a, b) => a.localeCompare(b));
 
 		return dates[0] ?? null;
+	}
+
+	function areSetsEqual<T>(a: Set<T>, b: Set<T>): boolean {
+		if (a.size !== b.size) return false;
+		for (const item of a) {
+			if (!b.has(item)) return false;
+		}
+		return true;
 	}
 
 	function handleTouchStart(e: TouchEvent) {
