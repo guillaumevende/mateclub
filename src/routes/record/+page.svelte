@@ -69,6 +69,7 @@
 	let isPaused = $state(false);
 	let isProcessing = $state(false); // Indique que l'enregistrement est en cours de finalisation
 	let mediaRecorder: MediaRecorder | null = $state(null);
+	let activeRecordingMimeType = '';
 	let chunks: Blob[] = []; // Non-réactif : évite les problèmes de closure
 	let timer = $state(0);
 	let timerInterval: ReturnType<typeof setInterval> | null = $state(null);
@@ -704,6 +705,7 @@
 			}
 			
 			mediaRecorder = new MediaRecorder(stream, { mimeType });
+			activeRecordingMimeType = mimeType;
 			chunks.length = 0; // Vider sans changer la référence
 
 			mediaRecorder.onstart = () => {
@@ -711,7 +713,14 @@
 				playRecordingStartSound();
 			};
 
-			mediaRecorder.start(1000);
+			const shouldUseTimeslice = !mimeType.startsWith('audio/mp4') && !mimeType.startsWith('audio/x-m4a');
+			if (shouldUseTimeslice) {
+				mediaRecorder.start(1000);
+				debug.recording.log('MediaRecorder start avec timeslice 1000ms');
+			} else {
+				mediaRecorder.start();
+				debug.recording.log('MediaRecorder start sans timeslice pour préserver le conteneur MP4');
+			}
 			isRecording = true;
 			isPaused = false;
 			showRecordingsList = false;
@@ -766,6 +775,7 @@
 				isRecording = false;
 				isPaused = false;
 				isProcessing = false;
+				activeRecordingMimeType = '';
 			};
 		} catch (err) {
 			error = 'Impossible d\'accéder au micro';
@@ -816,8 +826,8 @@
 			mediaRecorder.resume();
 		}
 
-		mediaRecorder.requestData();
-		debug.recording.log('requestData() appelé');
+		const recorderMimeType = mediaRecorder.mimeType || activeRecordingMimeType;
+		const isMp4Recording = recorderMimeType.startsWith('audio/mp4') || recorderMimeType.startsWith('audio/x-m4a');
 		
 		// Timeout de secours au cas où onstop ne serait pas appelé
 		const stopTimeout = setTimeout(() => {
@@ -841,14 +851,21 @@
 			}
 		}, 5000); // 5 secondes de timeout
 		
-		setTimeout(() => {
-			debug.recording.log('Timeout stop - state:', mediaRecorder?.state, 'chunks:', chunks.length);
-			if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-				mediaRecorder.stop();
-				debug.recording.log('stop() appelé');
-			}
-			clearTimeout(stopTimeout); // Annuler le timeout de secours si tout va bien
-		}, 300);
+		if (isMp4Recording) {
+			debug.recording.log('stop() direct sans requestData pour préserver le conteneur MP4');
+			mediaRecorder.stop();
+		} else {
+			mediaRecorder.requestData();
+			debug.recording.log('requestData() appelé');
+			setTimeout(() => {
+				debug.recording.log('Timeout stop - state:', mediaRecorder?.state, 'chunks:', chunks.length);
+				if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+					mediaRecorder.stop();
+					debug.recording.log('stop() appelé');
+				}
+				clearTimeout(stopTimeout); // Annuler le timeout de secours si tout va bien
+			}, 300);
+		}
 	} else {
 		// MediaRecorder déjà inactif ou inexistant
 		debug.recording.log('MediaRecorder déjà inactif - réinitialisation forcée');
