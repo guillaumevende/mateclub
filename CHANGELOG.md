@@ -2,6 +2,25 @@
 
 ---
 
+## v0.32.5 (2026-05-01) - Redémarrage d'enregistrement fiabilisé
+
+### 🐛 Corrections
+
+#### Enregistrement
+- **Nouvel enregistrement après `Terminer`** : les gestionnaires `MediaRecorder` sont maintenant attachés avant le démarrage effectif de l'enregistrement
+- **Nettoyage complet du recorder** : le stream micro, le timeout de secours et l'instance `MediaRecorder` sont remis à zéro après l'arrêt
+- **Erreur rouge évitée au second enregistrement** : le cas où aucun chunk n'était encore collecté ne laisse plus le micro ou le recorder dans un état intermédiaire
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+- `npm run build`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.5`
+
+---
+
 ## v0.32.4 (2026-05-01) - Son de démarrage d'enregistrement
 
 ### 🎵 Audio

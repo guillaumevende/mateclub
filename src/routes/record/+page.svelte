@@ -71,6 +71,7 @@
 	let mediaRecorder: MediaRecorder | null = $state(null);
 	let activeRecordingMimeType = '';
 	let chunks: Blob[] = []; // Non-réactif : évite les problèmes de closure
+	let recordingStopTimeout: ReturnType<typeof setTimeout> | null = null;
 	let timer = $state(0);
 	let timerInterval: ReturnType<typeof setInterval> | null = $state(null);
 	let error = $state<string | null>(null);
@@ -676,6 +677,8 @@
 	}
 
 	async function startRecording() {
+		if (isRecording || isProcessing || (mediaRecorder && mediaRecorder.state !== 'inactive')) return;
+
 		triggerHaptic('success');
 		await primeRecordingCueAudio();
 		
@@ -713,6 +716,38 @@
 				playRecordingStartSound();
 			};
 
+			mediaRecorder.ondataavailable = (e) => {
+				if (e.data.size > 0) {
+					chunks.push(e.data);
+				}
+			};
+
+			mediaRecorder.onstop = () => {
+				if (recordingStopTimeout) {
+					clearTimeout(recordingStopTimeout);
+					recordingStopTimeout = null;
+				}
+
+				debug.recording.log('MediaRecorder stopped - chunks:', chunks.length);
+				const isMp4 = mimeType.startsWith('audio/mp4') || mimeType.startsWith('audio/x-m4a');
+				const type = isMp4 ? 'audio/mp4' : 'audio/webm';
+				
+				if (chunks.length === 0) {
+					debug.recording.error('Aucun chunk audio collecté');
+					error = 'Erreur d\'enregistrement - veuillez réessayer';
+				} else {
+					const recordedBlob = new Blob(chunks, { type });
+					addDraftToQueue(recordedBlob, type, timer);
+				}
+				
+				stream.getTracks().forEach(track => track.stop());
+				isRecording = false;
+				isPaused = false;
+				isProcessing = false;
+				activeRecordingMimeType = '';
+				mediaRecorder = null;
+			};
+
 			const shouldUseTimeslice = !mimeType.startsWith('audio/mp4') && !mimeType.startsWith('audio/x-m4a');
 			if (shouldUseTimeslice) {
 				mediaRecorder.start(1000);
@@ -748,35 +783,6 @@
 			}
 			
 			startTimer();
-
-			mediaRecorder.ondataavailable = (e) => {
-				if (e.data.size > 0) {
-					chunks.push(e.data);
-				}
-			};
-
-			mediaRecorder.onstop = () => {
-				debug.recording.log('MediaRecorder stopped - chunks:', chunks.length);
-				const isMp4 = mimeType.startsWith('audio/mp4') || mimeType.startsWith('audio/x-m4a');
-				const type = isMp4 ? 'audio/mp4' : 'audio/webm';
-				
-				if (chunks.length === 0) {
-					debug.recording.error('Aucun chunk audio collecté');
-					error = 'Erreur d\'enregistrement - veuillez réessayer';
-					isRecording = false;
-					isPaused = false;
-					isProcessing = false;
-					return;
-				}
-				
-				const recordedBlob = new Blob(chunks, { type });
-				addDraftToQueue(recordedBlob, type, timer);
-				stream.getTracks().forEach(track => track.stop());
-				isRecording = false;
-				isPaused = false;
-				isProcessing = false;
-				activeRecordingMimeType = '';
-			};
 		} catch (err) {
 			error = 'Impossible d\'accéder au micro';
 			const errorName = err instanceof Error ? err.name : 'UnknownError';
@@ -830,7 +836,7 @@
 		const isMp4Recording = recorderMimeType.startsWith('audio/mp4') || recorderMimeType.startsWith('audio/x-m4a');
 		
 		// Timeout de secours au cas où onstop ne serait pas appelé
-		const stopTimeout = setTimeout(() => {
+		recordingStopTimeout = setTimeout(() => {
 			debug.recording.log('Timeout de secours - forçage arrêt');
 			if (mediaRecorder && mediaRecorder.state !== 'inactive') {
 				try {
@@ -863,7 +869,10 @@
 					mediaRecorder.stop();
 					debug.recording.log('stop() appelé');
 				}
-				clearTimeout(stopTimeout); // Annuler le timeout de secours si tout va bien
+				if (recordingStopTimeout) {
+					clearTimeout(recordingStopTimeout);
+					recordingStopTimeout = null;
+				}
 			}, 300);
 		}
 	} else {
