@@ -8,56 +8,40 @@
 		player = value;
 	});
 
-	function handleSeek(e: Event) {
-		const input = e.target as HTMLInputElement;
-		const time = parseFloat(input.value);
-		seekTo(time);
-	}
-
-	function handleSeekFromClick(e: MouseEvent) {
-		const track = e.currentTarget as HTMLDivElement;
+	function seekFromClientX(track: HTMLDivElement, clientX: number) {
 		const rect = track.getBoundingClientRect();
-		const percent = (e.clientX - rect.left) / rect.width;
+		const percent = Math.max(0, Math.min((clientX - rect.left) / rect.width, 1));
 		const time = Math.max(0, Math.min(percent * displayDuration, displayDuration));
 		seekTo(time);
 	}
 
 	let isDragging = false;
 
-	function startDrag(e: MouseEvent | TouchEvent) {
+	function startDrag(e: globalThis.PointerEvent) {
 		e.preventDefault();
 		isDragging = true;
 		
-		const track = (e.currentTarget as HTMLDivElement).closest('.progress-track') as HTMLDivElement;
-		const rect = track.getBoundingClientRect();
+		const track = e.currentTarget as HTMLDivElement;
+		track.setPointerCapture?.(e.pointerId);
+		seekFromClientX(track, e.clientX);
 		
-		const moveHandler = (moveEvent: MouseEvent | TouchEvent) => {
+		const moveHandler = (moveEvent: globalThis.PointerEvent) => {
 			if (!isDragging) return;
-			
-			let clientX: number;
-			if ('touches' in moveEvent) {
-				clientX = moveEvent.touches[0].clientX;
-			} else {
-				clientX = moveEvent.clientX;
-			}
-			
-			const percent = Math.max(0, Math.min((clientX - rect.left) / rect.width, 1));
-			const time = percent * displayDuration;
-			seekTo(time);
+			moveEvent.preventDefault();
+			seekFromClientX(track, moveEvent.clientX);
 		};
 		
-		const upHandler = () => {
+		const upHandler = (upEvent: globalThis.PointerEvent) => {
 			isDragging = false;
-			document.removeEventListener('mousemove', moveHandler);
-			document.removeEventListener('mouseup', upHandler);
-			document.removeEventListener('touchmove', moveHandler);
-			document.removeEventListener('touchend', upHandler);
+			track.releasePointerCapture?.(upEvent.pointerId);
+			document.removeEventListener('pointermove', moveHandler);
+			document.removeEventListener('pointerup', upHandler);
+			document.removeEventListener('pointercancel', upHandler);
 		};
 		
-		document.addEventListener('mousemove', moveHandler);
-		document.addEventListener('mouseup', upHandler);
-		document.addEventListener('touchmove', moveHandler);
-		document.addEventListener('touchend', upHandler);
+		document.addEventListener('pointermove', moveHandler);
+		document.addEventListener('pointerup', upHandler);
+		document.addEventListener('pointercancel', upHandler);
 	}
 
 	function formatTime(seconds: number): string {
@@ -207,9 +191,7 @@
 			<span class="time current">{formatTime(player.progress)}</span>
 			<div
 				class="progress-track"
-				onclick={(e) => handleSeekFromClick(e)}
-				onmousedown={startDrag}
-				ontouchstart={startDrag}
+				onpointerdown={startDrag}
 				onkeydown={(e) => {
 					if (e.key === 'ArrowLeft') {
 						e.preventDefault();
@@ -374,6 +356,9 @@
 		cursor: pointer;
 		position: relative;
 		overflow: hidden;
+		touch-action: none;
+		user-select: none;
+		-webkit-user-select: none;
 	}
 
 	.progress-track::before {

@@ -2,6 +2,25 @@
 
 ---
 
+## v0.32.2 (2026-05-01) - Hotfix streaming audio Safari
+
+### 🐛 Corrections
+
+#### Lecture audio
+- **Support HTTP Range pour les capsules** : `/api/recordings/:id` répond désormais correctement aux requêtes `Range` avec `206 Partial Content` et `Content-Range`
+- **Fin prématurée iOS/Safari corrigée** : les fichiers audio longs ne devraient plus être considérés comme terminés après un court fragment, ce qui évite le jingle de fin lancé trop tôt
+- **Curseur du player plus réactif** : le premier geste de glissement sur la barre de progression agit immédiatement grâce aux pointer events
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.2`
+- README.md : mention du support HTTP Range audio
+
+---
+
 ## v0.32.1 (2026-04-27) - Pastille d’accueil plus compacte
 
 ### 🐛 Corrections
