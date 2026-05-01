@@ -2,6 +2,16 @@
 
 ---
 
+## v0.32.4 (2026-05-01) - Son de démarrage d'enregistrement
+
+### 🎵 Audio
+- **Son `start.mp3` remplacé** : mise à jour de l'asset joué au démarrage réel d'un enregistrement
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.4`
+
+---
+
 ## v0.32.3 (2026-05-01) - Anti-veille pendant l'écoute
 
 ### ✨ Améliorations
