@@ -39,6 +39,9 @@
 	let createSuccess = $state<string | null>(null);
 	let passwordError = $state<string | null>(null);
 	let pseudoError = $state<string | null>(null);
+	let resetPasswordErrors = $state<Record<number, string>>({});
+	let resetPasswordSuccess = $state<Record<number, string>>({});
+	let resetPasswordLoading = $state<Record<number, boolean>>({});
 	
 	// État du formulaire de création
 	let isCreatingUser = $state(false);
@@ -95,6 +98,11 @@
 				form.requestSubmit();
 			}
 		}
+	}
+
+	function clearResetPasswordStatus(userId: number) {
+		resetPasswordErrors = { ...resetPasswordErrors, [userId]: '' };
+		resetPasswordSuccess = { ...resetPasswordSuccess, [userId]: '' };
 	}
 	
 	onDestroy(() => {
@@ -497,6 +505,68 @@
 							🗑️ Supprimer
 						</button>
 					</div>
+					{#if !user.is_admin || isSelf}
+						<details class="password-reset">
+							<summary>🔐 Modifier le mot de passe</summary>
+							<form method="POST" action="?/resetPassword" class="password-reset-form" use:enhance={() => {
+								resetPasswordLoading = { ...resetPasswordLoading, [user.id]: true };
+								resetPasswordErrors = { ...resetPasswordErrors, [user.id]: '' };
+								resetPasswordSuccess = { ...resetPasswordSuccess, [user.id]: '' };
+
+								return async ({ result, formElement }) => {
+									resetPasswordLoading = { ...resetPasswordLoading, [user.id]: false };
+
+									if (result.type === 'failure') {
+										resetPasswordErrors = {
+											...resetPasswordErrors,
+											[user.id]: (result.data as any)?.error || 'Erreur lors de la modification'
+										};
+										resetPasswordSuccess = { ...resetPasswordSuccess, [user.id]: '' };
+									} else if (result.type === 'success') {
+										resetPasswordSuccess = {
+											...resetPasswordSuccess,
+											[user.id]: (result.data as any)?.message || 'Mot de passe mis à jour'
+										};
+										resetPasswordErrors = { ...resetPasswordErrors, [user.id]: '' };
+										formElement.reset();
+									}
+								};
+							}}>
+								<input type="hidden" name="csrf_token" value={data.csrfToken} />
+								<input type="hidden" name="user_id" value={user.id} />
+								<div class="password-reset-fields">
+									<input
+										type="password"
+										name="password"
+										placeholder="Nouveau mot de passe"
+										minlength="12"
+										required
+										autocomplete="new-password"
+										oninput={() => clearResetPasswordStatus(user.id)}
+									/>
+									<input
+										type="password"
+										name="confirm_password"
+										placeholder="Confirmer le mot de passe"
+										minlength="12"
+										required
+										autocomplete="new-password"
+										oninput={() => clearResetPasswordStatus(user.id)}
+									/>
+								</div>
+								<p class="password-reset-hint">12 caractères minimum. Le changement est immédiat.</p>
+								{#if resetPasswordErrors[user.id]}
+									<p class="field-error">{resetPasswordErrors[user.id]}</p>
+								{/if}
+								{#if resetPasswordSuccess[user.id]}
+									<p class="success-message compact">{resetPasswordSuccess[user.id]}</p>
+								{/if}
+								<button type="submit" class="password-reset-submit" disabled={resetPasswordLoading[user.id]}>
+									{resetPasswordLoading[user.id] ? 'Mise à jour...' : 'Mettre à jour'}
+								</button>
+							</form>
+						</details>
+					{/if}
 				</div>
 			{/each}
 		</div>
@@ -665,6 +735,60 @@
 		opacity: 0.4;
 		cursor: not-allowed;
 		background: #666;
+	}
+
+	.password-reset {
+		margin-top: 0.35rem;
+		border-top: 1px solid rgba(255, 255, 255, 0.08);
+		padding-top: 0.75rem;
+	}
+
+	.password-reset summary {
+		color: #ddd;
+		cursor: pointer;
+		font-size: 0.9rem;
+		font-weight: 600;
+		list-style-position: inside;
+	}
+
+	.password-reset summary:hover {
+		color: #fff;
+	}
+
+	.password-reset-form {
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+		margin-top: 0.75rem;
+	}
+
+	.password-reset-fields {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.5rem;
+	}
+
+	.password-reset-fields input {
+		min-width: 0;
+		margin-bottom: 0;
+		font-size: 0.9rem;
+	}
+
+	.password-reset-hint {
+		color: #8f8da8;
+		font-size: 0.78rem;
+		margin: 0;
+	}
+
+	.password-reset-submit {
+		align-self: flex-start;
+		background: #e94560;
+		padding: 0.55rem 1rem;
+		font-size: 0.875rem;
+	}
+
+	.success-message.compact {
+		margin: 0;
 	}
 
 	.avatar-label {
@@ -992,6 +1116,10 @@
 	@media (max-width: 520px) {
 		.pending-section {
 			padding: 1rem;
+		}
+
+		.password-reset-fields {
+			grid-template-columns: 1fr;
 		}
 	}
 </style>
