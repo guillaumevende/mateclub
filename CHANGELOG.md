@@ -2,6 +2,25 @@
 
 ---
 
+## v0.32.7 (2026-05-03) - Pastille non lue stabilisée
+
+### 🐛 Corrections
+
+#### Accueil
+- **Pastille des capsules non lues stabilisée** : la pastille ne revient plus au total serveur pendant les recalculs internes de la playlist à écouter
+- **Durée restante cohérente** : les capsules de la playlist non lue déjà marquées comme écoutées localement sont maintenant prises en compte dans le calcul du compteur et du temps restant
+- **Synchronisation anti-oscillation** : la reconstruction de la playlist non lue est désormais ignorée si les données utiles n'ont pas réellement changé, même si le player met à jour sa progression en continu
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+- `npm run build`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.7`
+
+---
+
 ## v0.32.6 (2026-05-01) - Préchargement silencieux des sons d'enregistrement
 
 ### 🐛 Corrections
