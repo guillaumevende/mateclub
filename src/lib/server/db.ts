@@ -905,6 +905,33 @@ export function markAsListened(recordingId: number, userId: number): void {
 	stmt.run(userId, recordingId);
 }
 
+export function markLatestOtherRecordingsAsUnread(userId: number, limit = 5): { selectedCount: number; changedCount: number } {
+	const recordingsStmt = db.prepare(`
+		SELECT id
+		FROM recordings
+		WHERE user_id != ?
+		ORDER BY recorded_at DESC, id DESC
+		LIMIT ?
+	`);
+	const recordings = recordingsStmt.all(userId, limit) as { id: number }[];
+
+	if (recordings.length === 0) {
+		return { selectedCount: 0, changedCount: 0 };
+	}
+
+	const placeholders = recordings.map(() => '?').join(',');
+	const deleteStmt = db.prepare(`
+		DELETE FROM listening_history
+		WHERE user_id = ? AND recording_id IN (${placeholders})
+	`);
+	const result = deleteStmt.run(userId, ...recordings.map((recording) => recording.id));
+
+	return {
+		selectedCount: recordings.length,
+		changedCount: result.changes
+	};
+}
+
 export function getRecordingFilePath(filename: string): string {
 	return join(uploadsDir, filename);
 }

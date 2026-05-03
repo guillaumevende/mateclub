@@ -17,7 +17,8 @@ import {
 	isRegistrationAllowed,
 	setAppConfig,
 	setUserAdmin,
-	updateUserPassword
+	updateUserPassword,
+	markLatestOtherRecordingsAsUnread
 } from '$lib/server/db';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -121,6 +122,24 @@ export const actions: Actions = {
 			toggleLogsEnabled(locals.user.id, enabled);
 		}
 		return { success: true };
+	},
+
+	markLatestUnread: async ({ locals }) => {
+		if (!locals.user?.is_admin) {
+			return fail(403, { error: 'Non autorisé' });
+		}
+
+		const result = markLatestOtherRecordingsAsUnread(locals.user.id, 5);
+
+		if (result.selectedCount === 0) {
+			return { success: true, message: 'Aucune capsule audio d’un autre utilisateur à passer en non lu' };
+		}
+
+		const plural = result.selectedCount > 1 ? 's' : '';
+		return {
+			success: true,
+			message: `${result.selectedCount} capsule${plural} audio passée${plural} en non lu`
+		};
 	},
 
 	toggleUserLogs: async ({ request, locals }) => {

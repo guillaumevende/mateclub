@@ -42,6 +42,9 @@
 	let resetPasswordErrors = $state<Record<number, string>>({});
 	let resetPasswordSuccess = $state<Record<number, string>>({});
 	let resetPasswordLoading = $state<Record<number, boolean>>({});
+	let unreadMarkingMessage = $state<string | null>(null);
+	let unreadMarkingError = $state<string | null>(null);
+	let unreadMarkingLoading = $state(false);
 	
 	// État du formulaire de création
 	let isCreatingUser = $state(false);
@@ -142,6 +145,41 @@
 			</form>
 		{/if}
 	</section>
+
+	<section>
+		<h2>Marquage non lu</h2>
+		<p class="super-text">
+			Cette option vous permet de mettre les 5 dernières capsules audio diffusées par d'autres utilisateurs comme non lues.
+		</p>
+		<form method="POST" action="?/markLatestUnread" use:enhance={() => {
+			unreadMarkingLoading = true;
+			unreadMarkingMessage = null;
+			unreadMarkingError = null;
+
+			return async ({ result }) => {
+				unreadMarkingLoading = false;
+
+				if (result.type === 'success') {
+					unreadMarkingMessage = (result.data as any)?.message || 'Capsules passées en non lu';
+					unreadMarkingError = null;
+				} else if (result.type === 'failure') {
+					unreadMarkingError = (result.data as any)?.error || 'Impossible de passer les capsules en non lu';
+					unreadMarkingMessage = null;
+				}
+			};
+		}}>
+			<input type="hidden" name="csrf_token" value={data.csrfToken} />
+			<button type="submit" class="super-btn logs-btn" disabled={unreadMarkingLoading}>
+				{unreadMarkingLoading ? 'Passage en cours...' : 'Passage en non lu'}
+			</button>
+			{#if unreadMarkingMessage}
+				<p class="success-message">{unreadMarkingMessage}</p>
+			{/if}
+			{#if unreadMarkingError}
+				<p class="error-message">{unreadMarkingError}</p>
+			{/if}
+		</form>
+ 	</section>
 
 	<section>
 		<h2>Logs</h2>

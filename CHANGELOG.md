@@ -11,6 +11,9 @@
 - **Durée restante cohérente** : les capsules de la playlist non lue déjà marquées comme écoutées localement sont maintenant prises en compte dans le calcul du compteur et du temps restant
 - **Synchronisation anti-oscillation** : la reconstruction de la playlist non lue est désormais ignorée si les données utiles n'ont pas réellement changé, même si le player met à jour sa progression en continu
 
+#### Administration
+- **Marquage non lu** : ajout d'une action admin permettant de repasser les 5 dernières capsules audio d'autres utilisateurs en non lues pour l'admin connecté
+
 ### 🧪 Tests
 - `npm run check`
 - `npm test`

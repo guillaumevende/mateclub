@@ -144,6 +144,7 @@ L'application gère automatiquement les conversions de fuseaux horaires pour gar
 - **Modification des seuils** - Heure de mise à disposition par utilisateur
 - **Super pouvoirs** - Attribution de privileges de lecture anticipée
 - **Promotion admin** - Un membre existant peut être promu administrateur
+- **Marquage non lu** - L'admin peut repasser les 5 dernières capsules d'autres utilisateurs en non lues pour ses propres tests
 - **Logs de debug** - Activation des logs audio / micro pour diagnostic, y compris pour un autre utilisateur
 - **Jingle d'intro** - Activation/désactivation du jingle musical
 - **Validation mobile clarifiée** - Les inscriptions en attente sont plus lisibles sur smartphone avec actions `Valider` / `Refuser` et la case `Admin` est respectée
@@ -594,6 +595,7 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 - Modification de l'heure de seuil quotidien
 - Promotion d'un utilisateur existant en admin
 - Attribution des super_powers
+- Marquage des 5 dernières capsules d'autres utilisateurs comme non lues pour l'admin connecté
 - Activation des logs de debug audio / micro, y compris pour un autre utilisateur
 - Activation du jingle d'intro
 
