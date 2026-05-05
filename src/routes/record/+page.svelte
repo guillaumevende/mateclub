@@ -69,7 +69,9 @@
 	let isPaused = $state(false);
 	let isProcessing = $state(false); // Indique que l'enregistrement est en cours de finalisation
 	let mediaRecorder: MediaRecorder | null = $state(null);
+	let activeRecordingMimeType = '';
 	let chunks: Blob[] = []; // Non-réactif : évite les problèmes de closure
+	let recordingStopTimeout: ReturnType<typeof setTimeout> | null = null;
 	let timer = $state(0);
 	let timerInterval: ReturnType<typeof setInterval> | null = $state(null);
 	let error = $state<string | null>(null);
@@ -639,7 +641,7 @@
 		return startAudio;
 	}
 
-	async function primeRecordingCueAudio() {
+	function primeRecordingCueAudio() {
 		const warnings = RECORDING_WARNING_OFFSETS.map((offset) => ensureWarningAudio(offset));
 		for (const warning of warnings) {
 			warning.load();
@@ -648,21 +650,7 @@
 		const start = ensureStartAudio();
 		start.load();
 
-		for (const warning of warnings) {
-			try {
-				warning.muted = true;
-				warning.currentTime = 0;
-				await warning.play();
-				warning.pause();
-				warning.currentTime = 0;
-				warning.muted = false;
-			} catch (err) {
-				warning.muted = false;
-				debug.recording.error('Impossible de pré-activer un son d’avertissement:', err);
-			}
-		}
-
-		debug.recording.log('Achievement audios primed');
+		debug.recording.log('Recording cue audios preloaded');
 	}
 
 	function playRecordingStartSound() {
@@ -675,8 +663,10 @@
 	}
 
 	async function startRecording() {
+		if (isRecording || isProcessing || (mediaRecorder && mediaRecorder.state !== 'inactive')) return;
+
 		triggerHaptic('success');
-		await primeRecordingCueAudio();
+		primeRecordingCueAudio();
 		
 		// Fermer le player s'il est ouvert
 		closePlayer();
@@ -704,6 +694,7 @@
 			}
 			
 			mediaRecorder = new MediaRecorder(stream, { mimeType });
+			activeRecordingMimeType = mimeType;
 			chunks.length = 0; // Vider sans changer la référence
 
 			mediaRecorder.onstart = () => {
@@ -711,7 +702,46 @@
 				playRecordingStartSound();
 			};
 
-			mediaRecorder.start(1000);
+			mediaRecorder.ondataavailable = (e) => {
+				if (e.data.size > 0) {
+					chunks.push(e.data);
+				}
+			};
+
+			mediaRecorder.onstop = () => {
+				if (recordingStopTimeout) {
+					clearTimeout(recordingStopTimeout);
+					recordingStopTimeout = null;
+				}
+
+				debug.recording.log('MediaRecorder stopped - chunks:', chunks.length);
+				const isMp4 = mimeType.startsWith('audio/mp4') || mimeType.startsWith('audio/x-m4a');
+				const type = isMp4 ? 'audio/mp4' : 'audio/webm';
+				
+				if (chunks.length === 0) {
+					debug.recording.error('Aucun chunk audio collecté');
+					error = 'Erreur d\'enregistrement - veuillez réessayer';
+				} else {
+					const recordedBlob = new Blob(chunks, { type });
+					addDraftToQueue(recordedBlob, type, timer);
+				}
+				
+				stream.getTracks().forEach(track => track.stop());
+				isRecording = false;
+				isPaused = false;
+				isProcessing = false;
+				activeRecordingMimeType = '';
+				mediaRecorder = null;
+			};
+
+			const shouldUseTimeslice = !mimeType.startsWith('audio/mp4') && !mimeType.startsWith('audio/x-m4a');
+			if (shouldUseTimeslice) {
+				mediaRecorder.start(1000);
+				debug.recording.log('MediaRecorder start avec timeslice 1000ms');
+			} else {
+				mediaRecorder.start();
+				debug.recording.log('MediaRecorder start sans timeslice pour préserver le conteneur MP4');
+			}
 			isRecording = true;
 			isPaused = false;
 			showRecordingsList = false;
@@ -739,34 +769,6 @@
 			}
 			
 			startTimer();
-
-			mediaRecorder.ondataavailable = (e) => {
-				if (e.data.size > 0) {
-					chunks.push(e.data);
-				}
-			};
-
-			mediaRecorder.onstop = () => {
-				debug.recording.log('MediaRecorder stopped - chunks:', chunks.length);
-				const isMp4 = mimeType.startsWith('audio/mp4') || mimeType.startsWith('audio/x-m4a');
-				const type = isMp4 ? 'audio/mp4' : 'audio/webm';
-				
-				if (chunks.length === 0) {
-					debug.recording.error('Aucun chunk audio collecté');
-					error = 'Erreur d\'enregistrement - veuillez réessayer';
-					isRecording = false;
-					isPaused = false;
-					isProcessing = false;
-					return;
-				}
-				
-				const recordedBlob = new Blob(chunks, { type });
-				addDraftToQueue(recordedBlob, type, timer);
-				stream.getTracks().forEach(track => track.stop());
-				isRecording = false;
-				isPaused = false;
-				isProcessing = false;
-			};
 		} catch (err) {
 			error = 'Impossible d\'accéder au micro';
 			const errorName = err instanceof Error ? err.name : 'UnknownError';
@@ -816,11 +818,11 @@
 			mediaRecorder.resume();
 		}
 
-		mediaRecorder.requestData();
-		debug.recording.log('requestData() appelé');
+		const recorderMimeType = mediaRecorder.mimeType || activeRecordingMimeType;
+		const isMp4Recording = recorderMimeType.startsWith('audio/mp4') || recorderMimeType.startsWith('audio/x-m4a');
 		
 		// Timeout de secours au cas où onstop ne serait pas appelé
-		const stopTimeout = setTimeout(() => {
+		recordingStopTimeout = setTimeout(() => {
 			debug.recording.log('Timeout de secours - forçage arrêt');
 			if (mediaRecorder && mediaRecorder.state !== 'inactive') {
 				try {
@@ -841,14 +843,24 @@
 			}
 		}, 5000); // 5 secondes de timeout
 		
-		setTimeout(() => {
-			debug.recording.log('Timeout stop - state:', mediaRecorder?.state, 'chunks:', chunks.length);
-			if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-				mediaRecorder.stop();
-				debug.recording.log('stop() appelé');
-			}
-			clearTimeout(stopTimeout); // Annuler le timeout de secours si tout va bien
-		}, 300);
+		if (isMp4Recording) {
+			debug.recording.log('stop() direct sans requestData pour préserver le conteneur MP4');
+			mediaRecorder.stop();
+		} else {
+			mediaRecorder.requestData();
+			debug.recording.log('requestData() appelé');
+			setTimeout(() => {
+				debug.recording.log('Timeout stop - state:', mediaRecorder?.state, 'chunks:', chunks.length);
+				if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+					mediaRecorder.stop();
+					debug.recording.log('stop() appelé');
+				}
+				if (recordingStopTimeout) {
+					clearTimeout(recordingStopTimeout);
+					recordingStopTimeout = null;
+				}
+			}, 300);
+		}
 	} else {
 		// MediaRecorder déjà inactif ou inexistant
 		debug.recording.log('MediaRecorder déjà inactif - réinitialisation forcée');

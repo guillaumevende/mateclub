@@ -76,6 +76,7 @@ let audioElement: HTMLAudioElement | null = null;
 let guardianElement: HTMLAudioElement | null = null;
 let jingleElement: HTMLAudioElement | null = null;
 let endSoundElement: HTMLAudioElement | null = null;
+let playbackWakeLock: WakeLockSentinel | null = null;
 let isInitialized = false;
 
 // Jingle configuration - volume is now set in the MP3 file itself
@@ -242,6 +243,48 @@ function stopGuardian() {
   }
 }
 
+function isWakeLockSupported() {
+  return typeof navigator !== 'undefined' && 'wakeLock' in navigator && navigator.wakeLock !== null;
+}
+
+async function acquirePlaybackWakeLock() {
+  if (!isWakeLockSupported() || playbackWakeLock) return;
+
+  try {
+    playbackWakeLock = await navigator.wakeLock.request('screen');
+    logDebug('🔆 Wake Lock écoute acquis');
+
+    playbackWakeLock.addEventListener('release', () => {
+      logDebug('🔅 Wake Lock écoute libéré par le système');
+      playbackWakeLock = null;
+    });
+  } catch (err) {
+    logDebug(`⚠️ Wake Lock écoute impossible: ${err instanceof Error ? err.message : err}`);
+    playbackWakeLock = null;
+  }
+}
+
+async function releasePlaybackWakeLock() {
+  if (!playbackWakeLock) return;
+
+  try {
+    await playbackWakeLock.release();
+  } catch (err) {
+    logDebug(`⚠️ Wake Lock écoute release impossible: ${err instanceof Error ? err.message : err}`);
+  } finally {
+    playbackWakeLock = null;
+  }
+}
+
+function handlePlaybackVisibilityChange() {
+  if (typeof document === 'undefined' || document.visibilityState !== 'visible') return;
+
+  const state = get(playerStore);
+  if (state.isPlaying && state.currentRecording) {
+    void acquirePlaybackWakeLock();
+  }
+}
+
 async function resumePlayback(source: 'ui' | 'media-session' = 'ui') {
   const audio = getAudioElement();
   const state = get(playerStore);
@@ -259,10 +302,12 @@ async function resumePlayback(source: 'ui' | 'media-session' = 'ui') {
 
   try {
     await audio.play();
+    void acquirePlaybackWakeLock();
     logDebug(`▶️ Reprise ${source} OK`);
   } catch (error) {
     logDebug(`❌ Reprise ${source} impossible: ${error instanceof Error ? error.message : error}`);
     playerStore.update((s) => ({ ...s, isLoading: false, isPlaying: false }));
+    void releasePlaybackWakeLock();
   }
 }
 
@@ -320,6 +365,8 @@ function initAudioElement() {
       fetch(`/api/recordings/${recordingThatJustFinished.id}/listened`, { method: 'POST' }).catch(() => {});
       lastListenedRecordingId.set(recordingThatJustFinished.id);
     }
+
+    void acquirePlaybackWakeLock();
     
     // Jouer le son de fin approprié
     const isLastRecordingOfDay = dayData && currentIndexAtEnd === dayData.recordings.length - 1;
@@ -354,9 +401,11 @@ function initAudioElement() {
         
         try {
           await audio.play();
+          void acquirePlaybackWakeLock();
         } catch (e) {
           console.error('Auto-play next failed:', e);
           playerStore.update(s => ({ ...s, isLoading: false, isPlaying: false }));
+          void releasePlaybackWakeLock();
         }
       }
     } else {
@@ -364,6 +413,7 @@ function initAudioElement() {
       // NE PAS arrêter le guardian - le garder actif pour permettre l'enchaînement auto
       logDebug('⏹ Playlist terminée, ARRET guardian');
       stopGuardian();
+      void releasePlaybackWakeLock();
     }
   });
   
@@ -374,6 +424,7 @@ function initAudioElement() {
       navigator.mediaSession.playbackState = 'playing';
     }
     startGuardian();
+    void acquirePlaybackWakeLock();
     // Resume jingle if it was playing before pause
     const jingle = getJingleElement();
     if (!jingle.paused) {
@@ -396,6 +447,7 @@ function initAudioElement() {
     }
     playerStore.update(s => ({ ...s, isPlaying: true, isLoading: false }));
     startGuardian();
+    void acquirePlaybackWakeLock();
   });
   
   audio.addEventListener('pause', () => {
@@ -413,6 +465,7 @@ function initAudioElement() {
       logDebug('⏸ Audio en pause (ended=true) - guardian continue');
     } else {
       stopGuardian();
+      void releasePlaybackWakeLock();
     }
   });
   
@@ -433,6 +486,10 @@ function initAudioElement() {
   });
   
   isInitialized = true;
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', handlePlaybackVisibilityChange);
+  }
 }
 
 function setupMediaSession() {
@@ -561,9 +618,11 @@ export async function playRecording(dayData: DayRecordings, index: number) {
     
     // Always play voice
     await audio.play();
+    void acquirePlaybackWakeLock();
   } catch (e) {
     console.error('Playback failed:', e);
     playerStore.update(s => ({ ...s, isLoading: false }));
+    void releasePlaybackWakeLock();
   }
 }
 
@@ -617,6 +676,7 @@ export function closePlayer() {
   }));
   
   updateMediaSessionMetadata(null);
+  void releasePlaybackWakeLock();
 }
 
 export { getAudioElement };

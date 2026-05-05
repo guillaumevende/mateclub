@@ -5,7 +5,34 @@ import { existsSync, createReadStream, statSync, openSync, readSync, closeSync }
 import { detectAudioMimeType } from '$lib/server/fileValidation';
 import { Readable } from 'stream';
 
-export const GET: RequestHandler = async ({ params, locals }) => {
+function parseRangeHeader(rangeHeader: string | null, fileSize: number) {
+	if (!rangeHeader) return null;
+
+	const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader);
+	if (!match) return null;
+
+	const [, rawStart, rawEnd] = match;
+	let start = rawStart ? parseInt(rawStart, 10) : 0;
+	let end = rawEnd ? parseInt(rawEnd, 10) : fileSize - 1;
+
+	if (!rawStart && rawEnd) {
+		const suffixLength = parseInt(rawEnd, 10);
+		start = Math.max(fileSize - suffixLength, 0);
+		end = fileSize - 1;
+	}
+
+	if (Number.isNaN(start) || Number.isNaN(end) || start > end || start >= fileSize) {
+		return { unsatisfiable: true as const };
+	}
+
+	return {
+		start,
+		end: Math.min(end, fileSize - 1),
+		unsatisfiable: false as const
+	};
+}
+
+export const GET: RequestHandler = async ({ request, params, locals }) => {
 	if (!locals.user) {
 		throw redirect(303, '/login');
 	}
@@ -42,6 +69,36 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 				? 'audio/mpeg'
 				: 'audio/mp4';
 	const contentType = detectedMimeType || fallbackMimeType;
+	const range = parseRangeHeader(request.headers.get('range'), stat.size);
+
+	if (range?.unsatisfiable) {
+		return new Response(null, {
+			status: 416,
+			headers: {
+				'Content-Range': `bytes */${stat.size}`,
+				'Accept-Ranges': 'bytes',
+				'Cache-Control': 'no-cache'
+			}
+		});
+	}
+
+	if (range) {
+		const chunkSize = range.end - range.start + 1;
+
+		return new Response(
+			Readable.toWeb(createReadStream(filepath, { start: range.start, end: range.end })) as unknown as ReadableStream<Uint8Array>,
+			{
+				status: 206,
+				headers: {
+					'Content-Type': contentType,
+					'Content-Length': chunkSize.toString(),
+					'Content-Range': `bytes ${range.start}-${range.end}/${stat.size}`,
+					'Accept-Ranges': 'bytes',
+					'Cache-Control': 'no-cache'
+				}
+			}
+		);
+	}
 
 	return new Response(Readable.toWeb(createReadStream(filepath)) as unknown as ReadableStream<Uint8Array>, {
 		headers: {

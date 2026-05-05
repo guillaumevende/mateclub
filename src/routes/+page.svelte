@@ -105,6 +105,7 @@
 	let todayDay = $state<DayRecordings | null>(initialHomeState.initialTodayDay);
 	let openingUnreadSummary = $state(false);
 	let syncingUnreadPlaylist = false;
+	let lastUnreadPlaylistSyncKey = '';
 
 	// Données du calendrier calculées uniquement quand nécessaire
 	let calendarCells = $state<CalendarCell[][]>([]);
@@ -171,7 +172,11 @@
 
 	// Computed: unread recordings count and total duration (from server/local UI state)
 	let unreadStats = $derived.by(() => {
-		const allKnownRecordings = [...(todayDay?.recordings || []), ...allDays.flatMap(d => d.recordings)];
+		const allKnownRecordings = [
+			...(todayDay?.recordings || []),
+			...allDays.flatMap(d => d.recordings),
+			...(unreadPlaylistSession?.playlist.recordings || [])
+		];
 		const dedupedRecordings = Array.from(new Map(allKnownRecordings.map((recording) => [recording.id, recording])).values());
 		const serverUnreadCount = data.unreadStats?.count ?? 0;
 		const serverUnreadSeconds = data.unreadStats?.totalSeconds ?? 0;
@@ -189,14 +194,26 @@
 		return { count: adjustedCount, totalSeconds: adjustedSeconds };
 	});
 
-	let canPlayUnreadSummary = $derived((unreadPlaylistSession?.count ?? 0) > 0);
+	let playableUnreadSummaryStats = $derived.by(() => {
+		if (!unreadPlaylistSession) {
+			return { count: 0, totalSeconds: 0 };
+		}
+
+		const remainingRecordings = unreadPlaylistSession.playlist.recordings.filter((recording) => !isRecordingListened(recording));
+		return {
+			count: remainingRecordings.length,
+			totalSeconds: remainingRecordings.reduce((sum, recording) => sum + recording.duration_seconds, 0)
+		};
+	});
+
+	let canPlayUnreadSummary = $derived(playableUnreadSummaryStats.count > 0);
 
 	let unreadSummaryPresentation = $derived.by(() => {
 		const totalCount = unreadStats.count;
 		const totalSeconds = unreadStats.totalSeconds;
-		const playableCount = unreadPlaylistSession?.count ?? 0;
-		const playableSeconds = unreadPlaylistSession?.totalSeconds ?? 0;
-		const hasResolvedPlayableState = unreadPlaylistResolved || totalCount === 0;
+		const playableCount = playableUnreadSummaryStats.count;
+		const playableSeconds = playableUnreadSummaryStats.totalSeconds;
+		const hasResolvedPlayableState = unreadPlaylistResolved || unreadPlaylistSession !== null || totalCount === 0;
 		const hasPlayableUnread = playableCount > 0;
 		const hasOnlyLockedUnread = hasResolvedPlayableState && totalCount > 0 && playableCount === 0;
 		const hasMixedUnread = hasResolvedPlayableState && playableCount > 0 && playableCount < totalCount;
@@ -258,7 +275,12 @@
 				listened.add(r.id);
 			}
 		});
-		listenedRecordings = listened;
+		// Preserve optimistic local updates while the server catches up.
+		// Replacing the set here can make the unread pill oscillate during playback.
+		const mergedListened = new Set([...listenedRecordings, ...listened]);
+		if (!areSetsEqual(listenedRecordings, mergedListened)) {
+			listenedRecordings = mergedListened;
+		}
 	});
 
 	function computeCalendarCells() {
@@ -330,6 +352,14 @@
 			.sort((a, b) => a.localeCompare(b));
 
 		return dates[0] ?? null;
+	}
+
+	function areSetsEqual<T>(a: Set<T>, b: Set<T>): boolean {
+		if (a.size !== b.size) return false;
+		for (const item of a) {
+			if (!b.has(item)) return false;
+		}
+		return true;
 	}
 
 	function handleTouchStart(e: TouchEvent) {
@@ -440,6 +470,29 @@
 		void syncUnreadPlaylistSession();
 	});
 
+	function getUnreadPlaylistSyncKey(): string {
+		const loadedRecordingState = [todayDay, ...allDays]
+			.filter(Boolean)
+			.flatMap((day) => (day as DayRecordings).recordings)
+			.map((recording) => `${recording.id}:${recording.listened_by_user}`)
+			.sort()
+			.join(',');
+		const listenedState = Array.from(listenedRecordings).sort((a, b) => a - b).join(',');
+		const calendarState = Object.entries(calendarDates)
+			.filter(([, info]) => info.hasUnread)
+			.map(([date]) => date)
+			.sort()
+			.join(',');
+
+		return [
+			data.unreadStats?.count ?? 0,
+			data.unreadStats?.totalSeconds ?? 0,
+			calendarState,
+			loadedRecordingState,
+			listenedState
+		].join('|');
+	}
+
 	async function loadMore() {
 		if (loadingMore) return;
 		loadingMore = true;
@@ -547,12 +600,17 @@
 		};
 	}
 
-	async function syncUnreadPlaylistSession() {
+	async function syncUnreadPlaylistSession(force = false) {
+		const syncKey = getUnreadPlaylistSyncKey();
+		if (!force && syncKey === lastUnreadPlaylistSyncKey) return;
 		if (syncingUnreadPlaylist) return;
 		syncingUnreadPlaylist = true;
-		unreadPlaylistResolved = false;
+		if (!unreadPlaylistSession) {
+			unreadPlaylistResolved = false;
+		}
 		try {
 			unreadPlaylistSession = await buildUnreadPlaylistSession();
+			lastUnreadPlaylistSyncKey = syncKey;
 		} finally {
 			syncingUnreadPlaylist = false;
 			unreadPlaylistResolved = true;
@@ -587,6 +645,7 @@
 			const session = await buildUnreadPlaylistSession();
 			if (!session) return;
 			unreadPlaylistSession = session;
+			lastUnreadPlaylistSyncKey = getUnreadPlaylistSyncKey();
 			unreadPlaylistModal = session;
 
 			playFromRecording(session.playlist, 0);

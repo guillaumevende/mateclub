@@ -2,6 +2,114 @@
 
 ---
 
+## v0.32.7 (2026-05-03) - Pastille non lue stabilisée
+
+### 🐛 Corrections
+
+#### Accueil
+- **Pastille des capsules non lues stabilisée** : la pastille ne revient plus au total serveur pendant les recalculs internes de la playlist à écouter
+- **Durée restante cohérente** : les capsules de la playlist non lue déjà marquées comme écoutées localement sont maintenant prises en compte dans le calcul du compteur et du temps restant
+- **Synchronisation anti-oscillation** : la reconstruction de la playlist non lue est désormais ignorée si les données utiles n'ont pas réellement changé, même si le player met à jour sa progression en continu
+
+#### Administration
+- **Marquage non lu** : ajout d'une action admin permettant de repasser les 5 dernières capsules audio d'autres utilisateurs en non lues pour l'admin connecté
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+- `npm run build`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.7`
+
+---
+
+## v0.32.6 (2026-05-01) - Préchargement silencieux des sons d'enregistrement
+
+### 🐛 Corrections
+
+#### Enregistrement
+- **Avertissement sonore au démarrage supprimé** : les sons `achievement1/2/3.mp3` ne sont plus joués, même en muet, lors du lancement d'un enregistrement
+- **Préchargement conservé** : les sons d'avertissement restent chargés à l'avance, mais ne doivent se déclencher qu'aux seuils de fin d'enregistrement
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+- `npm run build`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.6`
+
+---
+
+## v0.32.5 (2026-05-01) - Redémarrage d'enregistrement fiabilisé
+
+### 🐛 Corrections
+
+#### Enregistrement
+- **Nouvel enregistrement après `Terminer`** : les gestionnaires `MediaRecorder` sont maintenant attachés avant le démarrage effectif de l'enregistrement
+- **Nettoyage complet du recorder** : le stream micro, le timeout de secours et l'instance `MediaRecorder` sont remis à zéro après l'arrêt
+- **Erreur rouge évitée au second enregistrement** : le cas où aucun chunk n'était encore collecté ne laisse plus le micro ou le recorder dans un état intermédiaire
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+- `npm run build`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.5`
+
+---
+
+## v0.32.4 (2026-05-01) - Son de démarrage d'enregistrement
+
+### 🎵 Audio
+- **Son `start.mp3` remplacé** : mise à jour de l'asset joué au démarrage réel d'un enregistrement
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.4`
+
+---
+
+## v0.32.3 (2026-05-01) - Anti-veille pendant l'écoute
+
+### ✨ Améliorations
+
+#### Lecture audio
+- **Screen Wake Lock pendant l'écoute** : l'application demande désormais le maintien éveillé de l'écran pendant la lecture des capsules, comme elle le faisait déjà pendant l'enregistrement
+- **Réacquisition au retour au premier plan** : si le système libère le Wake Lock lors d'un changement de visibilité, l'app tente de le récupérer quand elle redevient visible et qu'une capsule est toujours en lecture
+- **Libération propre** : le Wake Lock est relâché à la pause utilisateur, à la fermeture du player, à l'échec de reprise et à la fin de playlist
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+- `npm run build`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.3`
+- README.md : précision du support Screen Wake Lock pendant l'écoute
+
+---
+
+## v0.32.2 (2026-05-01) - Hotfix streaming audio Safari
+
+### 🐛 Corrections
+
+#### Lecture audio
+- **Support HTTP Range pour les capsules** : `/api/recordings/:id` répond désormais correctement aux requêtes `Range` avec `206 Partial Content` et `Content-Range`
+- **Fin prématurée iOS/Safari corrigée** : les fichiers audio longs ne devraient plus être considérés comme terminés après un court fragment, ce qui évite le jingle de fin lancé trop tôt
+- **Curseur du player plus réactif** : le premier geste de glissement sur la barre de progression agit immédiatement grâce aux pointer events
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.2`
+- README.md : mention du support HTTP Range audio
+
+---
+
 ## v0.32.1 (2026-04-27) - Pastille d’accueil plus compacte
 
 ### 🐛 Corrections
