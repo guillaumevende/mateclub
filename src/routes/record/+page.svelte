@@ -103,6 +103,7 @@
 	let selectedImageUrl = $state<string | null>(null);
 
 	// Mic permission state
+	const MIC_ACCESS_TRUST_KEY = 'mateclub:mic-access-confirmed';
 	let micPermissionState = $state<'prompt' | 'granted' | 'denied' | 'unknown'>('prompt');
 	let showMicPrompt = $state(false);
 
@@ -273,29 +274,60 @@
 		}
 	}
 
+	function hasTrustedMicAccess() {
+		try {
+			return window.localStorage.getItem(MIC_ACCESS_TRUST_KEY) === '1';
+		} catch {
+			return false;
+		}
+	}
+
+	function rememberTrustedMicAccess() {
+		try {
+			window.localStorage.setItem(MIC_ACCESS_TRUST_KEY, '1');
+		} catch {
+			// localStorage can be unavailable in hardened/private contexts.
+		}
+	}
+
+	function forgetTrustedMicAccess() {
+		try {
+			window.localStorage.removeItem(MIC_ACCESS_TRUST_KEY);
+		} catch {
+			// localStorage can be unavailable in hardened/private contexts.
+		}
+	}
+
 	async function checkMicPermission() {
 		const standalone = window.matchMedia('(display-mode: standalone)').matches;
 		logMic(`Vérification micro (standalone=${standalone ? 'oui' : 'non'}, secure=${window.isSecureContext ? 'oui' : 'non'})`);
 
 		if (!navigator.permissions || !navigator.permissions.query) {
-			micPermissionState = 'unknown';
-			logMic('Permissions API indisponible');
+			micPermissionState = hasTrustedMicAccess() ? 'granted' : 'unknown';
+			showMicPrompt = !hasTrustedMicAccess();
+			logMic(`Permissions API indisponible (accès mémorisé=${hasTrustedMicAccess() ? 'oui' : 'non'})`);
 			return;
 		}
 		
 		try {
 			const result = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-			micPermissionState = result.state;
-			showMicPrompt = result.state === 'prompt';
-			logMic(`Permissions API -> ${result.state}`);
+			const trustedMicAccess = hasTrustedMicAccess();
+			micPermissionState = result.state === 'prompt' && trustedMicAccess ? 'granted' : result.state;
+			showMicPrompt = result.state === 'prompt' && !trustedMicAccess;
+			logMic(`Permissions API -> ${result.state} (accès mémorisé=${trustedMicAccess ? 'oui' : 'non'})`);
 			
 			result.addEventListener('change', () => {
-				micPermissionState = result.state;
-				showMicPrompt = result.state === 'prompt';
-				logMic(`Permission micro modifiée -> ${result.state}`);
+				const trustedMicAccessAfterChange = hasTrustedMicAccess();
+				micPermissionState = result.state === 'prompt' && trustedMicAccessAfterChange ? 'granted' : result.state;
+				showMicPrompt = result.state === 'prompt' && !trustedMicAccessAfterChange;
+				if (result.state === 'denied') {
+					forgetTrustedMicAccess();
+				}
+				logMic(`Permission micro modifiée -> ${result.state} (accès mémorisé=${trustedMicAccessAfterChange ? 'oui' : 'non'})`);
 			});
 		} catch (err) {
-			micPermissionState = 'unknown';
+			micPermissionState = hasTrustedMicAccess() ? 'granted' : 'unknown';
+			showMicPrompt = !hasTrustedMicAccess();
 			logMic(`Erreur Permissions API: ${err instanceof Error ? err.name : 'unknown'}`);
 		}
 	}
@@ -303,12 +335,15 @@
 	async function requestMicAccess() {
 		try {
 			logMic('Demande explicite d’accès micro');
-			await navigator.mediaDevices.getUserMedia({ audio: true });
+			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+			stream.getTracks().forEach(track => track.stop());
+			rememberTrustedMicAccess();
 			micPermissionState = 'granted';
 			showMicPrompt = false;
 			logMic('Accès micro accordé');
 		} catch (err) {
 			console.error('Mic access denied:', err);
+			forgetTrustedMicAccess();
 			micPermissionState = 'denied';
 			const errorName = err instanceof Error ? err.name : 'UnknownError';
 			const errorMessage = err instanceof Error ? err.message : String(err);
@@ -683,6 +718,9 @@
 		try {
 			logMic('Démarrage enregistrement : getUserMedia');
 			const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+			rememberTrustedMicAccess();
+			micPermissionState = 'granted';
+			showMicPrompt = false;
 			logMic('getUserMedia OK');
 			
 			let mimeType = 'audio/mp4';
@@ -771,6 +809,7 @@
 			startTimer();
 		} catch (err) {
 			error = 'Impossible d\'accéder au micro';
+			forgetTrustedMicAccess();
 			const errorName = err instanceof Error ? err.name : 'UnknownError';
 			const errorMessage = err instanceof Error ? err.message : String(err);
 			logMic(`Échec démarrage enregistrement (${errorName})`);

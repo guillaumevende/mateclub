@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.32.7-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.32.8-blue?style=for-the-badge)
 
 </div>
 
@@ -87,6 +87,7 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 - **File "À écouter"** - Toutes les capsules non lues disponibles peuvent s'enchaîner dans une seule session de lecture
 - **Jingle d'intro** - Jingle musical au début de la première capsule du jour (activable via admin)
 - **Lecture arrière-plan** - Fonctionne smartphone verrouillé via technique "audio guardian"
+- **Transitions non bloquantes** - L'enchaînement arrière-plan continue même si le navigateur suspend un événement de fin de `ding`
 - **MediaSession API** - Contrôles lockscreen (play/pause/next/prev) avec reprise fiabilisée depuis le player de l'OS
 - **Haptique** - Vibration au démarrage de la lecture
 - **Déduplication SHA-256** - Détection des doublons basée sur le hash audio (seuil 30s)

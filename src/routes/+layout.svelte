@@ -274,6 +274,17 @@
 		will-change: bottom;
 	}
 
+	nav::after {
+		content: '';
+		position: absolute;
+		top: 100%;
+		left: 0;
+		right: 0;
+		height: calc(var(--viewport-bottom-offset) + env(safe-area-inset-bottom, 0px) + 8px);
+		background: #16213e;
+		pointer-events: none;
+	}
+
 	nav.with-player {
 		justify-content: flex-end;
 	}
