@@ -30,7 +30,7 @@
 		status: string;
 	};
 
-	let { data, form }: { data: PageData & { currentUser?: User; csrfToken?: string; pendingRegistrations?: PendingRegistration[]; allowRegistration?: boolean }; form?: { success?: boolean; error?: string; message?: string } } = $props();
+	let { data, form }: { data: PageData & { currentUser?: User; csrfToken?: string; pendingRegistrations?: PendingRegistration[]; allowRegistration?: boolean; oldestAdminId?: number | null }; form?: { success?: boolean; error?: string; message?: string } } = $props();
 
 	const emojis = ['☕', '😀', '😎', '🤠', '🥳', '😇', '🤩', '😈', '👻', '🤖', '🎸', '🎮', '🚀', '🍕', '🍺', '🌈', '🔥', '⭐', '❤️'];
 	
@@ -472,6 +472,7 @@
 			{#each data.users as user}
 				{@const isSelf = user.id === data.currentUser?.id}
 				{@const canDelete = !user.is_admin && !isSelf}
+				{@const canRemoveAdmin = user.is_admin && user.id !== data.oldestAdminId}
 				{@const createdAt = user.created_at.includes('T') || user.created_at.includes('Z') ? new Date(user.created_at) : new Date(user.created_at.replace(' ', 'T') + 'Z')}
 				{@const lastLogin = user.last_login ? (user.last_login.includes('T') || user.last_login.includes('Z') ? new Date(user.last_login) : new Date(user.last_login.replace(' ', 'T') + 'Z')) : null}
 				<div class="user-card">
@@ -537,6 +538,20 @@
 								<input type="hidden" name="user_id" value={user.id} />
 								<button type="submit" class="promote-admin">
 									👑 Rendre admin
+								</button>
+							</form>
+						{:else if canRemoveAdmin}
+							<form method="POST" action="?/removeAdmin" use:enhance={() => {
+								return async ({ result }) => {
+									if (result.type === 'success') {
+										window.location.reload();
+									}
+								};
+							}}>
+								<input type="hidden" name="csrf_token" value={data.csrfToken} />
+								<input type="hidden" name="user_id" value={user.id} />
+								<button type="submit" class="demote-admin">
+									⬇️ Retirer admin
 								</button>
 							</form>
 						{/if}
@@ -758,7 +773,8 @@
 	}
 
 	.logs-toggle-user,
-	.promote-admin {
+	.promote-admin,
+	.demote-admin {
 		padding: 0.5rem 1rem;
 		font-size: 0.875rem;
 	}
@@ -769,6 +785,10 @@
 
 	.promote-admin {
 		background: #9b59b6;
+	}
+
+	.demote-admin {
+		background: #7a5f2a;
 	}
 
 	.delete {

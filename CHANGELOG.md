@@ -2,6 +2,29 @@
 
 ---
 
+## v0.32.10 (2026-05-07) - Retrait contrôlé du statut admin
+
+### ✨ Nouvelles fonctionnalités
+
+#### Administration
+- **Retrait du statut admin** : un bouton `Retirer admin` est disponible pour les administrateurs secondaires afin de repasser un compte admin en membre
+- **Protection de l’admin historique** : l’administrateur le plus ancien n’affiche jamais ce bouton et reste protégé côté serveur contre toute tentative de rétrogradation
+
+### 🐛 Corrections
+
+#### Accueil
+- **Pastille non lue stabilisée au chargement** : l’état verrouillé s’affiche directement pendant la résolution des capsules disponibles, sans flash intermédiaire
+- **Libellé verrouillé ajusté** : la pastille affiche désormais `N capsule(s) dispo à Th`
+
+#### Administration
+- **Bouton `Vérifier` harmonisé** : le CTA de la section `Nettoyage` utilise désormais la même largeur visuelle que les autres boutons pleine largeur de la page admin
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.10`
+- README.md : ajout du retrait contrôlé du statut admin dans les fonctionnalités admin
+
+---
+
 ## v0.32.9 (2026-05-07) - Nettoyage admin des capsules courtes
 
 ### ✨ Nouvelles fonctionnalités

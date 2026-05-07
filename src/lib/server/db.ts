@@ -561,6 +561,18 @@ export function getUserById(id: number): User | undefined {
 	return stmt.get(id) as User | undefined;
 }
 
+export function getOldestAdminId(): number | null {
+	const stmt = db.prepare(`
+		SELECT id
+		FROM users
+		WHERE is_admin = 1
+		ORDER BY datetime(created_at) ASC, id ASC
+		LIMIT 1
+	`);
+	const result = stmt.get() as { id: number } | undefined;
+	return result?.id ?? null;
+}
+
 export function verifyPassword(hash: string, password: string): boolean {
 	return compareSync(password, hash);
 }

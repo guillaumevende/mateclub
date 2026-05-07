@@ -18,7 +18,8 @@ import {
 	setAppConfig,
 	setUserAdmin,
 	updateUserPassword,
-	markLatestOtherRecordingsAsUnread
+	markLatestOtherRecordingsAsUnread,
+	getOldestAdminId
 } from '$lib/server/db';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -34,7 +35,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const currentUser = getUserById(locals.user.id);
 	const pendingRegistrations = getPendingRegistrations();
 	const allowRegistration = isRegistrationAllowed();
-	return { users, currentUser, csrfToken: locals.csrfToken, pendingRegistrations, allowRegistration };
+	const oldestAdminId = getOldestAdminId();
+	return { users, currentUser, csrfToken: locals.csrfToken, pendingRegistrations, allowRegistration, oldestAdminId };
 };
 
 export const actions: Actions = {
@@ -210,6 +212,36 @@ export const actions: Actions = {
 			setUserAdmin(targetUser.id, true);
 		}
 
+		return { success: true };
+	},
+
+	removeAdmin: async ({ request, locals }) => {
+		if (!locals.user?.is_admin) {
+			return fail(403, { error: 'Non autorisé' });
+		}
+
+		const data = await request.formData();
+		const userId = data.get('user_id')?.toString();
+
+		if (!userId) {
+			return fail(400, { error: 'Utilisateur manquant' });
+		}
+
+		const targetUser = getUserById(parseInt(userId, 10));
+		if (!targetUser) {
+			return fail(404, { error: 'Utilisateur introuvable' });
+		}
+
+		if (!targetUser.is_admin) {
+			return fail(400, { error: 'Cet utilisateur n’est pas administrateur' });
+		}
+
+		const oldestAdminId = getOldestAdminId();
+		if (oldestAdminId !== null && targetUser.id === oldestAdminId) {
+			return fail(400, { error: 'Impossible de retirer le statut admin à l’administrateur le plus ancien' });
+		}
+
+		setUserAdmin(targetUser.id, false);
 		return { success: true };
 	},
 

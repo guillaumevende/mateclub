@@ -1607,10 +1607,10 @@
 		margin: 0.6rem auto 0;
 		padding: 0.8rem 1rem 0.85rem;
 		display: grid;
-		grid-template-columns: 42px minmax(0, 1fr) 42px;
+		grid-template-columns: 38px minmax(0, 1fr) 38px;
 		align-items: center;
 		column-gap: 0.15rem;
-		width: min(100%, 290px);
+		width: min(100%, 320px);
 		border-radius: 999px;
 		border: 1px solid rgba(233, 69, 96, 0.28);
 		background:
@@ -1651,8 +1651,8 @@
 
 	.unread-summary-pill .pill-leading-slot,
 	.unread-summary-pill .pill-trailing-slot {
-		width: 34px;
-		height: 34px;
+		width: 30px;
+		height: 30px;
 		display: flex;
 		align-items: center;
 	}
