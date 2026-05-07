@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
-import { getUserById, getUserTimezone, db } from '$lib/server/db';
+import { getUserById, getUserTimezone, db, getConfiguredHistoryMonths } from '$lib/server/db';
 
 export const GET: RequestHandler = async ({ locals }) => {
 	if (!locals.user) {
@@ -14,8 +14,9 @@ export const GET: RequestHandler = async ({ locals }) => {
 	const mins = thresholdMinutes % 60;
 	const threshold = mins === 0 ? `${hours}h` : `${hours}h${mins.toString().padStart(2, '0')}`;
 
-	const oneYearAgo = new Date();
-	oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+	const historyMonths = getConfiguredHistoryMonths();
+	const historyCutoff = new Date();
+	historyCutoff.setMonth(historyCutoff.getMonth() - historyMonths);
 
 	try {
 		// Récupérer les enregistrements individuels pour vérifier le verrouillage
@@ -30,7 +31,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 			ORDER BY r.recorded_at ASC
 		`);
 
-		const results = stmt.all(locals.user.id, oneYearAgo.toISOString()) as {
+		const results = stmt.all(locals.user.id, historyCutoff.toISOString()) as {
 			recorded_at: string;
 			user_id: number;
 			listened_id: number | null;

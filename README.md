@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.33.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.34.0-blue?style=for-the-badge)
 
 </div>
 
@@ -28,7 +28,7 @@
 
 ## Description
 
-Maté Club est une application web PWA permettant à un groupe d'amis d'enregistrer et partager des capsules audio quotidiennes. Chaque membre peut enregistrer des messages vocaux jusqu'à 3 minutes, avec possibilité d'ajouter une miniature image et un lien URL.
+Maté Club est une application web PWA permettant à un groupe d'amis d'enregistrer et partager des capsules audio quotidiennes. Chaque membre peut enregistrer des messages vocaux avec une durée maximum configurable (3 minutes par défaut), avec possibilité d'ajouter une miniature image et un lien URL.
 
 ## Versioning
 
@@ -72,7 +72,7 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 ## Fonctionnalités
 
 ### Audio & Lecture
-- **Enregistrement audio** - Durée max 3 minutes avec compression WebM
+- **Enregistrement audio** - Durée max configurable (3 minutes par défaut) avec compression WebM
 - **Pause / reprise** - Une capsule peut être mise en pause puis reprise avant validation finale
 - **Brouillons locaux** - Chaque capsule terminée est conservée localement pour pouvoir en enregistrer plusieurs avant l’envoi
 - **Rail de brouillons** - Les capsules prêtes à envoyer sont pilotées depuis un rail horizontal compact avec une capsule active détaillée
@@ -146,6 +146,7 @@ L'application gère automatiquement les conversions de fuseaux horaires pour gar
 
 ### Panel Admin
 - **Gestion des utilisateurs** - Liste, création, suppression des non-admins
+- **Configuration du groupe** - Nom du groupe, durée d’historique en mois et durée maximum des messages audio
 - **Modification des seuils** - Heure de mise à disposition par utilisateur
 - **Super pouvoirs** - Attribution de privileges de lecture anticipée
 - **Promotion admin** - Un membre existant peut être promu administrateur
@@ -525,7 +526,7 @@ Variables d'environnement:
 
 ### BODY_SIZE_LIMIT (important)
 
-Pour allow sending audio recordings up to 3 minutes with images, vous devez configurer cette variable:
+Pour allow sending audio recordings up to the default 3 minutes with images, vous devez configurer cette variable:
 
 ```yaml
 # docker-compose.yml
@@ -581,7 +582,7 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 ### Page enregistrer
 
 - Bouton d'enregistrement microphone
-- Durée maximale : 3 minutes
+- Durée maximale : configurable depuis l’admin (3 minutes par défaut)
 - Zone pour ajouter une image
 - Champ pour ajouter une URL (doit commencer par https://)
 - Liste des enregistrements personnels avec :

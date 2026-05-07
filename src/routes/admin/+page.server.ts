@@ -19,7 +19,8 @@ import {
 	setUserAdmin,
 	updateUserPassword,
 	markLatestOtherRecordingsAsUnread,
-	getOldestAdminId
+	getOldestAdminId,
+	getAppSettings
 } from '$lib/server/db';
 
 export const load: PageServerLoad = async ({ locals }) => {
@@ -36,7 +37,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const pendingRegistrations = getPendingRegistrations();
 	const allowRegistration = isRegistrationAllowed();
 	const oldestAdminId = getOldestAdminId();
-	return { users, currentUser, csrfToken: locals.csrfToken, pendingRegistrations, allowRegistration, oldestAdminId };
+	const appSettings = getAppSettings();
+	return { users, currentUser, csrfToken: locals.csrfToken, pendingRegistrations, allowRegistration, oldestAdminId, appSettings };
 };
 
 export const actions: Actions = {
@@ -124,6 +126,61 @@ export const actions: Actions = {
 			toggleLogsEnabled(locals.user.id, enabled);
 		}
 		return { success: true };
+	},
+
+	saveGroupConfig: async ({ request, locals }) => {
+		if (!locals.user?.is_admin) {
+			return fail(403, { error: 'Non autorisé' });
+		}
+
+		const data = await request.formData();
+		const groupName = data.get('group_name')?.toString().trim() ?? '';
+		const historyMonthsRaw = data.get('history_months')?.toString() ?? '';
+		const maxMinutesRaw = data.get('max_recording_minutes')?.toString() ?? '';
+		const maxSecondsRaw = data.get('max_recording_seconds')?.toString() ?? '';
+		const currentSettings = getAppSettings();
+
+		if (groupName.length > currentSettings.maxGroupNameLength) {
+			return fail(400, { error: `Le nom du groupe ne doit pas dépasser ${currentSettings.maxGroupNameLength} caractères` });
+		}
+
+		if (!/^\d+$/.test(historyMonthsRaw)) {
+			return fail(400, { error: 'La durée d’historique doit être un nombre entier de mois' });
+		}
+
+		const historyMonths = Number.parseInt(historyMonthsRaw, 10);
+		if (historyMonths < 1 || historyMonths > 24) {
+			return fail(400, { error: 'La durée d’historique doit être comprise entre 1 et 24 mois' });
+		}
+
+		if (!/^\d+$/.test(maxMinutesRaw) || !/^\d+$/.test(maxSecondsRaw)) {
+			return fail(400, { error: 'La durée maximum des messages audio doit être composée de nombres entiers' });
+		}
+
+		const maxMinutes = Number.parseInt(maxMinutesRaw, 10);
+		const maxSeconds = Number.parseInt(maxSecondsRaw, 10);
+		if (maxSeconds < 0 || maxSeconds > 59 || maxMinutes < 0) {
+			return fail(400, { error: 'Les secondes doivent être comprises entre 0 et 59' });
+		}
+
+		const maxRecordingSeconds = maxMinutes * 60 + maxSeconds;
+		if (maxRecordingSeconds < 15) {
+			return fail(400, { error: 'La durée maximum doit être d’au moins 15 secondes' });
+		}
+
+		if (maxRecordingSeconds > 3600) {
+			return fail(400, { error: 'La durée maximum ne peut pas dépasser 60 minutes' });
+		}
+
+		setAppConfig('group_name', groupName);
+		setAppConfig('history_months', historyMonths.toString());
+		setAppConfig('max_recording_seconds', maxRecordingSeconds.toString());
+
+		return {
+			success: true,
+			message: 'Réglages du groupe enregistrés',
+			appSettings: getAppSettings()
+		};
 	},
 
 	markLatestUnread: async ({ locals }) => {

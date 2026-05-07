@@ -1,4 +1,5 @@
 	<script lang="ts">
+	import type { PageData } from './$types';
 	import { beforeNavigate } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import { get } from 'svelte/store';
@@ -26,6 +27,10 @@
 		recorded_at: string;
 		avatar?: string;
 		pseudo?: string;
+	};
+
+	type AppSettings = {
+		maxRecordingSeconds: number;
 	};
 
 	type RecordingImageEditorState = {
@@ -62,7 +67,6 @@
 		uploadProgress: number;
 	};
 
-	const MAX_DURATION = 180;
 	const RECORDING_WARNING_OFFSETS = [15, 10, 5] as const;
 	type RecordingWarningOffset = typeof RECORDING_WARNING_OFFSETS[number];
 	const RECORDING_WARNING_SOUNDS: Record<RecordingWarningOffset, string> = {
@@ -113,6 +117,7 @@
 	let isDeleting = $state(false);
 
 	let player = $state({ ...$playerStore });
+	let { data }: { data: PageData & { appSettings?: AppSettings } } = $props();
 
 	// Image viewer state
 	let selectedImageUrl = $state<string | null>(null);
@@ -818,7 +823,11 @@
 	}
 
 	function getRecordingDurationLimit() {
-		return MAX_DURATION;
+		return data.appSettings?.maxRecordingSeconds ?? 180;
+	}
+
+	function getRecordingDurationLimitLabel() {
+		return formatTimeSeconds(getRecordingDurationLimit());
 	}
 
 	function maybePlayRecordingWarning() {
@@ -1391,8 +1400,8 @@
 				</div>
 			{/if}
 			
-			<div class="timer {isRecording ? 'recording' : ''} {isRecording && timer >= 160 ? 'warning' : ''}">
-				{formatTimeSeconds(timer)} / 3:00
+			<div class="timer {isRecording ? 'recording' : ''} {isRecording && timer >= Math.max(0, getRecordingDurationLimit() - 20) ? 'warning' : ''}">
+				{formatTimeSeconds(timer)} / {getRecordingDurationLimitLabel()}
 			</div>
 
 			{#if isPaused}

@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { getRecordingsGroupedByDayWithHasMore, getUserById, getAllUsers, getUserTimezone, getUnreadCount, getPendingRegistrationsCount } from '$lib/server/db';
+import { getRecordingsGroupedByDayWithHasMore, getUserById, getAllUsers, getUserTimezone, getUnreadCount, getPendingRegistrationsCount, getAppSettings } from '$lib/server/db';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) {
@@ -15,6 +15,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const user = getUserById(locals.user.id);
 	const allUsers = getAllUsers();
 	const unreadStats = getUnreadCount(locals.user.id);
+	const appSettings = getAppSettings();
 
 	const thresholdMinutes = user?.daily_notification_hour ?? 420;
 	const hours = Math.floor(thresholdMinutes / 60);
@@ -32,6 +33,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		allUsers,
 		page,
 		unreadStats,
-		pendingRegistrationsCount
+		pendingRegistrationsCount,
+		groupName: appSettings.groupName
 	};
 };

@@ -2,6 +2,25 @@
 
 ---
 
+## v0.34.0 (2026-05-07) - Configuration globale du groupe
+
+### ✨ Nouvelles fonctionnalités
+
+#### Administration
+- **Bloc `Configuration du groupe`** : un nouvel espace en tête de l’admin centralise les réglages transverses du groupe
+- **Nom du groupe** : un nom facultatif peut être saisi pour personnaliser l’accueil avec `Bienvenue chez [nom du groupe], [utilisateur] !`
+- **Historique configurable** : la durée d’historique disponible n’est plus figée à 3 mois et devient pilotable en nombre entier de mois
+- **Durée max configurable** : la durée maximum des messages audio peut être définie en minutes et secondes depuis l’admin
+
+#### Application
+- **Accueil personnalisé** : le message de bienvenue affiche le nom du groupe quand il est renseigné
+- **Historique unifié** : l’accueil, le calendrier, `Charger plus`, `Mes enregistrements` et les profils utilisent désormais la même fenêtre d’historique
+- **Enregistrement synchronisé** : le minuteur, l’arrêt automatique et la validation serveur d’upload suivent la durée max configurée
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.34.0`
+- README.md : ajout de la configuration globale du groupe et des valeurs par défaut configurables
+
 ## v0.33.0 (2026-05-07) - Profils utilisateurs et enrichissement post-publication
 
 ### ✨ Nouvelles fonctionnalités

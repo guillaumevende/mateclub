@@ -20,6 +20,10 @@ if (!existsSync(uploadsDir)) {
 
 export const db = new Database(dbPath);
 
+const DEFAULT_HISTORY_MONTHS = 3;
+const DEFAULT_MAX_RECORDING_SECONDS = 180;
+const MAX_GROUP_NAME_LENGTH = 24;
+
 // No automatic admin creation - first admin must be created via /setup page
 
 	db.exec(`
@@ -158,7 +162,7 @@ try {
 	// Table déjà existante
 }
 
-try {
+	try {
 	db.exec(`
 		CREATE TABLE IF NOT EXISTS app_config (
 			key TEXT PRIMARY KEY,
@@ -168,8 +172,50 @@ try {
 	// Initialiser la configuration par défaut
 	const stmt = db.prepare('INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)');
 	stmt.run('allow_registration', 'false');
+	stmt.run('group_name', '');
+	stmt.run('history_months', DEFAULT_HISTORY_MONTHS.toString());
+	stmt.run('max_recording_seconds', DEFAULT_MAX_RECORDING_SECONDS.toString());
 } catch (e) {
 	// Table déjà existante
+}
+
+export type AppSettings = {
+	allowRegistration: boolean;
+	groupName: string;
+	historyMonths: number;
+	maxRecordingSeconds: number;
+	maxGroupNameLength: number;
+};
+
+function parseAppConfigInteger(value: string | null, fallback: number, min: number, max: number): number {
+	const parsed = Number.parseInt(value ?? '', 10);
+	if (!Number.isInteger(parsed)) return fallback;
+	return Math.min(max, Math.max(min, parsed));
+}
+
+function getHistoryCutoffDate(): Date {
+	const historyMonths = getConfiguredHistoryMonths();
+	const cutoff = new Date();
+	cutoff.setMonth(cutoff.getMonth() - historyMonths);
+	return cutoff;
+}
+
+export function getConfiguredHistoryMonths(): number {
+	return parseAppConfigInteger(getAppConfig('history_months'), DEFAULT_HISTORY_MONTHS, 1, 24);
+}
+
+export function getConfiguredMaxRecordingSeconds(): number {
+	return parseAppConfigInteger(getAppConfig('max_recording_seconds'), DEFAULT_MAX_RECORDING_SECONDS, 15, 60 * 60);
+}
+
+export function getAppSettings(): AppSettings {
+	return {
+		allowRegistration: isRegistrationAllowed(),
+		groupName: (getAppConfig('group_name') ?? '').trim().slice(0, MAX_GROUP_NAME_LENGTH),
+		historyMonths: getConfiguredHistoryMonths(),
+		maxRecordingSeconds: getConfiguredMaxRecordingSeconds(),
+		maxGroupNameLength: MAX_GROUP_NAME_LENGTH
+	};
 }
 
 export type User = {
@@ -315,8 +361,7 @@ export function getRecordingsByDate(userId: number, date: string): DayRecordings
 	if (!user) return null;
 
 	const timezone = user.timezone || 'Europe/Paris';
-	const threeMonthsAgo = new Date();
-	threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+	const historyCutoff = getHistoryCutoffDate();
 	const stmt = db.prepare(`
 		SELECT 
 			r.id, r.user_id, r.filename, r.image_filename, r.url, r.duration_seconds, r.recorded_at,
@@ -328,7 +373,7 @@ export function getRecordingsByDate(userId: number, date: string): DayRecordings
 		WHERE r.recorded_at >= ?
 		ORDER BY r.recorded_at ASC
 	`);
-	const results = stmt.all(userId, threeMonthsAgo.toISOString()) as Recording[];
+	const results = stmt.all(userId, historyCutoff.toISOString()) as Recording[];
 	const filteredResults = results.filter(
 		(recording) => getDateWithThreshold(recording.recorded_at, user.daily_notification_hour, timezone) === date
 	);
@@ -410,6 +455,7 @@ export function getRecordingsGroupedByDay(userId: number, limit = 7, page = 1, t
 
 	const userTimezone = timezone || user.timezone || 'Europe/Paris';
 	const threshold = user.daily_notification_hour;
+	const historyCutoff = getHistoryCutoffDate();
 
 	const offset = (page - 1) * limit;
 
@@ -421,10 +467,11 @@ export function getRecordingsGroupedByDay(userId: number, limit = 7, page = 1, t
 		FROM recordings r 
 		JOIN users u ON r.user_id = u.id 
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
+		WHERE r.recorded_at >= ?
 		ORDER BY r.recorded_at DESC
 		LIMIT ? OFFSET ?
 	`);
-	const results = stmt.all(userId, limit * 3, offset) as Recording[];
+	const results = stmt.all(userId, historyCutoff.toISOString(), limit * 3, offset) as Recording[];
 
 	const grouped: Record<string, Recording[]> = {};
 	for (const row of results) {
@@ -467,10 +514,8 @@ export function getRecordingsGroupedByDayWithHasMore(
 	const userTimezone = timezone || user.timezone || 'Europe/Paris';
 	const threshold = user.daily_notification_hour;
 
-	// Filtrer sur les 3 derniers mois
-	const threeMonthsAgo = new Date();
-	threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-	const threeMonthsAgoStr = threeMonthsAgo.toISOString();
+	const historyCutoff = getHistoryCutoffDate();
+	const historyCutoffStr = historyCutoff.toISOString();
 
 	const offset = (page - 1) * limit;
 
@@ -492,7 +537,7 @@ export function getRecordingsGroupedByDayWithHasMore(
 		LIMIT ? OFFSET ?
 	`);
 	// Demander enough records pour avoir tous les jours (limit * 10 par sécurité)
-	const results = stmt.all(userId, threeMonthsAgoStr, limit * 10, offset) as Recording[];
+	const results = stmt.all(userId, historyCutoffStr, limit * 10, offset) as Recording[];
 
 	const grouped: Record<string, Recording[]> = {};
 	for (const row of results) {
@@ -533,10 +578,7 @@ export function getRecordingsGroupedByDayWithHasMore(
 }
 
 export function getUnreadCount(userId: number): { count: number; totalSeconds: number } {
-	// Filtrer sur les 3 derniers mois pour correspondre à l'affichage
-	const threeMonthsAgo = new Date();
-	threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-	const threeMonthsAgoStr = threeMonthsAgo.toISOString();
+	const historyCutoffStr = getHistoryCutoffDate().toISOString();
 	
 	const stmt = db.prepare(`
 		SELECT 
@@ -546,7 +588,7 @@ export function getUnreadCount(userId: number): { count: number; totalSeconds: n
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
 		WHERE l.id IS NULL AND r.user_id != ? AND r.recorded_at >= ?
 	`);
-	const result = stmt.get(userId, userId, threeMonthsAgoStr) as { count: number; totalSeconds: number };
+	const result = stmt.get(userId, userId, historyCutoffStr) as { count: number; totalSeconds: number };
 	return result;
 }
 
@@ -591,9 +633,7 @@ export function verifyPassword(hash: string, password: string): boolean {
 export type UserWithCount = User & { recording_count: number };
 
 export function getAllUsers(): UserWithCount[] {
-	// Get all users with their recording count in the last 3 months
-	const threeMonthsAgo = new Date();
-	threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+	const historyCutoff = getHistoryCutoffDate();
 	
 	const stmt = db.prepare(`
 		SELECT 
@@ -607,7 +647,7 @@ export function getAllUsers(): UserWithCount[] {
 		FROM users u
 		ORDER BY recording_count DESC, u.pseudo ASC
 	`);
-	return stmt.all(threeMonthsAgo.toISOString()) as UserWithCount[];
+	return stmt.all(historyCutoff.toISOString()) as UserWithCount[];
 }
 
 export function deleteUser(id: number): void {
@@ -966,9 +1006,7 @@ export function getShortRecordings(filters: ShortRecordingFilters = {}): Recordi
 }
 
 export function getUserRecordings(userId: number, limit = 5, offset = 0): Recording[] {
-	// Get recordings for a specific user within the last 3 months
-	const threeMonthsAgo = new Date();
-	threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+	const historyCutoff = getHistoryCutoffDate();
 	
 	const stmt = db.prepare(`
 		SELECT r.id, r.user_id, r.filename, r.image_filename, r.duration_seconds, r.recorded_at, r.url, u.pseudo, u.avatar
@@ -979,12 +1017,11 @@ export function getUserRecordings(userId: number, limit = 5, offset = 0): Record
 		LIMIT ? OFFSET ?
 	`);
 	
-	return stmt.all(userId, threeMonthsAgo.toISOString(), limit, offset) as Recording[];
+	return stmt.all(userId, historyCutoff.toISOString(), limit, offset) as Recording[];
 }
 
 export function getUserRecordingsCount(userId: number): number {
-	const threeMonthsAgo = new Date();
-	threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+	const historyCutoff = getHistoryCutoffDate();
 	
 	const stmt = db.prepare(`
 		SELECT COUNT(*) as count
@@ -992,11 +1029,12 @@ export function getUserRecordingsCount(userId: number): number {
 		WHERE user_id = ? AND recorded_at >= ?
 	`);
 	
-	const result = stmt.get(userId, threeMonthsAgo.toISOString()) as { count: number };
+	const result = stmt.get(userId, historyCutoff.toISOString()) as { count: number };
 	return result.count;
 }
 
 export function getUserProfileImages(userId: number, limit = 8, offset = 0): ProfileImage[] {
+	const historyCutoff = getHistoryCutoffDate();
 	const stmt = db.prepare(`
 		SELECT
 			r.id,
@@ -1009,26 +1047,28 @@ export function getUserProfileImages(userId: number, limit = 8, offset = 0): Pro
 			u.avatar
 		FROM recordings r
 		JOIN users u ON u.id = r.user_id
-		WHERE r.user_id = ? AND r.image_filename IS NOT NULL
+		WHERE r.user_id = ? AND r.image_filename IS NOT NULL AND r.recorded_at >= ?
 		ORDER BY datetime(r.recorded_at) DESC, r.id DESC
 		LIMIT ? OFFSET ?
 	`);
 
-	return stmt.all(userId, limit, offset) as ProfileImage[];
+	return stmt.all(userId, historyCutoff.toISOString(), limit, offset) as ProfileImage[];
 }
 
 export function getUserProfileImagesCount(userId: number): number {
+	const historyCutoff = getHistoryCutoffDate();
 	const stmt = db.prepare(`
 		SELECT COUNT(*) as count
 		FROM recordings
-		WHERE user_id = ? AND image_filename IS NOT NULL
+		WHERE user_id = ? AND image_filename IS NOT NULL AND recorded_at >= ?
 	`);
 
-	const result = stmt.get(userId) as { count: number };
+	const result = stmt.get(userId, historyCutoff.toISOString()) as { count: number };
 	return result.count;
 }
 
 export function getUserRecentRecordings(userId: number, limit = 10): Recording[] {
+	const historyCutoff = getHistoryCutoffDate();
 	const stmt = db.prepare(`
 		SELECT
 			r.id,
@@ -1043,12 +1083,12 @@ export function getUserRecentRecordings(userId: number, limit = 10): Recording[]
 			u.avatar
 		FROM recordings r
 		JOIN users u ON u.id = r.user_id
-		WHERE r.user_id = ?
+		WHERE r.user_id = ? AND r.recorded_at >= ?
 		ORDER BY datetime(r.recorded_at) DESC, r.id DESC
 		LIMIT ?
 	`);
 
-	return stmt.all(userId, limit) as Recording[];
+	return stmt.all(userId, historyCutoff.toISOString(), limit) as Recording[];
 }
 
 export function getRecordingsForUser(userId: number): Recording[] {

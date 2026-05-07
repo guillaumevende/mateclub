@@ -47,6 +47,13 @@
 		recording_count?: number;
 	};
 
+	type AppSettings = {
+		groupName: string;
+		historyMonths: number;
+		maxRecordingSeconds: number;
+		maxGroupNameLength: number;
+	};
+
 	type DateInfo = {
 		hasRecordings: boolean;
 		hasUnread: boolean;
@@ -72,7 +79,7 @@
 		count: number;
 	};
 
-	let { data }: { data: PageData & { user?: User; allUsers: UserList[]; threshold: number; unreadStats?: { count: number; totalSeconds: number }; hasMore?: boolean; pendingRegistrationsCount?: number } } = $props();
+	let { data }: { data: PageData & { user?: User; allUsers: UserList[]; threshold: string; unreadStats?: { count: number; totalSeconds: number }; hasMore?: boolean; pendingRegistrationsCount?: number; groupName?: string; appSettings?: AppSettings } } = $props();
 
 	function getInitialHomeState() {
 		const initialPage = data.page ?? 1;
@@ -1081,7 +1088,13 @@
 		{/if}
 		<img src="/icon-512x512.png" alt="Maté Club" class="logo" />
 		<p class="date">{getTodayDate()}</p>
-		<p class="welcome">Bienvenue, {data.user?.pseudo} !</p>
+		<p class="welcome">
+			{#if (data.groupName || data.appSettings?.groupName)}
+				Bienvenue chez {data.groupName || data.appSettings?.groupName}, {data.user?.pseudo} !
+			{:else}
+				Bienvenue, {data.user?.pseudo} !
+			{/if}
+		</p>
 		{#if unreadStats.count > 0}
 			<button
 				class="unread-summary-pill"

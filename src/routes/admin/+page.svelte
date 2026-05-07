@@ -20,6 +20,13 @@
 		jingles_enabled?: number;
 	};
 
+	type AppSettings = {
+		groupName: string;
+		historyMonths: number;
+		maxRecordingSeconds: number;
+		maxGroupNameLength: number;
+	};
+
 	type PendingRegistration = {
 		id: number;
 		pseudo: string;
@@ -30,7 +37,7 @@
 		status: string;
 	};
 
-	let { data, form }: { data: PageData & { currentUser?: User; csrfToken?: string; pendingRegistrations?: PendingRegistration[]; allowRegistration?: boolean; oldestAdminId?: number | null }; form?: { success?: boolean; error?: string; message?: string } } = $props();
+	let { data, form }: { data: PageData & { currentUser?: User; csrfToken?: string; pendingRegistrations?: PendingRegistration[]; allowRegistration?: boolean; oldestAdminId?: number | null; appSettings: AppSettings }; form?: { success?: boolean; error?: string; message?: string } } = $props();
 
 	const emojis = ['☕', '😀', '😎', '🤠', '🥳', '😇', '🤩', '😈', '👻', '🤖', '🎸', '🎮', '🚀', '🍕', '🍺', '🌈', '🔥', '⭐', '❤️'];
 	
@@ -45,6 +52,13 @@
 	let unreadMarkingMessage = $state<string | null>(null);
 	let unreadMarkingError = $state<string | null>(null);
 	let unreadMarkingLoading = $state(false);
+	let groupConfigMessage = $state<string | null>(null);
+	let groupConfigError = $state<string | null>(null);
+	let isSavingGroupConfig = $state(false);
+	let groupName = $state('');
+	let historyMonths = $state(3);
+	let maxRecordingMinutes = $state(3);
+	let maxRecordingSeconds = $state(0);
 	
 	// État du formulaire de création
 	let isCreatingUser = $state(false);
@@ -65,6 +79,11 @@
 	$effect(() => {
 		superPowersEnabled = data.currentUser?.super_powers === 1;
 		allowRegistrationEnabled = data.allowRegistration === true;
+		groupName = data.appSettings?.groupName ?? '';
+		historyMonths = data.appSettings?.historyMonths ?? 3;
+		const duration = data.appSettings?.maxRecordingSeconds ?? 180;
+		maxRecordingMinutes = Math.floor(duration / 60);
+		maxRecordingSeconds = duration % 60;
 	});
 
 	function openDeleteModal(user: User) {
@@ -117,6 +136,101 @@
 
 <div class="container">
 	<h1>Administration</h1>
+
+	<section>
+		<h2>Configuration du groupe</h2>
+		<form method="POST" action="?/saveGroupConfig" use:enhance={() => {
+			isSavingGroupConfig = true;
+			groupConfigMessage = null;
+			groupConfigError = null;
+
+			return async ({ result }) => {
+				isSavingGroupConfig = false;
+
+				if (result.type === 'success') {
+					groupConfigMessage = (result.data as any)?.message || 'Réglages enregistrés';
+					const savedSettings = (result.data as any)?.appSettings as AppSettings | undefined;
+					if (savedSettings) {
+						groupName = savedSettings.groupName;
+						historyMonths = savedSettings.historyMonths;
+						maxRecordingMinutes = Math.floor(savedSettings.maxRecordingSeconds / 60);
+						maxRecordingSeconds = savedSettings.maxRecordingSeconds % 60;
+					}
+				} else if (result.type === 'failure') {
+					groupConfigError = (result.data as any)?.error || 'Impossible d’enregistrer les réglages';
+				}
+			};
+		}} class="group-config-form">
+			<input type="hidden" name="csrf_token" value={data.csrfToken} />
+			<label class="config-field">
+				<span class="config-label">Nom du groupe :</span>
+				<input
+					type="text"
+					name="group_name"
+					maxlength={data.appSettings.maxGroupNameLength}
+					bind:value={groupName}
+					placeholder="Facultatif"
+				/>
+				<span class="config-hint">{data.appSettings.maxGroupNameLength} caractères maximum</span>
+			</label>
+
+			<label class="config-field">
+				<span class="config-label">Durée d'historique disponible en mois :</span>
+				<input
+					type="number"
+					name="history_months"
+					min="1"
+					max="24"
+					step="1"
+					bind:value={historyMonths}
+					required
+				/>
+				<span class="config-hint">Nombre entier entre 1 et 24. Valeur par défaut : 3.</span>
+			</label>
+
+			<div class="config-field">
+				<span class="config-label">Durée maximum des messages audio :</span>
+				<div class="duration-config-fields">
+					<label>
+						<span>Minutes</span>
+						<input
+							type="number"
+							name="max_recording_minutes"
+							min="0"
+							max="60"
+							step="1"
+							bind:value={maxRecordingMinutes}
+							required
+						/>
+					</label>
+					<label>
+						<span>Secondes</span>
+						<input
+							type="number"
+							name="max_recording_seconds"
+							min="0"
+							max="59"
+							step="1"
+							bind:value={maxRecordingSeconds}
+							required
+						/>
+					</label>
+				</div>
+				<span class="config-hint">Valeur par défaut : 3 minutes et 0 seconde.</span>
+			</div>
+
+			{#if groupConfigMessage}
+				<p class="success-message">{groupConfigMessage}</p>
+			{/if}
+			{#if groupConfigError}
+				<p class="error-message">{groupConfigError}</p>
+			{/if}
+
+			<button type="submit" class="super-btn section-action-btn" disabled={isSavingGroupConfig}>
+				{isSavingGroupConfig ? 'Enregistrement...' : 'Enregistrer les réglages'}
+			</button>
+		</form>
+	</section>
 
 	<section>
 		<h2>Mes super pouvoirs</h2>
@@ -927,6 +1041,43 @@
 		width: 100%;
 		box-sizing: border-box;
 		text-align: center;
+	}
+
+	.group-config-form {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.config-field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+	}
+
+	.config-label {
+		color: #eee;
+		font-weight: 600;
+	}
+
+	.config-hint {
+		color: #8e8aa8;
+		font-size: 0.9rem;
+		line-height: 1.4;
+	}
+
+	.duration-config-fields {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.75rem;
+	}
+
+	.duration-config-fields label {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		color: #cfcde6;
+		font-size: 0.95rem;
 	}
 
 	/* Modal de confirmation */
