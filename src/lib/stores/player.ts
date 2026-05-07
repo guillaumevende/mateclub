@@ -78,6 +78,7 @@ let jingleElement: HTMLAudioElement | null = null;
 let endSoundElement: HTMLAudioElement | null = null;
 let playbackWakeLock: WakeLockSentinel | null = null;
 let isInitialized = false;
+const END_SOUND_MAX_WAIT_MS = 3500;
 
 // Jingle configuration - volume is now set in the MP3 file itself
 const JINGLE_CONFIG = {
@@ -136,6 +137,23 @@ function getEndSoundElement(): HTMLAudioElement {
 function playEndSound(soundUrl: string): Promise<void> {
   return new Promise((resolve) => {
     const endSound = getEndSoundElement();
+    let settled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const finish = (reason: string) => {
+      if (settled) return;
+      settled = true;
+
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      endSound.onended = null;
+      endSound.onerror = null;
+      logDebug(reason);
+      resolve();
+    };
     
     logDebug(`🔔 Playing end sound: ${soundUrl}`);
     
@@ -144,22 +162,27 @@ function playEndSound(soundUrl: string): Promise<void> {
     endSound.load();
     
     endSound.onended = () => {
-      logDebug('🔔 End sound finished');
-      endSound.onended = null;
-      resolve();
+      finish('🔔 End sound finished');
     };
     
     endSound.onerror = () => {
-      logDebug('🔔 End sound error, continuing...');
-      endSound.onerror = null;
-      resolve();
+      finish('🔔 End sound error, continuing...');
     };
+
+    timeoutId = setTimeout(() => {
+      finish('🔔 End sound timeout, continuing...');
+    }, END_SOUND_MAX_WAIT_MS);
     
     endSound.play().catch((e) => {
-      logDebug(`🔔 End sound play failed: ${e}`);
-      resolve();
+      finish(`🔔 End sound play failed: ${e}`);
     });
   });
+}
+
+function shouldWaitForTransitionSound(): boolean {
+  if (typeof document === 'undefined') return true;
+
+  return document.visibilityState === 'visible';
 }
 
 function playJingleIntro(): Promise<void> {
@@ -356,7 +379,7 @@ function initAudioElement() {
     if (now - lastEndedTime < 1000) return;
     lastEndedTime = now;
     
-    let state = get(playerStore);
+    const state = get(playerStore);
     const recordingThatJustFinished = state.currentRecording;
     const currentIndexAtEnd = state.currentIndex;
     const dayData = state.currentDayData;
@@ -371,7 +394,12 @@ function initAudioElement() {
     // Jouer le son de fin approprié
     const isLastRecordingOfDay = dayData && currentIndexAtEnd === dayData.recordings.length - 1;
     const endSoundUrl = isLastRecordingOfDay ? '/doudoudou.mp3' : '/ding.mp3';
-    await playEndSound(endSoundUrl);
+    if (shouldWaitForTransitionSound()) {
+      await playEndSound(endSoundUrl);
+    } else {
+      logDebug('🔔 Page en arrière-plan : son de transition lancé sans bloquer l’enchaînement');
+      void playEndSound(endSoundUrl);
+    }
     
     if (dayData && currentIndexAtEnd < dayData.recordings.length - 1) {
       const nextIndex = currentIndexAtEnd + 1;

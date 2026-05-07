@@ -2,6 +2,31 @@
 
 ---
 
+## v0.32.8 (2026-05-06) - Enchaînement arrière-plan non bloquant
+
+### 🐛 Corrections
+
+#### Lecture audio
+- **Enchaînement arrière-plan fiabilisé** : les sons de transition sont joués en best effort sur tous les navigateurs, sans exception spécifique Firefox Android
+- **Sons de transition non bloquants** : quand la page n'est pas visible, les jingles `ding` / fin de série sont lancés sans bloquer le démarrage de la capsule suivante
+- **Compatibilité Firefox Android** : si Firefox suspend l'événement de fin du `ding` hors premier plan, la capsule suivante démarre quand même immédiatement
+
+#### Interface
+- **Navigation Android / Firefox PWA** : la zone sous la navigation inférieure est maintenant peinte avec le fond de la nav pour éviter le filet de pixels de l'arrière-plan
+- **Autorisation micro Firefox Android** : l'app mémorise localement un accès micro validé pour éviter de réafficher l'écran "Autoriser le micro" quand Firefox indique encore `prompt`
+- **Flux micro plus propre** : le test d'autorisation coupe immédiatement les pistes audio ouvertes hors enregistrement réel
+
+### 🧪 Tests
+- `npm run check`
+- `npm test`
+- `npm run build`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.8`
+- README.md : mention de la compatibilité arrière-plan avec les navigateurs qui suspendent les sons de transition
+
+---
+
 ## v0.32.7 (2026-05-03) - Pastille non lue stabilisée
 
 ### 🐛 Corrections
