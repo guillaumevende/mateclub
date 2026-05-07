@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { redirect, json } from '@sveltejs/kit';
-import { getRecordingById, getRecordingFilePath, markAsListened, deleteRecording, updateRecordingImage } from '$lib/server/db';
+import { getRecordingById, getRecordingFilePath, markAsListened, deleteRecording, updateRecordingImage, updateRecordingUrl } from '$lib/server/db';
 import { existsSync, createReadStream, statSync, openSync, readSync, closeSync } from 'fs';
 import { detectAudioMimeType, isValidImageBuffer } from '$lib/server/fileValidation';
 import { Readable } from 'stream';
@@ -153,10 +153,6 @@ export const PATCH: RequestHandler = async ({ request, params, locals }) => {
 		return json({ error: 'Non autorisé' }, { status: 403 });
 	}
 
-	if (recording.image_filename) {
-		return json({ error: 'Cette capsule a déjà une image' }, { status: 400 });
-	}
-
 	const recordedAt = new Date(recording.recorded_at.includes('T') ? recording.recorded_at : `${recording.recorded_at.replace(' ', 'T')}Z`);
 	if (Number.isNaN(recordedAt.getTime()) || Date.now() - recordedAt.getTime() > 24 * 60 * 60 * 1000) {
 		return json({ error: 'Cette capsule n’est plus modifiable' }, { status: 400 });
@@ -169,9 +165,43 @@ export const PATCH: RequestHandler = async ({ request, params, locals }) => {
 		return json({ error: 'Requête invalide' }, { status: 400 });
 	}
 
+	const rawUrl = formData.get('url');
+	if (typeof rawUrl === 'string') {
+		const trimmedUrl = rawUrl.trim();
+
+		if (recording.url) {
+			return json({ error: 'Cette capsule a déjà un lien' }, { status: 400 });
+		}
+
+		if (!trimmedUrl) {
+			return json({ error: 'URL requise' }, { status: 400 });
+		}
+
+		try {
+			const parsed = new URL(trimmedUrl);
+			if (parsed.protocol !== 'https:') {
+				return json({ error: "L'URL doit commencer par https://" }, { status: 400 });
+			}
+		} catch {
+			return json({ error: 'URL invalide' }, { status: 400 });
+		}
+
+		try {
+			const updated = updateRecordingUrl(recordingId, trimmedUrl);
+			return json({ recording: updated });
+		} catch (error) {
+			console.error('Error updating recording url:', error);
+			return json({ error: 'Erreur lors de la mise à jour du lien' }, { status: 500 });
+		}
+	}
+
 	const image = formData.get('image');
 	if (!(image instanceof File) || image.size === 0) {
 		return json({ error: 'Image requise' }, { status: 400 });
+	}
+
+	if (recording.image_filename) {
+		return json({ error: 'Cette capsule a déjà une image' }, { status: 400 });
 	}
 
 	const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];

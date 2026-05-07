@@ -9,6 +9,7 @@
 	let { data, form }: { 
 		data: { 
 			user?: {
+				id: number;
 				pseudo: string;
 				avatar: string;
 				daily_notification_hour: number;
@@ -352,13 +353,15 @@
 
 	<!-- Affichage avatar actuel en haut -->
 	<div class="current-avatar-display">
-		{#if getAvatarDisplay().type === 'preview'}
-			<img src={getAvatarDisplay().value} alt="Avatar" class="avatar-image" />
-		{:else if getAvatarDisplay().type === 'image'}
-			<img src="/uploads/avatars/{getAvatarDisplay().value}" alt="Avatar" class="avatar-image" />
-		{:else}
-			<span class="avatar-emoji">{getAvatarDisplay().value}</span>
-		{/if}
+		<a href={`/profile/${data.user?.id}`} class="current-avatar-link" aria-label="Voir mon profil">
+			{#if getAvatarDisplay().type === 'preview'}
+				<img src={getAvatarDisplay().value} alt="Avatar" class="avatar-image" />
+			{:else if getAvatarDisplay().type === 'image'}
+				<img src="/uploads/avatars/{getAvatarDisplay().value}" alt="Avatar" class="avatar-image" />
+			{:else}
+				<span class="avatar-emoji">{getAvatarDisplay().value}</span>
+			{/if}
+		</a>
 		{#if isUploading}
 			<div class="upload-indicator">Upload...</div>
 		{/if}
@@ -600,6 +603,12 @@
 		justify-content: center;
 		margin-bottom: 1.5rem;
 		position: relative;
+	}
+
+	.current-avatar-link {
+		display: inline-flex;
+		border-radius: 999px;
+		text-decoration: none;
 	}
 
 	.avatar-image {

@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
 	import '$lib/shared.css';
-	import Avatar from '$lib/components/Avatar.svelte';
+	import UserProfileAvatarLink from '$lib/components/UserProfileAvatarLink.svelte';
 	import { scrollLock } from '$lib/actions/scrollLock';
 	import { onDestroy } from 'svelte';
 
@@ -478,7 +478,7 @@
 				<div class="user-card">
 					<div class="user-row">
 						<div class="user-left">
-							<Avatar avatar={user.avatar} size="small" />
+							<UserProfileAvatarLink userId={user.id} avatar={user.avatar} size="small" label={`Voir le profil de ${user.pseudo}`} />
 							<span class="user-pseudo">{user.pseudo}</span>
 						</div>
 						<div class="user-right">

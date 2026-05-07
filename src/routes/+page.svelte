@@ -3,12 +3,12 @@
 	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
 	import { generateCalendarMonths, type CalendarMonth } from '$lib/calendar';
-	import Avatar from '$lib/components/Avatar.svelte';
 	import ImageViewer from '$lib/components/ImageViewer.svelte';
 	import RecordingCard from '$lib/components/RecordingCard.svelte';
 	import TeamList from '$lib/components/TeamList.svelte';
 	import Calendar from '$lib/components/Calendar.svelte';
 	import CloseIconButton from '$lib/components/CloseIconButton.svelte';
+	import UserProfileAvatarLink from '$lib/components/UserProfileAvatarLink.svelte';
 	import { scrollLock } from '$lib/actions/scrollLock';
 	import { triggerHaptic, triggerLockedHaptic } from '$lib/utils/haptics';
 	import { playerStore, lastListenedRecordingId, type Recording, type DayRecordings, type PlayerState, playRecording, togglePlayPause, closePlayer, playNext } from '$lib/stores/player';
@@ -1238,12 +1238,8 @@
 							{#if showAuthors}
 							<div class="day-authors-header">
 								{#each displayAuthors as author, i}
-									<div 
-										class="author-avatar-header" 
-										title={author.pseudo}
-										style="margin-left: {i === 0 ? 0 : -17}px; z-index: {i}"
-									>
-										<Avatar avatar={author.avatar} size="small" />
+									<div class="author-avatar-header" title={author.pseudo} style="margin-left: {i === 0 ? 0 : -17}px; z-index: {i}">
+										<UserProfileAvatarLink userId={author.user_id} avatar={author.avatar} size="small" label={`Voir le profil de ${author.pseudo}`} />
 									</div>
 								{/each}
 								{#if hasMore}
@@ -1325,12 +1321,8 @@
 							{#if showAuthors}
 							<div class="day-authors-header">
 								{#each displayAuthors as author, i}
-									<div 
-										class="author-avatar-header" 
-										title={author.pseudo}
-										style="margin-left: {i === 0 ? 0 : -17}px; z-index: {i}"
-									>
-										<Avatar avatar={author.avatar} size="small" />
+									<div class="author-avatar-header" title={author.pseudo} style="margin-left: {i === 0 ? 0 : -17}px; z-index: {i}">
+										<UserProfileAvatarLink userId={author.user_id} avatar={author.avatar} size="small" label={`Voir le profil de ${author.pseudo}`} />
 									</div>
 								{/each}
 								{#if hasMore}
@@ -1397,12 +1389,8 @@
 						{#if showAuthors}
 						<div class="day-authors-header">
 							{#each displayAuthors as author, i}
-									<div 
-										class="author-avatar-header" 
-										title={author.pseudo}
-										style="margin-left: {i === 0 ? 0 : -17}px; z-index: {i}"
-									>
-										<Avatar avatar={author.avatar} size="small" />
+									<div class="author-avatar-header" title={author.pseudo} style="margin-left: {i === 0 ? 0 : -17}px; z-index: {i}">
+										<UserProfileAvatarLink userId={author.user_id} avatar={author.avatar} size="small" label={`Voir le profil de ${author.pseudo}`} />
 									</div>
 								{/each}
 								{#if hasMore}

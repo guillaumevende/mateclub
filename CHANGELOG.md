@@ -2,6 +2,30 @@
 
 ---
 
+## v0.33.0 (2026-05-07) - Profils utilisateurs et enrichissement post-publication
+
+### ✨ Nouvelles fonctionnalités
+
+#### Profils
+- **Page profil utilisateur** : cliquer sur un avatar ouvre désormais une page dédiée avec avatar, pseudo, galerie d’images et dernières capsules audio
+- **Galerie paginée** : les 8 dernières images publiées sont affichées, avec un bouton pour charger 8 images supplémentaires
+- **Zoom image** : chaque image de galerie peut être ouverte en grand
+- **Retour accueil** : un bouton dédié permet de revenir à l’accueil sans transformer le profil en entrée de navigation principale
+
+#### Capsules récentes
+- **Ajout d’image après publication** : depuis `Mes enregistrements` et depuis son propre profil, une capsule de moins de 24h sans photo affiche une zone pointillée `+` qui ouvre le composant photo existant
+- **Ajout de lien après publication** : depuis `Mes enregistrements` et depuis son propre profil, une capsule de moins de 24h sans lien affiche un bouton rond pointillé `+` pour ajouter une URL `https://`
+- **Navigation avatar généralisée** : les avatars cliquables sont maintenant reliés au profil utilisateur depuis les capsules, la page Réglages, la page Admin et la modale `La team`
+
+### 🐛 Corrections
+
+#### Réglages
+- **CTA principal mieux positionné** : le bouton `Sauvegarder` reste au-dessus du bloc `Tuto PWA`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.33.0`
+- README.md : ajout de la page profil, de la galerie utilisateur et de l’enrichissement post-publication des capsules récentes
+
 ## v0.32.12 (2026-05-07) - Ajout d’image sur capsules récentes
 
 ### ✨ Nouvelles fonctionnalités

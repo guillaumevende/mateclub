@@ -217,6 +217,17 @@ export type ShortRecordingFilters = {
 	offset?: number;
 };
 
+export type ProfileImage = {
+	id: number;
+	user_id: number;
+	image_filename: string;
+	recorded_at: string;
+	duration_seconds: number;
+	url: string | null;
+	pseudo: string;
+	avatar: string;
+};
+
 export type DayRecordings = {
 	date: string;
 	recordings: Recording[];
@@ -811,6 +822,16 @@ export function updateRecordingImage(recordingId: number, imageData: Buffer): Re
 	return getRecordingById(recordingId);
 }
 
+export function updateRecordingUrl(recordingId: number, url: string | null): Recording | undefined {
+	const recording = getRecordingById(recordingId);
+	if (!recording) return undefined;
+
+	const stmt = db.prepare('UPDATE recordings SET url = ? WHERE id = ?');
+	stmt.run(url, recordingId);
+
+	return getRecordingById(recordingId);
+}
+
 export function getRecordingById(id: number): Recording | undefined {
 	const stmt = db.prepare(`
 		SELECT r.*, u.pseudo, u.avatar
@@ -973,6 +994,61 @@ export function getUserRecordingsCount(userId: number): number {
 	
 	const result = stmt.get(userId, threeMonthsAgo.toISOString()) as { count: number };
 	return result.count;
+}
+
+export function getUserProfileImages(userId: number, limit = 8, offset = 0): ProfileImage[] {
+	const stmt = db.prepare(`
+		SELECT
+			r.id,
+			r.user_id,
+			r.image_filename,
+			r.recorded_at,
+			r.duration_seconds,
+			r.url,
+			u.pseudo,
+			u.avatar
+		FROM recordings r
+		JOIN users u ON u.id = r.user_id
+		WHERE r.user_id = ? AND r.image_filename IS NOT NULL
+		ORDER BY datetime(r.recorded_at) DESC, r.id DESC
+		LIMIT ? OFFSET ?
+	`);
+
+	return stmt.all(userId, limit, offset) as ProfileImage[];
+}
+
+export function getUserProfileImagesCount(userId: number): number {
+	const stmt = db.prepare(`
+		SELECT COUNT(*) as count
+		FROM recordings
+		WHERE user_id = ? AND image_filename IS NOT NULL
+	`);
+
+	const result = stmt.get(userId) as { count: number };
+	return result.count;
+}
+
+export function getUserRecentRecordings(userId: number, limit = 10): Recording[] {
+	const stmt = db.prepare(`
+		SELECT
+			r.id,
+			r.user_id,
+			r.filename,
+			r.image_filename,
+			r.url,
+			r.duration_seconds,
+			r.recorded_at,
+			0 as listened_by_user,
+			u.pseudo,
+			u.avatar
+		FROM recordings r
+		JOIN users u ON u.id = r.user_id
+		WHERE r.user_id = ?
+		ORDER BY datetime(r.recorded_at) DESC, r.id DESC
+		LIMIT ?
+	`);
+
+	return stmt.all(userId, limit) as Recording[];
 }
 
 export function getRecordingsForUser(userId: number): Recording[] {

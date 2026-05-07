@@ -1,6 +1,6 @@
 {
   "name": "mateclub",
-  "version": "0.32.12",
+  "version": "0.33.0",
   "type": "module",
   "scripts": {
     "dev": "vite dev --host",

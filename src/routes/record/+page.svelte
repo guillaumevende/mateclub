@@ -36,6 +36,13 @@
 		isSaving: boolean;
 	};
 
+	type RecordingLinkEditorState = {
+		recordingId: number;
+		url: string;
+		error: string | null;
+		isSaving: boolean;
+	};
+
 	type VisualizerBar = {
 		style: string;
 	};
@@ -110,6 +117,7 @@
 	// Image viewer state
 	let selectedImageUrl = $state<string | null>(null);
 	let recordingImageEditor = $state<RecordingImageEditorState | null>(null);
+	let recordingLinkEditor = $state<RecordingLinkEditorState | null>(null);
 
 	// Mic permission state
 	const MIC_ACCESS_TRUST_KEY = 'mateclub:mic-access-confirmed';
@@ -388,15 +396,23 @@
 	}
 
 	function canAddImageToRecording(recording: UserRecording) {
-		if (recording.image_filename) return false;
-
 		const recordedAt = recording.recorded_at.includes('T')
 			? new Date(recording.recorded_at)
 			: new Date(`${recording.recorded_at.replace(' ', 'T')}Z`);
 
 		if (Number.isNaN(recordedAt.getTime())) return false;
 
-		return Date.now() - recordedAt.getTime() <= 24 * 60 * 60 * 1000;
+		return !recording.image_filename && Date.now() - recordedAt.getTime() <= 24 * 60 * 60 * 1000;
+	}
+
+	function canAddUrlToRecording(recording: UserRecording) {
+		const recordedAt = recording.recorded_at.includes('T')
+			? new Date(recording.recorded_at)
+			: new Date(`${recording.recorded_at.replace(' ', 'T')}Z`);
+
+		if (Number.isNaN(recordedAt.getTime())) return false;
+
+		return !recording.url && Date.now() - recordedAt.getTime() <= 24 * 60 * 60 * 1000;
 	}
 
 	function openRecordingImageEditor(recording: UserRecording) {
@@ -413,6 +429,7 @@
 			error: null,
 			isSaving: false
 		};
+		recordingLinkEditor = null;
 	}
 
 	function closeRecordingImageEditor() {
@@ -421,6 +438,22 @@
 		}
 
 		recordingImageEditor = null;
+	}
+
+	function openRecordingLinkEditor(recording: UserRecording) {
+		if (!canAddUrlToRecording(recording)) return;
+
+		closeRecordingImageEditor();
+		recordingLinkEditor = {
+			recordingId: recording.id,
+			url: '',
+			error: null,
+			isSaving: false
+		};
+	}
+
+	function closeRecordingLinkEditor() {
+		recordingLinkEditor = null;
 	}
 
 	function setRecordingImageDraft(blob: Blob | null, preview: string | null) {
@@ -482,6 +515,47 @@
 		}
 	}
 
+	async function saveRecordingLink() {
+		if (!recordingLinkEditor) return;
+
+		const url = recordingLinkEditor.url.trim();
+		if (!url) {
+			recordingLinkEditor = { ...recordingLinkEditor, error: 'Entrez une URL avant de continuer.' };
+			return;
+		}
+
+		const editor = recordingLinkEditor;
+		recordingLinkEditor = { ...editor, isSaving: true, error: null };
+
+		try {
+			const formData = new FormData();
+			formData.append('url', url);
+
+			const res = await fetch(`/api/recordings/${editor.recordingId}`, {
+				method: 'PATCH',
+				body: formData
+			});
+
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				throw new Error(data.error || 'Impossible d’ajouter le lien');
+			}
+
+			userRecordings = userRecordings.map((recording) =>
+				recording.id === editor.recordingId
+					? { ...recording, url: data.recording?.url ?? recording.url }
+					: recording
+			);
+			closeRecordingLinkEditor();
+		} catch (e) {
+			recordingLinkEditor = {
+				...editor,
+				isSaving: false,
+				error: e instanceof Error ? e.message : 'Impossible d’ajouter le lien'
+			};
+		}
+	}
+
 	async function deleteRecording() {
 		if (!recordingToDelete) return;
 		
@@ -507,6 +581,9 @@
 	function confirmDelete(recording: UserRecording) {
 		if (recordingImageEditor?.recordingId === recording.id) {
 			closeRecordingImageEditor();
+		}
+		if (recordingLinkEditor?.recordingId === recording.id) {
+			closeRecordingLinkEditor();
 		}
 		recordingToDelete = recording;
 		showDeleteModal = true;
@@ -1526,6 +1603,15 @@
 								>
 									🔗
 								</a>
+							{:else if canAddUrlToRecording(recording)}
+								<button
+									type="button"
+									class="url-add-btn"
+									onclick={() => openRecordingLinkEditor(recording)}
+									aria-label="Ajouter un lien"
+								>
+									+
+								</button>
 							{:else}
 								<span class="url-placeholder"></span>
 							{/if}
@@ -1572,6 +1658,38 @@
 									disabled={recordingImageEditor.isSaving || !recordingImageEditor.imageBlob}
 								>
 									{recordingImageEditor.isSaving ? 'Ajout…' : 'Ajouter la photo'}
+								</button>
+							</div>
+						</div>
+					{/if}
+
+					{#if recordingLinkEditor?.recordingId === recording.id}
+						<div class="recording-image-editor">
+							<input
+								type="url"
+								class="url-input"
+								placeholder="Lien URL pour cette capsule (https://...)"
+								bind:value={recordingLinkEditor.url}
+							/>
+							{#if recordingLinkEditor.error}
+								<p class="error draft-error">{recordingLinkEditor.error}</p>
+							{/if}
+							<div class="recording-image-editor-actions">
+								<button
+									type="button"
+									class="draft-action-btn draft-action-btn-secondary"
+									onclick={closeRecordingLinkEditor}
+									disabled={recordingLinkEditor.isSaving}
+								>
+									Annuler
+								</button>
+								<button
+									type="button"
+									class="draft-action-btn draft-action-btn-primary"
+									onclick={saveRecordingLink}
+									disabled={recordingLinkEditor.isSaving || !recordingLinkEditor.url.trim()}
+								>
+									{recordingLinkEditor.isSaving ? 'Ajout…' : 'Ajouter le lien'}
 								</button>
 							</div>
 						</div>
@@ -2327,9 +2445,9 @@
 	}
 
 	.url-placeholder {
-		width: 1.25rem;
-		height: 1.25rem;
-		margin: 0.5rem;
+		width: 42px;
+		height: 42px;
+		display: inline-block;
 	}
 
 	.listen-btn {
@@ -2373,6 +2491,21 @@
 
 	.url-btn:hover {
 		opacity: 1;
+	}
+
+	.url-add-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 42px;
+		height: 42px;
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.03);
+		border: 2px dashed rgba(255, 255, 255, 0.18);
+		color: #d8d3e2;
+		font-size: 1.35rem;
+		font-weight: 700;
+		line-height: 1;
 	}
 
 	.btn {

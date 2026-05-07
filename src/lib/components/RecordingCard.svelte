@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Avatar from './Avatar.svelte';
+	import UserProfileAvatarLink from './UserProfileAvatarLink.svelte';
 	import type { Recording } from '$lib/stores/player';
 	import type { PlayerState } from '$lib/stores/player';
 
@@ -64,7 +64,13 @@
 	<div class="card-top">
 		<div class="card-meta">
 			<div class="card-author">
-				<Avatar avatar={recording.avatar} size="medium" />
+				<UserProfileAvatarLink
+					userId={recording.user_id}
+					avatar={recording.avatar}
+					size="medium"
+					label={`Voir le profil de ${recording.pseudo}`}
+					stopPropagation={true}
+				/>
 				<span class="pseudo" class:unread={!isListened}>{recording.pseudo}</span>
 			</div>
 		</div>
