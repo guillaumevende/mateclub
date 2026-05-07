@@ -118,6 +118,8 @@
 
 	let player = $state({ ...$playerStore });
 	let { data }: { data: PageData & { appSettings?: AppSettings } } = $props();
+	let recordingDurationLimit = $derived(data.appSettings?.maxRecordingSeconds ?? 180);
+	let recordingWarningThreshold = $derived(Math.max(0, recordingDurationLimit - 20));
 
 	// Image viewer state
 	let selectedImageUrl = $state<string | null>(null);
@@ -806,9 +808,9 @@
 	function startTimer() {
 		if (timerInterval) clearInterval(timerInterval);
 		timerInterval = setInterval(() => {
-			timer++;
+			timer = timer + 1;
 			maybePlayRecordingWarning();
-			if (timer >= getRecordingDurationLimit() && !isStopping) {
+			if (timer >= recordingDurationLimit && !isStopping) {
 				isStopping = true;
 				stopRecording();
 			}
@@ -823,7 +825,7 @@
 	}
 
 	function getRecordingDurationLimit() {
-		return data.appSettings?.maxRecordingSeconds ?? 180;
+		return recordingDurationLimit;
 	}
 
 	function getRecordingDurationLimitLabel() {
@@ -1400,7 +1402,7 @@
 				</div>
 			{/if}
 			
-			<div class="timer {isRecording ? 'recording' : ''} {isRecording && timer >= Math.max(0, getRecordingDurationLimit() - 20) ? 'warning' : ''}">
+			<div class="timer {isRecording ? 'recording' : ''} {isRecording && timer >= recordingWarningThreshold ? 'warning' : ''}">
 				{formatTimeSeconds(timer)} / {getRecordingDurationLimitLabel()}
 			</div>
 
