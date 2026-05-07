@@ -2,6 +2,23 @@
 
 ---
 
+## v0.32.9 (2026-05-07) - Nettoyage admin des capsules courtes
+
+### ✨ Nouvelles fonctionnalités
+
+#### Administration
+- **Section `Nettoyage`** : une nouvelle entrée dans l'admin ouvre un espace dédié à la suppression des messages très courts enregistrés par erreur
+- **Liste ciblée des capsules courtes** : la page de nettoyage affiche les enregistrements de moins de 10 secondes par ordre antéchronologique
+- **Recherche multicritère** : filtrage par auteur et plage de dates pour retrouver rapidement une capsule précise
+- **Pagination incrémentale** : chargement initial limité à 20 résultats, puis extension par lots de 20 via `Charger plus...`
+- **Actions directes** : lecture et suppression depuis la liste admin, avec aperçu visuel quand une vignette image est présente
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.9`
+- README.md : ajout du nettoyage admin des capsules courtes dans les fonctionnalités
+
+---
+
 ## v0.32.8 (2026-05-06) - Enchaînement arrière-plan non bloquant
 
 ### 🐛 Corrections

@@ -182,6 +182,14 @@
  	</section>
 
 	<section>
+		<h2>Nettoyage</h2>
+		<p class="super-text">
+			Supprimez des messages courts enregistrés par erreur.
+		</p>
+		<a class="super-btn cleanup-link" href="/admin/cleanup">Vérifier</a>
+	</section>
+
+	<section>
 		<h2>Logs</h2>
 		<p class="super-text">
 			Affichez le bouton d'accès aux logs du player audio (pour développement et debug).
@@ -888,6 +896,10 @@
 
 	.super-btn:hover {
 		background: #d63650;
+	}
+
+	.cleanup-link {
+		text-decoration: none;
 	}
 
 	/* Modal de confirmation */

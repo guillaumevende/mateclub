@@ -201,6 +201,22 @@ export type Recording = {
 	audio_hash?: string | null;
 };
 
+export type ShortRecordingAuthor = {
+	id: number;
+	pseudo: string;
+	avatar: string;
+	short_recording_count: number;
+};
+
+export type ShortRecordingFilters = {
+	authorId?: number | null;
+	fromDate?: string | null;
+	toDate?: string | null;
+	maxDurationSeconds?: number;
+	limit?: number;
+	offset?: number;
+};
+
 export type DayRecordings = {
 	date: string;
 	recordings: Recording[];
@@ -824,6 +840,75 @@ export function deleteRecording(recordingId: number): void {
 	// Supprimer l'enregistrement
 	const deleteStmt = db.prepare('DELETE FROM recordings WHERE id = ?');
 	deleteStmt.run(recordingId);
+}
+
+function buildShortRecordingFilters(filters: ShortRecordingFilters = {}) {
+	const clauses = ['r.duration_seconds < ?'];
+	const params: (number | string)[] = [filters.maxDurationSeconds ?? 10];
+
+	if (filters.authorId) {
+		clauses.push('r.user_id = ?');
+		params.push(filters.authorId);
+	}
+
+	if (filters.fromDate) {
+		clauses.push("datetime(r.recorded_at) >= datetime(?)");
+		params.push(`${filters.fromDate} 00:00:00`);
+	}
+
+	if (filters.toDate) {
+		clauses.push("datetime(r.recorded_at) <= datetime(?)");
+		params.push(`${filters.toDate} 23:59:59`);
+	}
+
+	return {
+		whereClause: clauses.join(' AND '),
+		params
+	};
+}
+
+export function getShortRecordingAuthors(maxDurationSeconds = 10): ShortRecordingAuthor[] {
+	const stmt = db.prepare(`
+		SELECT
+			u.id,
+			u.pseudo,
+			u.avatar,
+			COUNT(r.id) as short_recording_count
+		FROM recordings r
+		JOIN users u ON u.id = r.user_id
+		WHERE r.duration_seconds < ?
+		GROUP BY u.id, u.pseudo, u.avatar
+		ORDER BY LOWER(u.pseudo) ASC
+	`);
+
+	return stmt.all(maxDurationSeconds) as ShortRecordingAuthor[];
+}
+
+export function getShortRecordings(filters: ShortRecordingFilters = {}): Recording[] {
+	const limit = filters.limit ?? 20;
+	const offset = filters.offset ?? 0;
+	const { whereClause, params } = buildShortRecordingFilters(filters);
+
+	const stmt = db.prepare(`
+		SELECT
+			r.id,
+			r.user_id,
+			r.filename,
+			r.image_filename,
+			r.url,
+			r.duration_seconds,
+			r.recorded_at,
+			u.pseudo,
+			u.avatar,
+			0 as listened_by_user
+		FROM recordings r
+		JOIN users u ON u.id = r.user_id
+		WHERE ${whereClause}
+		ORDER BY datetime(r.recorded_at) DESC, r.id DESC
+		LIMIT ? OFFSET ?
+	`);
+
+	return stmt.all(...params, limit, offset) as Recording[];
 }
 
 export function getUserRecordings(userId: number, limit = 5, offset = 0): Recording[] {

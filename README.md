@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.32.8-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.32.9-blue?style=for-the-badge)
 
 </div>
 
@@ -146,6 +146,7 @@ L'application gère automatiquement les conversions de fuseaux horaires pour gar
 - **Super pouvoirs** - Attribution de privileges de lecture anticipée
 - **Promotion admin** - Un membre existant peut être promu administrateur
 - **Marquage non lu** - L'admin peut repasser les 5 dernières capsules d'autres utilisateurs en non lues pour ses propres tests
+- **Nettoyage admin** - Une page dédiée permet de lister, écouter et supprimer les capsules de moins de 10 secondes avec filtres par auteur et date
 - **Logs de debug** - Activation des logs audio / micro pour diagnostic, y compris pour un autre utilisateur
 - **Jingle d'intro** - Activation/désactivation du jingle musical
 - **Validation mobile clarifiée** - Les inscriptions en attente sont plus lisibles sur smartphone avec actions `Valider` / `Refuser` et la case `Admin` est respectée
@@ -597,6 +598,7 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 - Promotion d'un utilisateur existant en admin
 - Attribution des super_powers
 - Marquage des 5 dernières capsules d'autres utilisateurs comme non lues pour l'admin connecté
+- Nettoyage des capsules de moins de 10 secondes avec lecture, suppression et filtres auteur/date
 - Activation des logs de debug audio / micro, y compris pour un autre utilisateur
 - Activation du jingle d'intro
 

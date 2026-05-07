@@ -122,8 +122,8 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 		return json({ error: 'Enregistrement non trouvé' }, { status: 404 });
 	}
 
-	// Only allow users to delete their own recordings
-	if (recording.user_id !== locals.user.id) {
+	// Users can delete their own recordings; admins can clean up any recording
+	if (recording.user_id !== locals.user.id && !locals.user.is_admin) {
 		return json({ error: 'Non autorisé' }, { status: 403 });
 	}
 
