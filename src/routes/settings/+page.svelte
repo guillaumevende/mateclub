@@ -19,7 +19,7 @@
 			savedImage: string | null
 			version: string
 		}, 
-		form?: { success?: boolean; passwordError?: string; error?: string } 
+		form?: { success?: boolean; passwordError?: string; error?: string; markAllAsListenedSuccess?: boolean; markAllAsListenedMessage?: string } 
 	} = $props();
 
 	const emojis = ['☕', '😀', '😎', '🤠', '🥳', '😇', '🤩', '😈', '👻', '🤖', '🎸', '🎮', '🚀', '🍕', '🍺', '🌈', '🔥', '⭐', '❤️'];
@@ -43,6 +43,7 @@
 		savedImageFilename = data.savedImage;
 	});
 	let showSuccessModal = $state(false);
+	let showMarkAllAsListenedModal = $state(false);
 	let compressionProgress = $state(0);
 	let isCompressing = $state(false);
 	let isDragging = $state(false);
@@ -51,6 +52,7 @@
 	let hasPendingImage = $state(false);
 	let serverError = $state<string | null>(null);
 	let hourError = $state<string | null>(null);
+	let markAllAsListenedMessage = $state<string | null>(null);
 	
 	// Convertir daily_notification_hour (minutes ou heures) en format HH:mm pour l'input time
 	function minutesToHHmm(value: number): string {
@@ -112,6 +114,10 @@
 	
 	function closeSuccessModal() {
 		showSuccessModal = false;
+	}
+
+	function closeMarkAllAsListenedModal() {
+		showMarkAllAsListenedModal = false;
 	}
 	
 	function handleDragOver(e: DragEvent) {
@@ -296,6 +302,50 @@
 					extraClass="settings-success-close-btn"
 				/>
 				<p class="success-message">Paramètres sauvegardés avec succès !</p>
+			</div>
+		</div>
+	{/if}
+
+	{#if showMarkAllAsListenedModal}
+		<div
+			class="modal-overlay"
+			use:scrollLock={showMarkAllAsListenedModal}
+			onclick={closeMarkAllAsListenedModal}
+			onkeydown={(e) => e.key === 'Escape' && closeMarkAllAsListenedModal()}
+			role="button"
+			tabindex="0"
+			aria-label="Fermer la confirmation"
+		>
+			<div
+				class="modal confirm-modal"
+				onclick={(e) => e.stopPropagation()}
+				onkeydown={(e) => e.key === 'Escape' && closeMarkAllAsListenedModal()}
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="mark-all-listened-title"
+				tabindex="-1"
+			>
+				<h2 id="mark-all-listened-title">Êtes-vous sûr de vouloir tout marquer comme lu ?</h2>
+				<p class="confirm-modal-text">Attention, cette action est irréversible.</p>
+				<div class="confirm-modal-actions">
+					<form method="POST" use:enhance={() => {
+						return async ({ result, update }) => {
+							await update();
+							if (result.type === 'success') {
+								showMarkAllAsListenedModal = false;
+								markAllAsListenedMessage = (result.data as any)?.markAllAsListenedMessage || 'Publications marquées comme lues';
+								setTimeout(() => {
+									window.location.reload();
+								}, 1000);
+							}
+						};
+					}}>
+						<input type="hidden" name="intent" value="markAllAsListened" />
+						<input type="hidden" name="csrf_token" value={(data as any)?.csrfToken ?? ''} />
+						<button type="submit" class="confirm-yes-btn">Oui</button>
+					</form>
+					<button type="button" class="confirm-cancel-btn" onclick={closeMarkAllAsListenedModal}>Annuler</button>
+				</div>
 			</div>
 		</div>
 	{/if}
@@ -526,6 +576,17 @@
 	</section>
 
 	<button type="submit" form="settings-form">Sauvegarder</button>
+
+	<section class="settings-toggle-card update-card">
+		<h2>Se mettre à jour</h2>
+		<p class="description">Marquez toutes les publications existantes comme lues.</p>
+		<button type="button" class="toggle-button update-button" onclick={() => showMarkAllAsListenedModal = true}>
+			Tout marquer comme lu
+		</button>
+		{#if markAllAsListenedMessage}
+			<p class="success-message update-success">{markAllAsListenedMessage}</p>
+		{/if}
+	</section>
 
 	<a href="/logout" class="btn" data-sveltekit-reload>Déconnexion</a>
 
@@ -784,6 +845,14 @@
 		width: 100%;
 	}
 
+	.update-card {
+		margin-top: 1.5rem;
+	}
+
+	.update-button {
+		margin-top: 0;
+	}
+
 	.btn {
 		display: block;
 		width: 100%;
@@ -832,6 +901,51 @@
 		text-align: center;
 	}
 
+	.confirm-modal h2 {
+		color: #fff;
+		font-size: 1.2rem;
+		line-height: 1.4;
+	}
+
+	.confirm-modal-text {
+		color: #ffb4c0;
+		font-size: 0.95rem;
+		margin: 0 0 1.25rem;
+	}
+
+	.confirm-modal-actions {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.75rem;
+		align-items: stretch;
+	}
+
+	.confirm-modal-actions form,
+	.confirm-modal-actions button {
+		margin: 0;
+	}
+
+	.confirm-yes-btn,
+	.confirm-cancel-btn {
+		width: 100%;
+		padding: 0.85rem 1rem;
+		border: none;
+		border-radius: 10px;
+		font-size: 1rem;
+		font-weight: 700;
+		cursor: pointer;
+	}
+
+	.confirm-yes-btn {
+		background: #e94560;
+		color: #fff;
+	}
+
+	.confirm-cancel-btn {
+		background: #44485f;
+		color: #d3d5e3;
+	}
+
 	:global(.settings-success-close-btn) {
 		position: absolute;
 		top: 1rem;
@@ -843,6 +957,11 @@
 		font-size: 1.1rem;
 		font-weight: 500;
 		margin: 0;
+	}
+
+	.update-success {
+		margin-top: 0.75rem;
+		font-size: 0.95rem;
 	}
 
 	/* Compression progress bar */

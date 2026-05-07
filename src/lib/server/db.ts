@@ -1029,6 +1029,29 @@ export function markLatestOtherRecordingsAsUnread(userId: number, limit = 5): { 
 	};
 }
 
+export function markAllExistingOtherRecordingsAsListened(userId: number): { selectedCount: number; changedCount: number } {
+	const countStmt = db.prepare(`
+		SELECT COUNT(*) as count
+		FROM recordings
+		WHERE user_id != ?
+	`);
+	const countResult = countStmt.get(userId) as { count: number } | undefined;
+	const selectedCount = countResult?.count ?? 0;
+
+	const insertStmt = db.prepare(`
+		INSERT OR IGNORE INTO listening_history (user_id, recording_id)
+		SELECT ?, r.id
+		FROM recordings r
+		WHERE r.user_id != ?
+	`);
+	const result = insertStmt.run(userId, userId);
+
+	return {
+		selectedCount,
+		changedCount: result.changes
+	};
+}
+
 export function getRecordingFilePath(filename: string): string {
 	return join(uploadsDir, filename);
 }

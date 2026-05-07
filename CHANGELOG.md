@@ -2,6 +2,23 @@
 
 ---
 
+## v0.32.11 (2026-05-07) - Marquage global des publications comme lues
+
+### ✨ Nouvelles fonctionnalités
+
+#### Réglages
+- **Section `Se mettre à jour`** : un nouveau bloc en bas de la page Réglages permet de marquer d’un coup toutes les publications existantes comme lues
+- **Confirmation explicite** : le bouton `Tout marquer comme lu` ouvre une modale de confirmation avec validation irréversible mise en avant
+
+### 🔧 Technique
+- **Marquage massif serveur** : insertion en bloc dans `listening_history` pour toutes les publications d’autres utilisateurs, sans toucher aux propres capsules du membre connecté
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.11`
+- README.md : ajout de la fonction de mise à jour rapide dans les réglages utilisateur
+
+---
+
 ## v0.32.10 (2026-05-07) - Retrait contrôlé du statut admin
 
 ### ✨ Nouvelles fonctionnalités

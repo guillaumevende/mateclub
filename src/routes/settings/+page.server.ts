@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { redirect, fail } from '@sveltejs/kit';
 import { hashSync } from 'bcrypt';
-import { updateUserAvatar, updateUserHour, updateUserTimezone, getUserById, updateUserPassword, updateUserPseudo, isPseudoAvailable, deleteUserSessions, togglePwaTutorialEnabled } from '$lib/server/db';
+import { updateUserAvatar, updateUserHour, updateUserTimezone, getUserById, updateUserPassword, updateUserPseudo, isPseudoAvailable, deleteUserSessions, togglePwaTutorialEnabled, markAllExistingOtherRecordingsAsListened } from '$lib/server/db';
 import { readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { version } from '../../../package.json';
@@ -82,6 +82,18 @@ export const load: PageServerLoad = async ({ locals }) => {
 			const enabled = data.get('enabled') === 'true';
 			togglePwaTutorialEnabled(locals.user.id, enabled);
 			return { success: true };
+		}
+
+		if (intent === 'markAllAsListened') {
+			const result = markAllExistingOtherRecordingsAsListened(locals.user.id);
+			const plural = result.selectedCount > 1 ? 's' : '';
+			return {
+				success: true,
+				markAllAsListenedSuccess: true,
+				markAllAsListenedMessage: result.selectedCount === 0
+					? 'Aucune publication à marquer comme lue'
+					: `${result.selectedCount} publication${plural} marquée${plural} comme lue${plural}`
+			};
 		}
 
 		const avatar = data.get('avatar')?.toString() || '☕';
