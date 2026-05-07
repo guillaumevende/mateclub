@@ -2,6 +2,24 @@
 
 ---
 
+## v0.32.12 (2026-05-07) - Ajout d’image sur capsules récentes
+
+### ✨ Nouvelles fonctionnalités
+
+#### Enregistrements
+- **Ajout d’image après publication** : dans `Mes enregistrements`, les capsules des 24 dernières heures sans photo affichent désormais une zone pointillée `+`
+- **Réutilisation de l’interface existante** : un clic sur cette zone ouvre le même composant d’ajout photo que pour une capsule en cours de préparation
+- **Mise à jour ciblée** : l’image peut être ajoutée directement à la capsule existante sans repasser par un nouvel envoi
+
+### 🐛 Corrections
+
+#### Réglages
+- **Bouton `Sauvegarder` remonté** : le CTA principal des réglages repasse au-dessus du bloc `Tuto PWA` pour retrouver une hiérarchie plus cohérente
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.12`
+- README.md : ajout de la possibilité d’enrichir une capsule récente avec une image après publication
+
 ## v0.32.11 (2026-05-07) - Marquage global des publications comme lues
 
 ### ✨ Nouvelles fonctionnalités

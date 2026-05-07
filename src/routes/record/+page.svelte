@@ -28,6 +28,14 @@
 		pseudo?: string;
 	};
 
+	type RecordingImageEditorState = {
+		recordingId: number;
+		imageBlob: Blob | null;
+		imagePreview: string | null;
+		error: string | null;
+		isSaving: boolean;
+	};
+
 	type VisualizerBar = {
 		style: string;
 	};
@@ -101,6 +109,7 @@
 
 	// Image viewer state
 	let selectedImageUrl = $state<string | null>(null);
+	let recordingImageEditor = $state<RecordingImageEditorState | null>(null);
 
 	// Mic permission state
 	const MIC_ACCESS_TRUST_KEY = 'mateclub:mic-access-confirmed';
@@ -378,6 +387,101 @@
 		await loadRecordings();
 	}
 
+	function canAddImageToRecording(recording: UserRecording) {
+		if (recording.image_filename) return false;
+
+		const recordedAt = recording.recorded_at.includes('T')
+			? new Date(recording.recorded_at)
+			: new Date(`${recording.recorded_at.replace(' ', 'T')}Z`);
+
+		if (Number.isNaN(recordedAt.getTime())) return false;
+
+		return Date.now() - recordedAt.getTime() <= 24 * 60 * 60 * 1000;
+	}
+
+	function openRecordingImageEditor(recording: UserRecording) {
+		if (!canAddImageToRecording(recording)) return;
+
+		if (recordingImageEditor?.imagePreview) {
+			URL.revokeObjectURL(recordingImageEditor.imagePreview);
+		}
+
+		recordingImageEditor = {
+			recordingId: recording.id,
+			imageBlob: null,
+			imagePreview: null,
+			error: null,
+			isSaving: false
+		};
+	}
+
+	function closeRecordingImageEditor() {
+		if (recordingImageEditor?.imagePreview) {
+			URL.revokeObjectURL(recordingImageEditor.imagePreview);
+		}
+
+		recordingImageEditor = null;
+	}
+
+	function setRecordingImageDraft(blob: Blob | null, preview: string | null) {
+		if (!recordingImageEditor) return;
+
+		if (recordingImageEditor.imagePreview && recordingImageEditor.imagePreview !== preview) {
+			URL.revokeObjectURL(recordingImageEditor.imagePreview);
+		}
+
+		recordingImageEditor = {
+			...recordingImageEditor,
+			imageBlob: blob,
+			imagePreview: preview,
+			error: null
+		};
+	}
+
+	async function saveRecordingImage() {
+		if (!recordingImageEditor?.imageBlob) {
+			recordingImageEditor = recordingImageEditor
+				? { ...recordingImageEditor, error: 'Choisissez une image avant de continuer.' }
+				: null;
+			return;
+		}
+
+		const editor = recordingImageEditor as RecordingImageEditorState & { imageBlob: Blob };
+		recordingImageEditor = { ...editor, isSaving: true, error: null };
+
+		try {
+			const formData = new FormData();
+			formData.append('image', editor.imageBlob, getImageFilename(editor.imageBlob));
+
+			const res = await fetch(`/api/recordings/${editor.recordingId}`, {
+				method: 'PATCH',
+				body: formData
+			});
+
+			const data = await res.json().catch(() => ({}));
+
+			if (!res.ok) {
+				throw new Error(data.error || 'Impossible d’ajouter l’image');
+			}
+
+			userRecordings = userRecordings.map((recording) =>
+				recording.id === editor.recordingId
+					? { ...recording, image_filename: data.recording?.image_filename ?? recording.image_filename }
+					: recording
+			);
+			closeRecordingImageEditor();
+		} catch (e) {
+			recordingImageEditor = recordingImageEditor
+				? {
+						...recordingImageEditor,
+						isSaving: false,
+						error: e instanceof Error ? e.message : 'Impossible d’ajouter l’image'
+					}
+				: null;
+			return;
+		}
+	}
+
 	async function deleteRecording() {
 		if (!recordingToDelete) return;
 		
@@ -401,6 +505,9 @@
 	}
 
 	function confirmDelete(recording: UserRecording) {
+		if (recordingImageEditor?.recordingId === recording.id) {
+			closeRecordingImageEditor();
+		}
 		recordingToDelete = recording;
 		showDeleteModal = true;
 	}
@@ -1382,47 +1489,93 @@
 		<div class="recordings-list">
 			{#each userRecordings as recording}
 				{@const isCurrentlyPlaying = player.currentRecording?.id === recording.id && player.isPlaying}
-				<div class="recording-item">
-					{#if recording.image_filename}
-						<button 
-							class="recording-thumb" 
-							onclick={() => selectedImageUrl = `/uploads/${recording.image_filename}`}
-							aria-label="Voir l'image"
-						>
-							<img src="/uploads/{recording.image_filename}" alt="" />
-						</button>
-					{:else}
-						<div class="recording-thumb recording-thumb-empty">🎙️</div>
-					{/if}
-				<div class="recording-info">
-					<span class="recording-date">{formatDate(recording.recorded_at)} ({formatTime(recording.recorded_at)})</span>
-					<span class="recording-duration">{formatDuration(recording.duration_seconds)}</span>
-				</div>
-					<div class="recording-item-actions">
-						{#if recording.url}
-							<a 
-								href={recording.url}
-								target="_blank"
-								rel="noopener noreferrer"
-								class="url-btn"
-								aria-label="Ouvrir le lien"
+				<div class="recording-item-wrapper">
+					<div class="recording-item">
+						{#if recording.image_filename}
+							<button
+								class="recording-thumb"
+								onclick={() => selectedImageUrl = `/uploads/${recording.image_filename}`}
+								aria-label="Voir l'image"
 							>
-								🔗
-							</a>
+								<img src="/uploads/{recording.image_filename}" alt="" />
+							</button>
+						{:else if canAddImageToRecording(recording)}
+							<button
+								type="button"
+								class="recording-thumb recording-thumb-add"
+								onclick={() => openRecordingImageEditor(recording)}
+								aria-label="Ajouter une image à cette capsule"
+							>
+								<span class="recording-thumb-add-icon">+</span>
+							</button>
 						{:else}
-							<span class="url-placeholder"></span>
+							<div class="recording-thumb recording-thumb-empty">🎙️</div>
 						{/if}
-						<button 
-							class="listen-btn" 
-							onclick={() => playRecording(recording)}
-							aria-label="Écouter"
-						>
-							{isCurrentlyPlaying ? '⏸️' : '▶️'}
-						</button>
-						<button class="delete-btn" onclick={() => confirmDelete(recording)} aria-label="Supprimer">
-							🗑️
-						</button>
+						<div class="recording-info">
+							<span class="recording-date">{formatDate(recording.recorded_at)} ({formatTime(recording.recorded_at)})</span>
+							<span class="recording-duration">{formatDuration(recording.duration_seconds)}</span>
+						</div>
+						<div class="recording-item-actions">
+							{#if recording.url}
+								<a
+									href={recording.url}
+									target="_blank"
+									rel="noopener noreferrer"
+									class="url-btn"
+									aria-label="Ouvrir le lien"
+								>
+									🔗
+								</a>
+							{:else}
+								<span class="url-placeholder"></span>
+							{/if}
+							<button
+								class="listen-btn"
+								onclick={() => playRecording(recording)}
+								aria-label="Écouter"
+							>
+								{isCurrentlyPlaying ? '⏸️' : '▶️'}
+							</button>
+							<button class="delete-btn" onclick={() => confirmDelete(recording)} aria-label="Supprimer">
+								🗑️
+							</button>
+						</div>
 					</div>
+
+					{#if recordingImageEditor?.recordingId === recording.id}
+						<div class="recording-image-editor">
+							{#key recording.id}
+								<ImageUpload
+									onImageChange={setRecordingImageDraft}
+									onWarning={(warning) => {
+										if (!recordingImageEditor) return;
+										recordingImageEditor = { ...recordingImageEditor, error: warning };
+									}}
+								/>
+							{/key}
+							{#if recordingImageEditor.error}
+								<p class="error draft-error">{recordingImageEditor.error}</p>
+							{/if}
+							<div class="recording-image-editor-actions">
+								<button
+									type="button"
+									class="draft-action-btn draft-action-btn-secondary"
+									onclick={closeRecordingImageEditor}
+									disabled={recordingImageEditor.isSaving}
+								>
+									Annuler
+								</button>
+								<button
+									type="button"
+									class="draft-action-btn draft-action-btn-primary"
+									onclick={saveRecordingImage}
+									disabled={recordingImageEditor.isSaving || !recordingImageEditor.imageBlob}
+								>
+									{recordingImageEditor.isSaving ? 'Ajout…' : 'Ajouter la photo'}
+								</button>
+							</div>
+						</div>
+					{/if}
 				</div>
 			{/each}
 		</div>
@@ -2077,6 +2230,12 @@
 		gap: 0.75rem;
 	}
 
+	.recording-item-wrapper {
+		display: flex;
+		flex-direction: column;
+		gap: 0.55rem;
+	}
+
 	.recording-item {
 		display: flex;
 		align-items: center;
@@ -2112,6 +2271,21 @@
 		font-size: 1.5rem;
 	}
 
+	.recording-thumb-add {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: rgba(255, 255, 255, 0.03);
+		border: 2px dashed rgba(255, 255, 255, 0.18);
+		color: #d8d3e2;
+	}
+
+	.recording-thumb-add-icon {
+		font-size: 1.9rem;
+		font-weight: 700;
+		line-height: 1;
+	}
+
 	.recording-info {
 		flex: 1;
 		display: flex;
@@ -2133,6 +2307,23 @@
 		display: flex;
 		align-items: center;
 		gap: 0.25rem;
+	}
+
+	.recording-image-editor {
+		display: flex;
+		flex-direction: column;
+		gap: 0.9rem;
+		padding: 0.95rem;
+		border-radius: 14px;
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid rgba(255, 255, 255, 0.06);
+	}
+
+	.recording-image-editor-actions {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 0.75rem;
 	}
 
 	.url-placeholder {

@@ -561,6 +561,8 @@
 		</section>
 	</form>
 
+	<button type="submit" form="settings-form">Sauvegarder</button>
+
 	<section class="settings-toggle-card">
 		<h2>Tuto PWA</h2>
 		<p class="description">Masque ou réactive les popups qui expliquent comment installer Maté Club en app.</p>
@@ -574,8 +576,6 @@
 			</button>
 		</form>
 	</section>
-
-	<button type="submit" form="settings-form">Sauvegarder</button>
 
 	<section class="settings-toggle-card update-card">
 		<h2>Se mettre à jour</h2>

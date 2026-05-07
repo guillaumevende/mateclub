@@ -790,6 +790,27 @@ export function saveRecording(userId: number, audioData: Buffer, durationSeconds
 	return getRecordingById(result.lastInsertRowid as number)!;
 }
 
+export function updateRecordingImage(recordingId: number, imageData: Buffer): Recording | undefined {
+	const recording = getRecordingById(recordingId);
+	if (!recording) return undefined;
+
+	if (recording.image_filename) {
+		const existingImagePath = join(uploadsDir, recording.image_filename);
+		if (existsSync(existingImagePath)) {
+			unlinkSync(existingImagePath);
+		}
+	}
+
+	const imageFilename = `${Date.now()}-${crypto.randomUUID()}.jpg`;
+	const imagePath = join(uploadsDir, imageFilename);
+	writeFileSync(imagePath, imageData);
+
+	const stmt = db.prepare('UPDATE recordings SET image_filename = ? WHERE id = ?');
+	stmt.run(imageFilename, recordingId);
+
+	return getRecordingById(recordingId);
+}
+
 export function getRecordingById(id: number): Recording | undefined {
 	const stmt = db.prepare(`
 		SELECT r.*, u.pseudo, u.avatar

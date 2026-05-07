@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.32.11-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.32.12-blue?style=for-the-badge)
 
 </div>
 
@@ -94,6 +94,7 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 
 ### Médias
 - **Miniatures** - Ajout d'images aux enregistrements (45x45px avec bordure)
+- **Photo ajoutable après coup** - Une capsule des 24 dernières heures peut recevoir une image après publication si elle a été envoyée sans photo
 - **Compression automatique** - Images compressées avant upload (~100KB)
 - **Support HEIC/HEIF** - Conversion automatique des photos Apple (HEIC→JPEG)
 - **Visionneuse plein écran** - Affichage des images en grand
