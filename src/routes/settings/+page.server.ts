@@ -5,6 +5,7 @@ import { updateUserAvatar, updateUserHour, updateUserTimezone, getUserById, upda
 import { readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { version } from '../../../package.json';
+import { getPushRuntimeConfig } from '$lib/server/push';
 
 // Regex pour validation pseudo: lettres, chiffres, accents européens, espaces, - . _
 const PSEUDO_REGEX = /^[a-zA-Z0-9\s\-._àáâãäåæçèéêëìíîïñòóôõöùúûüýÿÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝŸ]{3,22}$/;
@@ -65,7 +66,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 		timezones,
 		savedImage,
 		csrfToken: locals.csrfToken ?? '',
-		version
+		version,
+		pushConfig: getPushRuntimeConfig()
 	};
 };
 

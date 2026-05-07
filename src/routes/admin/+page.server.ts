@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { redirect, fail } from '@sveltejs/kit';
 import { hashSync } from 'bcrypt';
-import { 
+import {
 	getAllUsers, 
 	createUser, 
 	deleteUser, 
@@ -22,6 +22,7 @@ import {
 	getOldestAdminId,
 	getAppSettings
 } from '$lib/server/db';
+import { getPushRuntimeConfig } from '$lib/server/push';
 
 export const load: PageServerLoad = async ({ locals }) => {
 	if (!locals.user) {
@@ -38,7 +39,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const allowRegistration = isRegistrationAllowed();
 	const oldestAdminId = getOldestAdminId();
 	const appSettings = getAppSettings();
-	return { users, currentUser, csrfToken: locals.csrfToken, pendingRegistrations, allowRegistration, oldestAdminId, appSettings };
+	const pushConfig = getPushRuntimeConfig();
+	return { users, currentUser, csrfToken: locals.csrfToken, pendingRegistrations, allowRegistration, oldestAdminId, appSettings, pushConfig };
 };
 
 export const actions: Actions = {

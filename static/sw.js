@@ -1,4 +1,6 @@
-const CACHE_VERSION = 'v7';
+/* global self, caches, console, Headers, Response, fetch, URL */
+
+const CACHE_VERSION = 'v8';
 const CACHE_NAME_IMAGES = `mateclub-images-${CACHE_VERSION}`;
 const CACHE_NAME_AUDIO = `mateclub-audio-${CACHE_VERSION}`;
 const CACHE_DURATION = 90 * 24 * 60 * 60 * 1000; // 3 mois en millisecondes
@@ -129,4 +131,44 @@ self.addEventListener('message', event => {
 	if (event.data === 'skipWaiting') {
 		self.skipWaiting();
 	}
+});
+
+self.addEventListener('push', event => {
+	if (!event.data) {
+		return;
+	}
+
+	const payload = event.data.json();
+	const title = payload.title || 'Maté Club';
+	const options = {
+		body: payload.body || '',
+		icon: payload.icon || '/icon-192x192.png',
+		badge: payload.badge || '/icon-192x192.png',
+		tag: payload.tag || 'mateclub-notification',
+		data: payload.data || { url: '/' }
+	};
+
+	event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', event => {
+	event.notification.close();
+
+	const targetUrl = event.notification.data?.url || '/';
+
+	event.waitUntil((async () => {
+		const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+		for (const client of allClients) {
+			const clientUrl = new URL(client.url);
+			if (clientUrl.origin === self.location.origin) {
+				await client.focus();
+				if ('navigate' in client) {
+					await client.navigate(targetUrl);
+				}
+				return;
+			}
+		}
+
+		await self.clients.openWindow(targetUrl);
+	})());
 });

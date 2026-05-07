@@ -1,6 +1,6 @@
 {
   "name": "mateclub",
-  "version": "0.34.0",
+  "version": "0.35.0",
   "type": "module",
   "scripts": {
     "dev": "vite dev --host",
@@ -28,12 +28,14 @@
     "svelte": "^5.53.9",
     "typescript": "^5.9.3",
     "vite": "^8.0.1",
-    "web-haptics": "^0.0.6"
+    "web-haptics": "^0.0.6",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/bcrypt": "^6.0.0",
     "@types/better-sqlite3": "^7.6.13",
+    "@types/web-push": "^3.6.4",
     "eslint": "^10.1.0",
     "eslint-plugin-svelte": "^3.16.0",
     "node-gyp": "^12.2.0",

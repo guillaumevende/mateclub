@@ -2,6 +2,30 @@
 
 ---
 
+## v0.35.0 (2026-05-07) - Notifications push quotidiennes
+
+### ✨ Nouvelles fonctionnalités
+
+#### Notifications push
+- **Support Web Push / VAPID** : Maté Club peut désormais enregistrer des abonnements push navigateur et envoyer des notifications quotidiennes depuis un serveur auto-hébergé
+- **Opt-in utilisateur** : un nouveau bouton dans `Réglages`, juste sous l’heure de mise à disposition, permet d’activer ou désactiver les notifications push
+- **Message quotidien ciblé** : à l’heure de livraison quotidienne, une notification `C'est l'heure de venir profiter de ton Yerba Maté !` est envoyée uniquement s’il reste des capsules non lues disponibles
+- **Déclenchement sans doublon** : un journal interne empêche les réenvois multiples la même journée pour un même utilisateur
+
+#### Administration
+- **Bloc `Notifications push`** : l’admin voit immédiatement si le serveur est prêt pour les push
+- **État serveur explicite** : si les clés VAPID sont absentes, le bloc explique quelles variables renseigner côté Docker et rappelle la commande de génération
+
+### 🔧 Technique
+- **Service Worker enrichi** : prise en charge des événements `push` et `notificationclick` pour afficher les notifications et rouvrir l’application
+- **Scheduler serveur léger** : un contrôle périodique intégré au runtime Node vérifie les livraisons quotidiennes seulement quand la configuration VAPID est disponible
+- **Abonnements persistés** : stockage SQLite des abonnements push, de leur état et de l’historique journalier d’envoi
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.35.0`
+- README.md : ajout de la configuration VAPID et du comportement des notifications push
+- package.json / package-lock.json : version portée en `0.35.0`
+
 ## v0.34.0 (2026-05-07) - Configuration globale du groupe
 
 ### ✨ Nouvelles fonctionnalités

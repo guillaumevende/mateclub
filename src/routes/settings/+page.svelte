@@ -4,9 +4,17 @@
 	import CloseIconButton from '$lib/components/CloseIconButton.svelte';
 	import imageCompression from 'browser-image-compression';
 	import { scrollLock } from '$lib/actions/scrollLock';
+	import { onMount } from 'svelte';
 
 	type Timezone = { value: string; label: string };
-	let { data, form }: { 
+	type BrowserNotificationPermission = 'default' | 'denied' | 'granted';
+	type PushConfig = {
+		configured: boolean;
+		publicKey: string | null;
+		subject: string | null;
+		missingKeys: string[];
+	};
+	let { data }: { 
 		data: { 
 			user?: {
 				id: number;
@@ -15,12 +23,13 @@
 				daily_notification_hour: number;
 				timezone: string;
 				pwa_tutorial_enabled?: number;
+				push_notifications_enabled?: number;
 			}
 			timezones: Timezone[]
 			savedImage: string | null
 			version: string
+			pushConfig: PushConfig
 		}, 
-		form?: { success?: boolean; passwordError?: string; error?: string; markAllAsListenedSuccess?: boolean; markAllAsListenedMessage?: string } 
 	} = $props();
 
 	const emojis = ['☕', '😀', '😎', '🤠', '🥳', '😇', '🤩', '😈', '👻', '🤖', '🎸', '🎮', '🚀', '🍕', '🍺', '🌈', '🔥', '⭐', '❤️'];
@@ -54,6 +63,12 @@
 	let serverError = $state<string | null>(null);
 	let hourError = $state<string | null>(null);
 	let markAllAsListenedMessage = $state<string | null>(null);
+	let pushToggleLoading = $state(false);
+	let pushToggleMessage = $state<string | null>(null);
+	let pushToggleError = $state<string | null>(null);
+	let pushSupported = $state(false);
+	let pushPermission = $state<BrowserNotificationPermission>('default');
+	let pushEnabled = $state(data.user?.push_notifications_enabled === 1);
 	
 	// Convertir daily_notification_hour (minutes ou heures) en format HH:mm pour l'input time
 	function minutesToHHmm(value: number): string {
@@ -76,7 +91,7 @@
 		selectedHour = minutesToHHmm(data.user?.daily_notification_hour ?? 420);
 		selectedTimezone = data.user?.timezone || 'Europe/Paris';
 	});
-	
+
 	// Synchroniser avec data quand la page recharge (mais pas si l'utilisateur a déjà modifié le pseudo)
 	let hasUserModifiedPseudo = $state(false);
 	
@@ -119,6 +134,107 @@
 
 	function closeMarkAllAsListenedModal() {
 		showMarkAllAsListenedModal = false;
+	}
+
+	onMount(() => {
+		pushSupported = typeof window !== 'undefined'
+			&& 'Notification' in window
+			&& 'serviceWorker' in navigator
+			&& 'PushManager' in window;
+		if (pushSupported) {
+			pushPermission = window.Notification.permission as BrowserNotificationPermission;
+		}
+	});
+
+	function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
+		const padding = '='.repeat((4 - base64String.length % 4) % 4);
+		const normalized = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+		const rawData = window.atob(normalized);
+		return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0))).buffer;
+	}
+
+	async function subscribeToPush() {
+		if (!data.pushConfig.configured || !data.pushConfig.publicKey) {
+			pushToggleError = 'Les notifications push ne sont pas configurées sur ce serveur.';
+			return;
+		}
+
+		if (!pushSupported) {
+			pushToggleError = 'Les notifications push ne sont pas supportées sur cet appareil.';
+			return;
+		}
+
+		pushToggleLoading = true;
+		pushToggleMessage = null;
+		pushToggleError = null;
+
+		try {
+			const permission = await window.Notification.requestPermission();
+			pushPermission = permission;
+			if (permission !== 'granted') {
+				pushToggleError = 'Autorisez les notifications dans votre navigateur pour les activer.';
+				return;
+			}
+
+			const registration = await navigator.serviceWorker.ready;
+			const existingSubscription = await registration.pushManager.getSubscription();
+			const subscription = existingSubscription ?? await registration.pushManager.subscribe({
+				userVisibleOnly: true,
+				applicationServerKey: urlBase64ToUint8Array(data.pushConfig.publicKey)
+			});
+
+			const response = await fetch('/api/push/subscription', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ subscription: subscription.toJSON() })
+			});
+
+			if (!response.ok) {
+				const result = await response.json().catch(() => ({}));
+				throw new Error(result.error || 'Impossible d’activer les notifications push');
+			}
+
+			pushEnabled = true;
+			pushToggleMessage = 'Notifications push activées. Vous recevrez un rappel à votre heure de mise à disposition.';
+		} catch (error) {
+			pushToggleError = error instanceof Error ? error.message : 'Impossible d’activer les notifications push';
+		} finally {
+			pushToggleLoading = false;
+		}
+	}
+
+	async function unsubscribeFromPush() {
+		pushToggleLoading = true;
+		pushToggleMessage = null;
+		pushToggleError = null;
+
+		try {
+			let endpoint: string | null = null;
+			if (pushSupported) {
+				const registration = await navigator.serviceWorker.ready;
+				const subscription = await registration.pushManager.getSubscription();
+				endpoint = subscription?.endpoint ?? null;
+				await subscription?.unsubscribe().catch(() => {});
+			}
+
+			const response = await fetch('/api/push/subscription', {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ endpoint })
+			});
+
+			if (!response.ok) {
+				const result = await response.json().catch(() => ({}));
+				throw new Error(result.error || 'Impossible de désactiver les notifications push');
+			}
+
+			pushEnabled = false;
+			pushToggleMessage = 'Notifications push désactivées.';
+		} catch (error) {
+			pushToggleError = error instanceof Error ? error.message : 'Impossible de désactiver les notifications push';
+		} finally {
+			pushToggleLoading = false;
+		}
 	}
 	
 	function handleDragOver(e: DragEvent) {
@@ -562,6 +678,38 @@
 				<p class="hour-feedback error">{hourError}</p>
 			{/if}
 		</section>
+
+		{#if data.pushConfig.configured}
+			<section class="settings-toggle-card push-settings-card">
+				<h2>Notifications push</h2>
+				<p class="description">Activez un rappel à votre heure quotidienne de mise à disposition. Vous recevrez une notification seulement s'il y a des capsules non lues à écouter.</p>
+				<button
+					type="button"
+					class="toggle-button"
+					disabled={pushToggleLoading || (!pushEnabled && (!pushSupported || pushPermission === 'denied'))}
+					onclick={() => pushEnabled ? unsubscribeFromPush() : subscribeToPush()}
+				>
+					{#if pushToggleLoading}
+						Mise à jour...
+					{:else if pushEnabled}
+						Désactiver les notifications push
+					{:else}
+						Activer les notifications push
+					{/if}
+				</button>
+				{#if pushPermission === 'denied' && !pushEnabled}
+					<p class="error-message update-success">Les notifications sont bloquées par le navigateur. Autorisez-les dans les réglages de votre appareil ou du navigateur.</p>
+				{:else if !pushSupported}
+					<p class="error-message update-success">Les notifications push ne sont pas supportées sur cet appareil ou dans ce navigateur.</p>
+				{/if}
+				{#if pushToggleMessage}
+					<p class="success-message update-success">{pushToggleMessage}</p>
+				{/if}
+				{#if pushToggleError}
+					<p class="error-message update-success">{pushToggleError}</p>
+				{/if}
+			</section>
+		{/if}
 	</form>
 
 	<button type="submit" form="settings-form">Sauvegarder</button>

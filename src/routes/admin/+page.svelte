@@ -27,6 +27,13 @@
 		maxGroupNameLength: number;
 	};
 
+	type PushConfig = {
+		configured: boolean;
+		publicKey: string | null;
+		subject: string | null;
+		missingKeys: string[];
+	};
+
 	type PendingRegistration = {
 		id: number;
 		pseudo: string;
@@ -37,7 +44,7 @@
 		status: string;
 	};
 
-	let { data, form }: { data: PageData & { currentUser?: User; csrfToken?: string; pendingRegistrations?: PendingRegistration[]; allowRegistration?: boolean; oldestAdminId?: number | null; appSettings: AppSettings }; form?: { success?: boolean; error?: string; message?: string } } = $props();
+	let { data, form }: { data: PageData & { currentUser?: User; csrfToken?: string; pendingRegistrations?: PendingRegistration[]; allowRegistration?: boolean; oldestAdminId?: number | null; appSettings: AppSettings; pushConfig: PushConfig }; form?: { success?: boolean; error?: string; message?: string } } = $props();
 
 	const emojis = ['☕', '😀', '😎', '🤠', '🥳', '😇', '🤩', '😈', '👻', '🤖', '🎸', '🎮', '🚀', '🍕', '🍺', '🌈', '🔥', '⭐', '❤️'];
 	
@@ -136,6 +143,29 @@
 
 <div class="container">
 	<h1>Administration</h1>
+
+	<section>
+		<h2>Notifications push</h2>
+		{#if data.pushConfig.configured}
+			<p class="super-text">
+				Le serveur est configuré pour les notifications push. Les utilisateurs peuvent activer leur rappel quotidien depuis Réglages.
+			</p>
+			<div class="config-status-card is-ready">
+				<p><strong>Statut :</strong> configuré</p>
+				<p><strong>Clé publique :</strong> {data.pushConfig.publicKey?.slice(0, 18)}...</p>
+				<p><strong>Sujet VAPID :</strong> {data.pushConfig.subject}</p>
+			</div>
+		{:else}
+			<p class="super-text">
+				Les notifications push ne sont pas configurées sur ce serveur. Ajoutez les clés VAPID au déploiement Docker pour débloquer l’option dans les réglages utilisateurs.
+			</p>
+			<div class="config-status-card is-disabled">
+				<p><strong>Variables requises :</strong> {data.pushConfig.missingKeys.join(', ')}</p>
+				<p><strong>À renseigner côté serveur :</strong> `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`</p>
+				<p><strong>Commande utile :</strong> `npx web-push generate-vapid-keys`</p>
+			</div>
+		{/if}
+	</section>
 
 	<section>
 		<h2>Configuration du groupe</h2>
@@ -1047,6 +1077,32 @@
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
+	}
+
+	.config-status-card {
+		border-radius: 12px;
+		padding: 1rem;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		background: rgba(255, 255, 255, 0.04);
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	.config-status-card p {
+		margin: 0;
+		color: #ddd;
+		line-height: 1.45;
+	}
+
+	.config-status-card.is-ready {
+		border-color: rgba(74, 222, 128, 0.35);
+		background: rgba(74, 222, 128, 0.08);
+	}
+
+	.config-status-card.is-disabled {
+		border-color: rgba(233, 69, 96, 0.35);
+		background: rgba(233, 69, 96, 0.08);
 	}
 
 	.config-field {

@@ -23,6 +23,7 @@ export const db = new Database(dbPath);
 const DEFAULT_HISTORY_MONTHS = 3;
 const DEFAULT_MAX_RECORDING_SECONDS = 180;
 const MAX_GROUP_NAME_LENGTH = 24;
+const DEFAULT_PUSH_CHECK_WINDOW_MINUTES = 120;
 
 // No automatic admin creation - first admin must be created via /setup page
 
@@ -74,6 +75,32 @@ const MAX_GROUP_NAME_LENGTH = 24;
 		session_id TEXT,
 		expires_at DATETIME NOT NULL,
 		FOREIGN KEY (session_id) REFERENCES sessions(id)
+	);
+
+	CREATE TABLE IF NOT EXISTS push_subscriptions (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL,
+		endpoint TEXT NOT NULL UNIQUE,
+		p256dh TEXT NOT NULL,
+		auth TEXT NOT NULL,
+		user_agent TEXT,
+		created_at DATETIME DEFAULT (datetime('now')),
+		updated_at DATETIME DEFAULT (datetime('now')),
+		last_success_at DATETIME,
+		last_failure_at DATETIME,
+		disabled_at DATETIME,
+		FOREIGN KEY (user_id) REFERENCES users(id)
+	);
+
+	CREATE TABLE IF NOT EXISTS push_delivery_log (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL,
+		delivery_date TEXT NOT NULL,
+		notification_type TEXT NOT NULL,
+		sent INTEGER DEFAULT 0,
+		recorded_at DATETIME DEFAULT (datetime('now')),
+		FOREIGN KEY (user_id) REFERENCES users(id),
+		UNIQUE(user_id, delivery_date, notification_type)
 	);
 `);
 
@@ -132,6 +159,12 @@ try {
 }
 
 try {
+	db.exec('ALTER TABLE users ADD COLUMN push_notifications_enabled INTEGER DEFAULT 0');
+} catch (e) {
+	// Colonne déjà existante
+}
+
+try {
 	db.exec(`
 		CREATE TABLE IF NOT EXISTS login_attempts (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -175,6 +208,7 @@ try {
 	stmt.run('group_name', '');
 	stmt.run('history_months', DEFAULT_HISTORY_MONTHS.toString());
 	stmt.run('max_recording_seconds', DEFAULT_MAX_RECORDING_SECONDS.toString());
+	stmt.run('push_check_window_minutes', DEFAULT_PUSH_CHECK_WINDOW_MINUTES.toString());
 } catch (e) {
 	// Table déjà existante
 }
@@ -208,6 +242,10 @@ export function getConfiguredMaxRecordingSeconds(): number {
 	return parseAppConfigInteger(getAppConfig('max_recording_seconds'), DEFAULT_MAX_RECORDING_SECONDS, 15, 60 * 60);
 }
 
+export function getConfiguredPushCheckWindowMinutes(): number {
+	return parseAppConfigInteger(getAppConfig('push_check_window_minutes'), DEFAULT_PUSH_CHECK_WINDOW_MINUTES, 1, 24 * 60);
+}
+
 export function getAppSettings(): AppSettings {
 	return {
 		allowRegistration: isRegistrationAllowed(),
@@ -231,6 +269,7 @@ export type User = {
 	logs_enabled?: number;
 	jingles_enabled?: number;
 	pwa_tutorial_enabled?: number;
+	push_notifications_enabled?: number;
 };
 
 export type Recording = {
@@ -272,6 +311,20 @@ export type ProfileImage = {
 	url: string | null;
 	pseudo: string;
 	avatar: string;
+};
+
+export type PushSubscriptionRecord = {
+	id: number;
+	user_id: number;
+	endpoint: string;
+	p256dh: string;
+	auth: string;
+	user_agent: string | null;
+	created_at: string;
+	updated_at: string;
+	last_success_at: string | null;
+	last_failure_at: string | null;
+	disabled_at: string | null;
 };
 
 export type DayRecordings = {
@@ -592,6 +645,41 @@ export function getUnreadCount(userId: number): { count: number; totalSeconds: n
 	return result;
 }
 
+export function getAvailableUnreadCount(userId: number): { count: number; totalSeconds: number } {
+	const user = getUserById(userId);
+	if (!user) return { count: 0, totalSeconds: 0 };
+
+	const historyCutoffStr = getHistoryCutoffDate().toISOString();
+	const stmt = db.prepare(`
+		SELECT
+			r.id,
+			r.user_id,
+			r.filename,
+			r.image_filename,
+			r.url,
+			r.duration_seconds,
+			r.recorded_at,
+			CASE WHEN l.id IS NOT NULL THEN 1 ELSE 0 END as listened_by_user,
+			u.pseudo,
+			u.avatar
+		FROM recordings r
+		JOIN users u ON r.user_id = u.id
+		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
+		WHERE l.id IS NULL AND r.user_id != ? AND r.recorded_at >= ?
+		ORDER BY datetime(r.recorded_at) ASC, r.id ASC
+	`);
+
+	const unreadRecordings = stmt.all(userId, userId, historyCutoffStr) as Recording[];
+	const availableRecordings = unreadRecordings.filter((recording) =>
+		isDateAvailable(recording.recorded_at, user.super_powers === 1, user.daily_notification_hour, user.timezone || 'Europe/Paris')
+	);
+
+	return {
+		count: availableRecordings.length,
+		totalSeconds: availableRecordings.reduce((sum, recording) => sum + recording.duration_seconds, 0)
+	};
+}
+
 export function createUser(pseudo: string, password: string, isAdmin = false, avatar = '☕'): User {
 	const hashpwd = hashSync(password, 10);
 	const stmt = db.prepare('INSERT INTO users (pseudo, password_hash, is_admin, avatar) VALUES (?, ?, ?, ?)');
@@ -610,7 +698,7 @@ export function hasAdmin(): boolean {
 }
 
 export function getUserById(id: number): User | undefined {
-	const stmt = db.prepare('SELECT id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, last_login, logs_enabled, jingles_enabled, pwa_tutorial_enabled FROM users WHERE id = ?');
+	const stmt = db.prepare('SELECT id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, last_login, logs_enabled, jingles_enabled, pwa_tutorial_enabled, push_notifications_enabled FROM users WHERE id = ?');
 	return stmt.get(id) as User | undefined;
 }
 
@@ -637,7 +725,7 @@ export function getAllUsers(): UserWithCount[] {
 	
 	const stmt = db.prepare(`
 		SELECT 
-			u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled,
+			u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled, u.push_notifications_enabled,
 			COALESCE((
 				SELECT COUNT(*) 
 				FROM recordings r 
@@ -763,6 +851,11 @@ export function togglePwaTutorialEnabled(userId: number, enabled: boolean): void
 	stmt.run(enabled ? 1 : 0, userId);
 }
 
+export function togglePushNotificationsEnabled(userId: number, enabled: boolean): void {
+	const stmt = db.prepare('UPDATE users SET push_notifications_enabled = ? WHERE id = ?');
+	stmt.run(enabled ? 1 : 0, userId);
+}
+
 export function setUserAdmin(userId: number, isAdmin: boolean): void {
 	const stmt = db.prepare('UPDATE users SET is_admin = ? WHERE id = ?');
 	stmt.run(isAdmin ? 1 : 0, userId);
@@ -783,7 +876,7 @@ export function updateLastLogin(userId: number): void {
 
 export function getSession(sessionId: string): User | undefined {
 	const stmt = db.prepare(`
-		SELECT u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled
+		SELECT u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled, u.push_notifications_enabled
 		FROM sessions s 
 		JOIN users u ON s.user_id = u.id 
 		WHERE s.id = ? AND s.expires_at > datetime('now')
@@ -1193,6 +1286,133 @@ export function getRecordingFilePath(filename: string): string {
 	return join(uploadsDir, filename);
 }
 
+export function upsertPushSubscription(
+	userId: number,
+	subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
+	userAgent?: string | null
+): PushSubscriptionRecord {
+	const stmt = db.prepare(`
+		INSERT INTO push_subscriptions (
+			user_id,
+			endpoint,
+			p256dh,
+			auth,
+			user_agent,
+			updated_at,
+			disabled_at
+		) VALUES (?, ?, ?, ?, ?, datetime('now'), NULL)
+		ON CONFLICT(endpoint) DO UPDATE SET
+			user_id = excluded.user_id,
+			p256dh = excluded.p256dh,
+			auth = excluded.auth,
+			user_agent = excluded.user_agent,
+			updated_at = datetime('now'),
+			disabled_at = NULL
+		RETURNING *
+	`);
+
+	return stmt.get(
+		userId,
+		subscription.endpoint,
+		subscription.keys.p256dh,
+		subscription.keys.auth,
+		userAgent ?? null
+	) as PushSubscriptionRecord;
+}
+
+export function getActivePushSubscriptionsForUser(userId: number): PushSubscriptionRecord[] {
+	const stmt = db.prepare(`
+		SELECT *
+		FROM push_subscriptions
+		WHERE user_id = ? AND disabled_at IS NULL
+		ORDER BY datetime(updated_at) DESC, id DESC
+	`);
+	return stmt.all(userId) as PushSubscriptionRecord[];
+}
+
+export function markPushSubscriptionSuccess(endpoint: string): void {
+	const stmt = db.prepare(`
+		UPDATE push_subscriptions
+		SET last_success_at = datetime('now'), updated_at = datetime('now')
+		WHERE endpoint = ?
+	`);
+	stmt.run(endpoint);
+}
+
+export function markPushSubscriptionFailure(endpoint: string): void {
+	const stmt = db.prepare(`
+		UPDATE push_subscriptions
+		SET last_failure_at = datetime('now'), updated_at = datetime('now')
+		WHERE endpoint = ?
+	`);
+	stmt.run(endpoint);
+}
+
+export function disablePushSubscription(endpoint: string): void {
+	const stmt = db.prepare(`
+		UPDATE push_subscriptions
+		SET disabled_at = datetime('now'), updated_at = datetime('now')
+		WHERE endpoint = ?
+	`);
+	stmt.run(endpoint);
+}
+
+export function disableAllPushSubscriptionsForUser(userId: number): void {
+	const stmt = db.prepare(`
+		UPDATE push_subscriptions
+		SET disabled_at = datetime('now'), updated_at = datetime('now')
+		WHERE user_id = ? AND disabled_at IS NULL
+	`);
+	stmt.run(userId);
+}
+
+export function hasPushDeliveryLog(userId: number, deliveryDate: string, notificationType = 'daily_delivery'): boolean {
+	const stmt = db.prepare(`
+		SELECT id
+		FROM push_delivery_log
+		WHERE user_id = ? AND delivery_date = ? AND notification_type = ?
+		LIMIT 1
+	`);
+	return !!stmt.get(userId, deliveryDate, notificationType);
+}
+
+export function recordPushDeliveryLog(userId: number, deliveryDate: string, sent: boolean, notificationType = 'daily_delivery'): void {
+	const stmt = db.prepare(`
+		INSERT OR REPLACE INTO push_delivery_log (
+			user_id,
+			delivery_date,
+			notification_type,
+			sent,
+			recorded_at
+		) VALUES (?, ?, ?, ?, datetime('now'))
+	`);
+	stmt.run(userId, deliveryDate, notificationType, sent ? 1 : 0);
+}
+
+export function getUsersWithPushNotificationsEnabled(): User[] {
+	const stmt = db.prepare(`
+		SELECT
+			id,
+			pseudo,
+			avatar,
+			is_admin,
+			super_powers,
+			daily_notification_hour,
+			timezone,
+			created_at,
+			last_login,
+			logs_enabled,
+			jingles_enabled,
+			pwa_tutorial_enabled,
+			push_notifications_enabled
+		FROM users
+		WHERE push_notifications_enabled = 1
+		ORDER BY id ASC
+	`);
+
+	return stmt.all() as User[];
+}
+
 // Rate limiting functions
 const MAX_LOGIN_ATTEMPTS = 5;
 const LOGIN_WINDOW_MINUTES = 15;
@@ -1368,7 +1588,7 @@ export function approveRegistration(id: number, isAdmin: boolean = false): User 
 	const insertUserStmt = db.prepare(`
 		INSERT INTO users (pseudo, password_hash, avatar, timezone, is_admin, super_powers)
 		VALUES (?, ?, ?, ?, ?, 0)
-		RETURNING id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, logs_enabled, jingles_enabled
+		RETURNING id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, logs_enabled, jingles_enabled, push_notifications_enabled
 	`);
 	const user = insertUserStmt.get(
 		registration.pseudo, 

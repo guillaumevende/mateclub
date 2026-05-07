@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.34.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.35.0-blue?style=for-the-badge)
 
 </div>
 
@@ -105,6 +105,7 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 ### Interface & UX
 - **Authentification** - Login par pseudo/mot de passe (pas d'email requis)
 - **PWA installable** - Installation sur mobile via manifest
+- **Notifications push quotidiennes** - Option utilisateur pour recevoir un rappel à l’heure de mise à disposition s’il reste des capsules non lues
 - **Tuto PWA désactivable** - Chaque utilisateur peut masquer les popups d’installation PWA depuis ses réglages
 - **Mise à jour rapide** - Un membre peut marquer en une fois toutes les publications existantes des autres utilisateurs comme lues
 - **Profils utilisateurs** - Chaque avatar ouvre une page profil avec galerie des images publiées et dernières capsules audio
@@ -147,6 +148,7 @@ L'application gère automatiquement les conversions de fuseaux horaires pour gar
 ### Panel Admin
 - **Gestion des utilisateurs** - Liste, création, suppression des non-admins
 - **Configuration du groupe** - Nom du groupe, durée d’historique en mois et durée maximum des messages audio
+- **État des notifications push** - L’admin voit si le serveur est configuré pour les push VAPID ou quelles variables manquent encore
 - **Modification des seuils** - Heure de mise à disposition par utilisateur
 - **Super pouvoirs** - Attribution de privileges de lecture anticipée
 - **Promotion admin** - Un membre existant peut être promu administrateur
@@ -360,6 +362,29 @@ Au premier lancement, si aucun administrateur n'existe, vous êtes redirigé ver
 3. Créez votre compte administrateur
 4. Après création, utilisez `/login` pour vous connecter
 
+#### Notifications push (optionnel)
+
+Si vous voulez activer les notifications push Web Push dans une instance auto-hébergée :
+
+1. **Générer les clés VAPID :**
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+
+2. **Ajouter les variables à `.env` :**
+   ```bash
+   echo "VAPID_PUBLIC_KEY=..." >> .env
+   echo "VAPID_PRIVATE_KEY=..." >> .env
+   echo "VAPID_SUBJECT=mailto:admin@example.com" >> .env
+   ```
+
+3. **Redémarrer l’application :**
+   ```bash
+   docker compose up -d --build
+   ```
+
+Quand ces variables sont absentes, l’admin affiche un bloc `Notifications push` grisé avec les instructions serveur et les utilisateurs ne voient pas l’option d’activation dans `Réglages`.
+
 #### Mise à jour
 
 Pour mettre à jour l'application avec la dernière version :
@@ -407,6 +432,9 @@ Après reset, l'application affichera `/setup` pour créer un nouvel administrat
 Variables d'environnement disponibles dans `.env`:
 - `PORT` - Port serveur (défaut: 3001)
 - `DATABASE_PATH` - Chemin de la BDD (défaut: ./data/mateclub.db)
+- `VAPID_PUBLIC_KEY` - Clé publique Web Push (optionnelle, requise pour activer les notifications push)
+- `VAPID_PRIVATE_KEY` - Clé privée Web Push (optionnelle, requise pour activer les notifications push)
+- `VAPID_SUBJECT` - Sujet VAPID, typiquement `mailto:admin@example.com`
 
 ### Manuel
 
