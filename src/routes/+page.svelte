@@ -218,9 +218,18 @@
 		const hasOnlyLockedUnread = hasResolvedPlayableState && totalCount > 0 && playableCount === 0;
 		const hasMixedUnread = hasResolvedPlayableState && playableCount > 0 && playableCount < totalCount;
 
+		if (!hasResolvedPlayableState && totalCount > 0) {
+			return {
+				title: `${totalCount} capsule${totalCount !== 1 ? 's' : ''} dispo à ${data.threshold}`,
+				duration: formatCompactDurationLabel(totalSeconds),
+				showPlayIcon: false,
+				showLockIcon: true
+			};
+		}
+
 		if (hasOnlyLockedUnread) {
 			return {
-				title: `${totalCount} capsule${totalCount !== 1 ? 's' : ''} pour ${data.threshold}`,
+				title: `${totalCount} capsule${totalCount !== 1 ? 's' : ''} dispo à ${data.threshold}`,
 				duration: formatCompactDurationLabel(totalSeconds),
 				showPlayIcon: false,
 				showLockIcon: true

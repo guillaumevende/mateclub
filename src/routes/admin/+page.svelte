@@ -186,7 +186,7 @@
 		<p class="super-text">
 			Supprimez des messages courts enregistrés par erreur.
 		</p>
-		<a class="super-btn cleanup-link" href="/admin/cleanup">Vérifier</a>
+		<a class="super-btn cleanup-link section-action-btn" href="/admin/cleanup">Vérifier</a>
 	</section>
 
 	<section>
@@ -900,6 +900,13 @@
 
 	.cleanup-link {
 		text-decoration: none;
+	}
+
+	.section-action-btn {
+		display: block;
+		width: 100%;
+		box-sizing: border-box;
+		text-align: center;
 	}
 
 	/* Modal de confirmation */
