@@ -6,13 +6,18 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.35.0-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.35.1-blue?style=for-the-badge)
 
 </div>
 
 ✨ **Ce projet est une expérimentation de *vibe coding* de Guillaume Vendé, créateur du podcast [Tech Café](https://techcafe.fr)** ✨
 
 🤝 **Soutenez-moi sur [patreon.com/techcafe](https://patreon.com/techcafe) : le premier niveau d'abonnement est gratuit !**
+
+📌 **Derniere version stable et documentation :**
+- [Derniere release GitHub](https://github.com/guillaumevende/mateclub/releases/latest)
+- [Journal des modifications complet](./CHANGELOG.md)
+- [Branche `develop` (developpements en cours)](https://github.com/guillaumevende/mateclub/tree/develop)
 
 ---
 
