@@ -21,16 +21,23 @@
 		id: number;
 		user_id: number;
 		filename: string;
+		processed_filename: string | null;
 		image_filename: string | null;
 		url: string | null;
 		duration_seconds: number;
 		recorded_at: string;
+		processing_status?: 'ready' | 'processing' | 'failed';
+		processing_mode?: 'none' | 'deepfilter';
+		processing_error?: string | null;
+		processing_started_at?: string | null;
+		processed_at?: string | null;
 		avatar?: string;
 		pseudo?: string;
 	};
 
 	type AppSettings = {
 		maxRecordingSeconds: number;
+		audioProcessingEnabled?: boolean;
 	};
 
 	type RecordingImageEditorState = {
@@ -410,6 +417,28 @@
 		if (Number.isNaN(recordedAt.getTime())) return false;
 
 		return !recording.image_filename && Date.now() - recordedAt.getTime() <= 24 * 60 * 60 * 1000;
+	}
+
+	function isServerProcessingRecording(recording: UserRecording) {
+		return recording.processing_status === 'processing';
+	}
+
+	function hasServerProcessingFailed(recording: UserRecording) {
+		return recording.processing_status === 'failed';
+	}
+
+	function canPlayRecording(recording: UserRecording) {
+		return !recording.processing_status || recording.processing_status === 'ready';
+	}
+
+	function getRecordingStatusLabel(recording: UserRecording) {
+		if (isServerProcessingRecording(recording)) {
+			return 'En traitement serveur';
+		}
+		if (hasServerProcessingFailed(recording)) {
+			return 'Traitement audio à relancer';
+		}
+		return null;
 	}
 
 	function canAddUrlToRecording(recording: UserRecording) {
@@ -1339,6 +1368,13 @@
 	}
 
 	async function playRecording(recording: UserRecording) {
+		if (!canPlayRecording(recording)) {
+			queueNotice = hasServerProcessingFailed(recording)
+				? 'Cette capsule n’a pas encore pu être optimisée côté serveur.'
+				: 'Cette capsule est encore en traitement serveur.';
+			return;
+		}
+
 		const audioElement = getAudioElement();
 		
 		const fakeDayData: DayRecordings = {
@@ -1602,6 +1638,15 @@
 						<div class="recording-info">
 							<span class="recording-date">{formatDate(recording.recorded_at)} ({formatTime(recording.recorded_at)})</span>
 							<span class="recording-duration">{formatDuration(recording.duration_seconds)}</span>
+							{#if getRecordingStatusLabel(recording)}
+								<span
+									class="recording-status-badge"
+									class:is-processing={isServerProcessingRecording(recording)}
+									class:is-failed={hasServerProcessingFailed(recording)}
+								>
+									{getRecordingStatusLabel(recording)}
+								</span>
+							{/if}
 						</div>
 						<div class="recording-item-actions">
 							{#if recording.url}
@@ -1630,8 +1675,13 @@
 								class="listen-btn"
 								onclick={() => playRecording(recording)}
 								aria-label="Écouter"
+								disabled={!canPlayRecording(recording)}
 							>
-								{isCurrentlyPlaying ? '⏸️' : '▶️'}
+								{#if !canPlayRecording(recording)}
+									{hasServerProcessingFailed(recording) ? '⚠️' : '⏳'}
+								{:else}
+									{isCurrentlyPlaying ? '⏸️' : '▶️'}
+								{/if}
 							</button>
 							<button class="delete-btn" onclick={() => confirmDelete(recording)} aria-label="Supprimer">
 								🗑️
@@ -2432,6 +2482,29 @@
 		font-size: 0.85rem;
 	}
 
+	.recording-status-badge {
+		display: inline-flex;
+		align-items: center;
+		width: fit-content;
+		padding: 0.2rem 0.55rem;
+		border-radius: 999px;
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.01em;
+		background: rgba(255, 255, 255, 0.08);
+		color: #cfd3ff;
+	}
+
+	.recording-status-badge.is-processing {
+		background: rgba(255, 196, 76, 0.14);
+		color: #ffd77c;
+	}
+
+	.recording-status-badge.is-failed {
+		background: rgba(255, 107, 129, 0.14);
+		color: #ff8ea2;
+	}
+
 	.recording-item-actions {
 		display: flex;
 		align-items: center;
@@ -2473,6 +2546,11 @@
 
 	.listen-btn:hover {
 		opacity: 1;
+	}
+
+	.listen-btn:disabled {
+		cursor: not-allowed;
+		opacity: 0.45;
 	}
 
 	.delete-btn {
