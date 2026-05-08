@@ -2,31 +2,6 @@
 
 ---
 
-## v0.36.0 (2026-05-08) - Traitement audio serveur optionnel
-
-### ✨ Nouvelles fonctionnalités
-
-#### Audio & lecture
-- **Amélioration audio serveur optionnelle** : une instance Maté Club peut désormais traiter les nouvelles capsules avec DeepFilter et une normalisation de volume côté serveur
-- **Traitement réservé aux nouveaux messages** : l’historique existant n’est pas retraité automatiquement ; seuls les nouveaux audios envoyés après activation passent dans le pipeline amélioré
-- **Source + version diffusée** : la capsule d’origine est conservée, puis une version optimisée dédiée à la lecture est générée pour la diffusion
-- **Diffusion différée** : tant qu’une capsule est en cours d’optimisation, elle reste indisponible aux autres utilisateurs et n’entre pas dans les files `À écouter`
-
-#### Administration
-- **Bloc `Amélioration audio`** : l’admin voit si le serveur est prêt pour DeepFilter, quelles dépendances manquent et peut activer ou désactiver l’optimisation pour le groupe
-- **Signalement des traitements en cours** : l’auteur voit désormais les badges `En traitement serveur` ou `Traitement audio à relancer` sur ses propres capsules tant qu’elles ne sont pas prêtes
-
-### 🔧 Technique
-- **Worker audio intégré** : un worker séquentiel reprend les capsules à traiter en arrière-plan sans bloquer l’upload utilisateur
-- **Pipeline Python + FFmpeg** : conversion WAV, passage DeepFilter, puis réencodage AAC/M4A avec normalisation de volume
-- **Base Docker Debian slim** : l’image serveur passe sur `node:20-bookworm-slim` pour embarquer Python 3.11, FFmpeg et l’environnement DeepFilter
-- **Statuts persistés en base** : `processing_status`, `processing_mode`, `processed_filename` et les timestamps de traitement permettent une reprise propre après redémarrage
-
-### 📚 Documentation
-- README.md : version mise à jour en `0.36.0`
-- README.md : ajout de la configuration serveur optionnelle `AUDIO_PROCESSING_MODE=deepfilter` et du comportement `En traitement serveur`
-- package.json / package-lock.json : version portée en `0.36.0`
-
 ## v0.35.1 (2026-05-08) - Visibilite GitHub du changelog
 
 ### 📚 Documentation
