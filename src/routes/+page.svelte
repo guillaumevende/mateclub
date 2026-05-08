@@ -52,7 +52,6 @@
 		historyMonths: number;
 		maxRecordingSeconds: number;
 		maxGroupNameLength: number;
-		audioProcessingEnabled?: boolean;
 	};
 
 	type DateInfo = {

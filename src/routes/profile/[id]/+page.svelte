@@ -19,16 +19,10 @@
 		id: number;
 		user_id: number;
 		filename: string;
-		processed_filename: string | null;
 		image_filename: string | null;
 		url: string | null;
 		duration_seconds: number;
 		recorded_at: string;
-		processing_status?: 'ready' | 'processing' | 'failed';
-		processing_mode?: 'none' | 'deepfilter';
-		processing_error?: string | null;
-		processing_started_at?: string | null;
-		processed_at?: string | null;
 		pseudo: string;
 		avatar: string;
 	};
@@ -132,28 +126,6 @@
 		return isOwnProfile && !recording.url && isRecentEditable(recording);
 	}
 
-	function isServerProcessingRecording(recording: ProfileRecording) {
-		return recording.processing_status === 'processing';
-	}
-
-	function hasServerProcessingFailed(recording: ProfileRecording) {
-		return recording.processing_status === 'failed';
-	}
-
-	function canPlayRecording(recording: ProfileRecording) {
-		return !recording.processing_status || recording.processing_status === 'ready';
-	}
-
-	function getRecordingStatusLabel(recording: ProfileRecording) {
-		if (isServerProcessingRecording(recording)) {
-			return 'En traitement serveur';
-		}
-		if (hasServerProcessingFailed(recording)) {
-			return 'Traitement audio à relancer';
-		}
-		return null;
-	}
-
 	async function loadMoreImages() {
 		if (isLoadingMoreImages || !hasMoreImages) return;
 		isLoadingMoreImages = true;
@@ -173,10 +145,6 @@
 	}
 
 	async function playRecording(recording: ProfileRecording) {
-		if (!canPlayRecording(recording)) {
-			return;
-		}
-
 		const audioElement = getAudioElement();
 
 		const fakeDayData: DayRecordings = {
@@ -442,15 +410,6 @@
 								</div>
 								<div class="recording-bottomline">
 									<span class="recording-duration">{formatDuration(recording.duration_seconds)}</span>
-									{#if getRecordingStatusLabel(recording)}
-										<span
-											class="recording-status-badge"
-											class:is-processing={isServerProcessingRecording(recording)}
-											class:is-failed={hasServerProcessingFailed(recording)}
-										>
-											{getRecordingStatusLabel(recording)}
-										</span>
-									{/if}
 								</div>
 							</div>
 
@@ -483,13 +442,8 @@
 									class="listen-btn"
 									onclick={() => playRecording(recording)}
 									aria-label="Écouter"
-									disabled={!canPlayRecording(recording)}
 								>
-									{#if !canPlayRecording(recording)}
-										{hasServerProcessingFailed(recording) ? '⚠️' : '⏳'}
-									{:else}
-										{isCurrentlyPlaying ? '⏸️' : '▶️'}
-									{/if}
+									{isCurrentlyPlaying ? '⏸️' : '▶️'}
 								</button>
 							</div>
 						</div>
@@ -722,28 +676,6 @@
 		font-weight: 600;
 	}
 
-	.recording-status-badge {
-		display: inline-flex;
-		align-items: center;
-		padding: 0.2rem 0.55rem;
-		border-radius: 999px;
-		font-size: 0.72rem;
-		font-weight: 700;
-		letter-spacing: 0.01em;
-		background: rgba(255, 255, 255, 0.08);
-		color: #cfd3ff;
-	}
-
-	.recording-status-badge.is-processing {
-		background: rgba(255, 196, 76, 0.14);
-		color: #ffd77c;
-	}
-
-	.recording-status-badge.is-failed {
-		background: rgba(255, 107, 129, 0.14);
-		color: #ff8ea2;
-	}
-
 	.recording-actions {
 		display: flex;
 		align-items: center;
@@ -766,11 +698,6 @@
 	.url-btn,
 	.listen-btn {
 		background: #2a2a4e;
-	}
-
-	.listen-btn:disabled {
-		opacity: 0.45;
-		cursor: not-allowed;
 	}
 
 	.url-add-btn {

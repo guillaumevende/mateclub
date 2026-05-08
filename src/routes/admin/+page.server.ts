@@ -1,7 +1,6 @@
 import type { PageServerLoad, Actions } from './$types';
 import { redirect, fail } from '@sveltejs/kit';
 import { hashSync } from 'bcrypt';
-import { getAudioProcessingRuntimeConfig } from '$lib/server/audioProcessing';
 import {
 	getAllUsers, 
 	createUser, 
@@ -41,18 +40,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const oldestAdminId = getOldestAdminId();
 	const appSettings = getAppSettings();
 	const pushConfig = getPushRuntimeConfig();
-	const audioProcessingConfig = getAudioProcessingRuntimeConfig();
-	return {
-		users,
-		currentUser,
-		csrfToken: locals.csrfToken,
-		pendingRegistrations,
-		allowRegistration,
-		oldestAdminId,
-		appSettings,
-		pushConfig,
-		audioProcessingConfig
-	};
+	return { users, currentUser, csrfToken: locals.csrfToken, pendingRegistrations, allowRegistration, oldestAdminId, appSettings, pushConfig };
 };
 
 export const actions: Actions = {
@@ -194,28 +182,6 @@ export const actions: Actions = {
 			success: true,
 			message: 'Réglages du groupe enregistrés',
 			appSettings: getAppSettings()
-		};
-	},
-
-	toggleAudioProcessing: async ({ request, locals }) => {
-		if (!locals.user?.is_admin) {
-			return fail(403, { error: 'Non autorisé' });
-		}
-
-		const runtimeConfig = getAudioProcessingRuntimeConfig();
-		if (!runtimeConfig.configured) {
-			return fail(400, { error: 'Le traitement audio n’est pas configuré sur ce serveur' });
-		}
-
-		const data = await request.formData();
-		const enabled = data.get('enabled') === 'true';
-		setAppConfig('audio_processing_enabled', enabled ? 'true' : 'false');
-
-		return {
-			success: true,
-			message: enabled
-				? 'Amélioration audio activée pour les prochaines capsules'
-				: 'Amélioration audio désactivée'
 		};
 	},
 
