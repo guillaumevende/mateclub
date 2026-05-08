@@ -1,6 +1,7 @@
 import type { RequestHandler } from './$types';
 import { redirect, json } from '@sveltejs/kit';
-import { saveRecording, getRecentRecordingByHash, getConfiguredMaxRecordingSeconds } from '$lib/server/db';
+import { saveRecording, getRecentRecordingByHash, getConfiguredMaxRecordingSeconds, isAudioProcessingEnabled } from '$lib/server/db';
+import { getAudioProcessingRuntimeConfig, pokeAudioProcessingWorker } from '$lib/server/audioProcessing';
 import { detectAudioMimeType, isValidAudioBuffer, isValidImageBuffer } from '$lib/server/fileValidation';
 import { prepareAudioForStorage } from '$lib/server/audioCompatibility';
 import crypto from 'crypto';
@@ -141,19 +142,34 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	let recording;
 	try {
+		const audioProcessingRuntime = getAudioProcessingRuntimeConfig();
+		const useAudioProcessing = audioProcessingRuntime.configured && isAudioProcessingEnabled();
 		recording = saveRecording(
 			locals.user.id,
 			buffer,
 			durationSeconds,
-			preparedAudio.extension,
-			imageBuffer,
-			url || null,
-			audioHash
+			{
+				audioExtension: preparedAudio.extension,
+				imageData: imageBuffer,
+				url: url || null,
+				audioHash,
+				processedFilename: useAudioProcessing ? null : undefined,
+				processingStatus: useAudioProcessing ? 'processing' : 'ready',
+				processingMode: useAudioProcessing ? 'deepfilter' : 'none',
+				processedAt: useAudioProcessing ? null : undefined
+			}
 		);
+		if (useAudioProcessing) {
+			pokeAudioProcessingWorker();
+		}
 	} catch (err) {
 		console.error('[RECORDINGS] Error saving recording:', err);
 		return json({ error: 'Erreur interne' }, { status: 500 });
 	}
 
-	return json({ id: recording.id });
+	return json({
+		id: recording.id,
+		processingStatus: recording.processing_status,
+		processingMode: recording.processing_mode
+	});
 };

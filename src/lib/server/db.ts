@@ -24,6 +24,7 @@ const DEFAULT_HISTORY_MONTHS = 3;
 const DEFAULT_MAX_RECORDING_SECONDS = 180;
 const MAX_GROUP_NAME_LENGTH = 24;
 const DEFAULT_PUSH_CHECK_WINDOW_MINUTES = 120;
+const DEFAULT_AUDIO_PROCESSING_ENABLED = false;
 
 // No automatic admin creation - first admin must be created via /setup page
 
@@ -45,9 +46,15 @@ const DEFAULT_PUSH_CHECK_WINDOW_MINUTES = 120;
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		user_id INTEGER NOT NULL,
 		filename TEXT NOT NULL,
+		processed_filename TEXT,
 		image_filename TEXT,
 		url TEXT,
 		duration_seconds INTEGER NOT NULL,
+		processing_status TEXT DEFAULT 'ready',
+		processing_mode TEXT DEFAULT 'none',
+		processing_error TEXT,
+		processing_started_at DATETIME,
+		processed_at DATETIME,
 		recorded_at DATETIME DEFAULT (datetime('now')),
 		FOREIGN KEY (user_id) REFERENCES users(id)
 	);
@@ -135,9 +142,55 @@ try {
 }
 
 try {
+	db.exec("ALTER TABLE recordings ADD COLUMN processed_filename TEXT");
+} catch (e) {
+	// Colonne déjà existante
+}
+
+try {
+	db.exec("ALTER TABLE recordings ADD COLUMN processing_status TEXT DEFAULT 'ready'");
+} catch (e) {
+	// Colonne déjà existante
+}
+
+try {
+	db.exec("ALTER TABLE recordings ADD COLUMN processing_mode TEXT DEFAULT 'none'");
+} catch (e) {
+	// Colonne déjà existante
+}
+
+try {
+	db.exec('ALTER TABLE recordings ADD COLUMN processing_error TEXT');
+} catch (e) {
+	// Colonne déjà existante
+}
+
+try {
+	db.exec('ALTER TABLE recordings ADD COLUMN processing_started_at DATETIME');
+} catch (e) {
+	// Colonne déjà existante
+}
+
+try {
+	db.exec('ALTER TABLE recordings ADD COLUMN processed_at DATETIME');
+} catch (e) {
+	// Colonne déjà existante
+}
+
+try {
 	db.exec('CREATE INDEX IF NOT EXISTS idx_audio_hash ON recordings(user_id, audio_hash)');
 } catch (e) {
 	// Index déjà existant
+}
+
+try {
+	db.exec("UPDATE recordings SET processed_filename = filename WHERE processed_filename IS NULL OR processed_filename = ''");
+	db.exec("UPDATE recordings SET processing_status = 'ready' WHERE processing_status IS NULL OR processing_status = ''");
+	db.exec("UPDATE recordings SET processing_mode = 'none' WHERE processing_mode IS NULL OR processing_mode = ''");
+	db.exec("UPDATE recordings SET processed_at = recorded_at WHERE processed_at IS NULL AND processing_status = 'ready'");
+	db.exec("CREATE INDEX IF NOT EXISTS idx_recordings_processing_status ON recordings(processing_status, recorded_at)");
+} catch (e) {
+	// Migration best effort
 }
 
 try {
@@ -209,6 +262,7 @@ try {
 	stmt.run('history_months', DEFAULT_HISTORY_MONTHS.toString());
 	stmt.run('max_recording_seconds', DEFAULT_MAX_RECORDING_SECONDS.toString());
 	stmt.run('push_check_window_minutes', DEFAULT_PUSH_CHECK_WINDOW_MINUTES.toString());
+	stmt.run('audio_processing_enabled', DEFAULT_AUDIO_PROCESSING_ENABLED ? 'true' : 'false');
 } catch (e) {
 	// Table déjà existante
 }
@@ -219,7 +273,11 @@ export type AppSettings = {
 	historyMonths: number;
 	maxRecordingSeconds: number;
 	maxGroupNameLength: number;
+	audioProcessingEnabled: boolean;
 };
+
+export type RecordingProcessingStatus = 'ready' | 'processing' | 'failed';
+export type RecordingProcessingMode = 'none' | 'deepfilter';
 
 function parseAppConfigInteger(value: string | null, fallback: number, min: number, max: number): number {
 	const parsed = Number.parseInt(value ?? '', 10);
@@ -252,7 +310,8 @@ export function getAppSettings(): AppSettings {
 		groupName: (getAppConfig('group_name') ?? '').trim().slice(0, MAX_GROUP_NAME_LENGTH),
 		historyMonths: getConfiguredHistoryMonths(),
 		maxRecordingSeconds: getConfiguredMaxRecordingSeconds(),
-		maxGroupNameLength: MAX_GROUP_NAME_LENGTH
+		maxGroupNameLength: MAX_GROUP_NAME_LENGTH,
+		audioProcessingEnabled: isAudioProcessingEnabled()
 	};
 }
 
@@ -276,6 +335,7 @@ export type Recording = {
 	id: number;
 	user_id: number;
 	filename: string;
+	processed_filename: string | null;
 	image_filename: string | null;
 	url: string | null;
 	duration_seconds: number;
@@ -284,6 +344,11 @@ export type Recording = {
 	pseudo: string;
 	avatar: string;
 	audio_hash?: string | null;
+	processing_status: RecordingProcessingStatus;
+	processing_mode: RecordingProcessingMode;
+	processing_error?: string | null;
+	processing_started_at?: string | null;
+	processed_at?: string | null;
 };
 
 export type ShortRecordingAuthor = {
@@ -417,13 +482,14 @@ export function getRecordingsByDate(userId: number, date: string): DayRecordings
 	const historyCutoff = getHistoryCutoffDate();
 	const stmt = db.prepare(`
 		SELECT 
-			r.id, r.user_id, r.filename, r.image_filename, r.url, r.duration_seconds, r.recorded_at,
+			r.id, r.user_id, r.filename, r.processed_filename, r.image_filename, r.url, r.duration_seconds, r.recorded_at,
+			r.processing_status, r.processing_mode, r.processing_error, r.processing_started_at, r.processed_at,
 			u.pseudo, u.avatar,
 			CASE WHEN l.id IS NOT NULL THEN 1 ELSE 0 END as listened_by_user
 		FROM recordings r 
 		JOIN users u ON r.user_id = u.id 
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
-		WHERE r.recorded_at >= ?
+		WHERE r.recorded_at >= ? AND r.processing_status = 'ready'
 		ORDER BY r.recorded_at ASC
 	`);
 	const results = stmt.all(userId, historyCutoff.toISOString()) as Recording[];
@@ -514,13 +580,14 @@ export function getRecordingsGroupedByDay(userId: number, limit = 7, page = 1, t
 
 	const stmt = db.prepare(`
 		SELECT 
-			r.id, r.user_id, r.filename, r.image_filename, r.url, r.duration_seconds, r.recorded_at,
+			r.id, r.user_id, r.filename, r.processed_filename, r.image_filename, r.url, r.duration_seconds, r.recorded_at,
+			r.processing_status, r.processing_mode, r.processing_error, r.processing_started_at, r.processed_at,
 			u.pseudo, u.avatar,
 			CASE WHEN l.id IS NOT NULL THEN 1 ELSE 0 END as listened_by_user
 		FROM recordings r 
 		JOIN users u ON r.user_id = u.id 
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
-		WHERE r.recorded_at >= ?
+		WHERE r.recorded_at >= ? AND r.processing_status = 'ready'
 		ORDER BY r.recorded_at DESC
 		LIMIT ? OFFSET ?
 	`);
@@ -579,13 +646,14 @@ export function getRecordingsGroupedByDayWithHasMore(
 	// Requête principale : récupérer les enregistrements des 3 derniers mois
 	const stmt = db.prepare(`
 		SELECT
-			r.id, r.user_id, r.filename, r.image_filename, r.url, r.duration_seconds, r.recorded_at,
+			r.id, r.user_id, r.filename, r.processed_filename, r.image_filename, r.url, r.duration_seconds, r.recorded_at,
+			r.processing_status, r.processing_mode, r.processing_error, r.processing_started_at, r.processed_at,
 			u.pseudo, u.avatar,
 			CASE WHEN l.id IS NOT NULL THEN 1 ELSE 0 END as listened_by_user
 		FROM recordings r
 		JOIN users u ON r.user_id = u.id
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
-		WHERE r.recorded_at >= ?
+		WHERE r.recorded_at >= ? AND r.processing_status = 'ready'
 		ORDER BY r.recorded_at DESC
 		LIMIT ? OFFSET ?
 	`);
@@ -639,7 +707,7 @@ export function getUnreadCount(userId: number): { count: number; totalSeconds: n
 			COALESCE(SUM(r.duration_seconds), 0) as totalSeconds
 		FROM recordings r
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
-		WHERE l.id IS NULL AND r.user_id != ? AND r.recorded_at >= ?
+		WHERE l.id IS NULL AND r.user_id != ? AND r.recorded_at >= ? AND r.processing_status = 'ready'
 	`);
 	const result = stmt.get(userId, userId, historyCutoffStr) as { count: number; totalSeconds: number };
 	return result;
@@ -655,17 +723,23 @@ export function getAvailableUnreadCount(userId: number): { count: number; totalS
 			r.id,
 			r.user_id,
 			r.filename,
+			r.processed_filename,
 			r.image_filename,
 			r.url,
 			r.duration_seconds,
 			r.recorded_at,
+			r.processing_status,
+			r.processing_mode,
+			r.processing_error,
+			r.processing_started_at,
+			r.processed_at,
 			CASE WHEN l.id IS NOT NULL THEN 1 ELSE 0 END as listened_by_user,
 			u.pseudo,
 			u.avatar
 		FROM recordings r
 		JOIN users u ON r.user_id = u.id
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
-		WHERE l.id IS NULL AND r.user_id != ? AND r.recorded_at >= ?
+		WHERE l.id IS NULL AND r.user_id != ? AND r.recorded_at >= ? AND r.processing_status = 'ready'
 		ORDER BY datetime(r.recorded_at) ASC, r.id ASC
 	`);
 
@@ -740,14 +814,24 @@ export function getAllUsers(): UserWithCount[] {
 
 export function deleteUser(id: number): void {
 	// First get all recordings to delete their files
-	const recordingsStmt = db.prepare('SELECT filename, image_filename FROM recordings WHERE user_id = ?');
-	const recordings = recordingsStmt.all(id) as { filename: string; image_filename: string | null }[];
+	const recordingsStmt = db.prepare('SELECT filename, processed_filename, image_filename FROM recordings WHERE user_id = ?');
+	const recordings = recordingsStmt.all(id) as {
+		filename: string;
+		processed_filename: string | null;
+		image_filename: string | null;
+	}[];
 	
 	// Delete audio and image files
 	for (const recording of recordings) {
 		const audioPath = join(uploadsDir, recording.filename);
 		if (existsSync(audioPath)) {
 			unlinkSync(audioPath);
+		}
+		if (recording.processed_filename && recording.processed_filename !== recording.filename) {
+			const processedPath = join(uploadsDir, recording.processed_filename);
+			if (existsSync(processedPath)) {
+				unlinkSync(processedPath);
+			}
 		}
 		if (recording.image_filename) {
 			const imagePath = join(uploadsDir, recording.image_filename);
@@ -911,10 +995,43 @@ export function deleteUserSessions(userId: number, exceptSessionId?: string): vo
 	}
 }
 
-export function saveRecording(userId: number, audioData: Buffer, durationSeconds: number, audioExtension = 'm4a', imageData?: Buffer, url?: string | null, audioHash?: string): Recording {
+export type SaveRecordingOptions = {
+	audioExtension?: string;
+	imageData?: Buffer;
+	url?: string | null;
+	audioHash?: string;
+	processedFilename?: string | null;
+	processingStatus?: RecordingProcessingStatus;
+	processingMode?: RecordingProcessingMode;
+	processingError?: string | null;
+	processingStartedAt?: string | null;
+	processedAt?: string | null;
+};
+
+export function saveRecording(
+	userId: number,
+	audioData: Buffer,
+	durationSeconds: number,
+	options: SaveRecordingOptions = {}
+): Recording {
+	const {
+		audioExtension = 'm4a',
+		imageData,
+		url,
+		audioHash,
+		processedFilename = null,
+		processingStatus = 'ready',
+		processingMode = 'none',
+		processingError = null,
+		processingStartedAt = null,
+		processedAt = processingStatus === 'ready' ? new Date().toISOString() : null
+	} = options;
+
 	debug.db.log('saveRecording - audioData:', audioData.length, 'bytes, imageData:', imageData?.length || 'none');
-	
+
 	const filename = `${Date.now()}-${crypto.randomUUID()}.${audioExtension}`;
+	const effectiveProcessedFilename =
+		processedFilename ?? (processingStatus === 'ready' ? filename : null);
 	const filepath = join(uploadsDir, filename);
 	debug.db.log('Écriture fichier audio:', filename);
 	writeFileSync(filepath, audioData);
@@ -927,8 +1044,36 @@ export function saveRecording(userId: number, audioData: Buffer, durationSeconds
 		writeFileSync(imagePath, imageData);
 	}
 
-	const stmt = db.prepare('INSERT INTO recordings (user_id, filename, image_filename, url, duration_seconds, audio_hash) VALUES (?, ?, ?, ?, ?, ?)');
-	const result = stmt.run(userId, filename, imageFilename, url || null, durationSeconds, audioHash || null);
+	const stmt = db.prepare(`
+		INSERT INTO recordings (
+			user_id,
+			filename,
+			processed_filename,
+			image_filename,
+			url,
+			duration_seconds,
+			audio_hash,
+			processing_status,
+			processing_mode,
+			processing_error,
+			processing_started_at,
+			processed_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`);
+	const result = stmt.run(
+		userId,
+		filename,
+		effectiveProcessedFilename,
+		imageFilename,
+		url || null,
+		durationSeconds,
+		audioHash || null,
+		processingStatus,
+		processingMode,
+		processingError,
+		processingStartedAt,
+		processedAt
+	);
 	debug.db.log('Enregistrement créé - id:', result.lastInsertRowid);
 
 	return getRecordingById(result.lastInsertRowid as number)!;
@@ -975,6 +1120,67 @@ export function getRecordingById(id: number): Recording | undefined {
 	return stmt.get(id) as Recording | undefined;
 }
 
+export function getNextRecordingForProcessing(): Recording | undefined {
+	const stmt = db.prepare(`
+		SELECT r.*, u.pseudo, u.avatar
+		FROM recordings r
+		JOIN users u ON r.user_id = u.id
+		WHERE r.processing_status = 'processing' AND r.processing_mode = 'deepfilter'
+		ORDER BY datetime(r.recorded_at) ASC, r.id ASC
+		LIMIT 1
+	`);
+	return stmt.get() as Recording | undefined;
+}
+
+export function markRecordingProcessingStarted(recordingId: number): void {
+	const stmt = db.prepare(`
+		UPDATE recordings
+		SET processing_started_at = datetime('now'), processing_error = NULL
+		WHERE id = ?
+	`);
+	stmt.run(recordingId);
+}
+
+export function markRecordingProcessingReady(recordingId: number, processedFilename: string): Recording | undefined {
+	const stmt = db.prepare(`
+		UPDATE recordings
+		SET
+			processed_filename = ?,
+			processing_status = 'ready',
+			processing_error = NULL,
+			processed_at = datetime('now')
+		WHERE id = ?
+	`);
+	stmt.run(processedFilename, recordingId);
+	return getRecordingById(recordingId);
+}
+
+export function markRecordingProcessingFailed(recordingId: number, errorMessage: string): Recording | undefined {
+	const stmt = db.prepare(`
+		UPDATE recordings
+		SET
+			processing_status = 'failed',
+			processing_error = ?,
+			processed_at = NULL
+		WHERE id = ?
+	`);
+	stmt.run(errorMessage.slice(0, 500), recordingId);
+	return getRecordingById(recordingId);
+}
+
+export function retryFailedRecordingProcessing(recordingId: number): void {
+	const stmt = db.prepare(`
+		UPDATE recordings
+		SET
+			processing_status = 'processing',
+			processing_error = NULL,
+			processing_started_at = NULL,
+			processed_at = NULL
+		WHERE id = ? AND processing_mode = 'deepfilter'
+	`);
+	stmt.run(recordingId);
+}
+
 export function getRecentRecordingByUser(userId: number, durationSeconds: number, secondsThreshold: number = 5): Recording | undefined {
 	const stmt = db.prepare(`
 		SELECT r.*, u.pseudo, u.avatar
@@ -1011,6 +1217,13 @@ export function deleteRecording(recordingId: number): void {
 	const audioPath = join(uploadsDir, recording.filename);
 	if (existsSync(audioPath)) {
 		unlinkSync(audioPath);
+	}
+
+	if (recording.processed_filename && recording.processed_filename !== recording.filename) {
+		const processedAudioPath = join(uploadsDir, recording.processed_filename);
+		if (existsSync(processedAudioPath)) {
+			unlinkSync(processedAudioPath);
+		}
 	}
 	
 	if (recording.image_filename) {
@@ -1061,11 +1274,11 @@ export function getShortRecordingAuthors(maxDurationSeconds = 10): ShortRecordin
 			u.pseudo,
 			u.avatar,
 			COUNT(r.id) as short_recording_count
-		FROM recordings r
-		JOIN users u ON u.id = r.user_id
-		WHERE r.duration_seconds < ?
-		GROUP BY u.id, u.pseudo, u.avatar
-		ORDER BY LOWER(u.pseudo) ASC
+	FROM recordings r
+	JOIN users u ON u.id = r.user_id
+	WHERE r.duration_seconds < ? AND r.processing_status = 'ready'
+	GROUP BY u.id, u.pseudo, u.avatar
+	ORDER BY LOWER(u.pseudo) ASC
 	`);
 
 	return stmt.all(maxDurationSeconds) as ShortRecordingAuthor[];
@@ -1081,16 +1294,22 @@ export function getShortRecordings(filters: ShortRecordingFilters = {}): Recordi
 			r.id,
 			r.user_id,
 			r.filename,
+			r.processed_filename,
 			r.image_filename,
 			r.url,
 			r.duration_seconds,
 			r.recorded_at,
+			r.processing_status,
+			r.processing_mode,
+			r.processing_error,
+			r.processing_started_at,
+			r.processed_at,
 			u.pseudo,
 			u.avatar,
 			0 as listened_by_user
 		FROM recordings r
 		JOIN users u ON u.id = r.user_id
-		WHERE ${whereClause}
+		WHERE ${whereClause} AND r.processing_status = 'ready'
 		ORDER BY datetime(r.recorded_at) DESC, r.id DESC
 		LIMIT ? OFFSET ?
 	`);
@@ -1102,7 +1321,22 @@ export function getUserRecordings(userId: number, limit = 5, offset = 0): Record
 	const historyCutoff = getHistoryCutoffDate();
 	
 	const stmt = db.prepare(`
-		SELECT r.id, r.user_id, r.filename, r.image_filename, r.duration_seconds, r.recorded_at, r.url, u.pseudo, u.avatar
+		SELECT
+			r.id,
+			r.user_id,
+			r.filename,
+			r.processed_filename,
+			r.image_filename,
+			r.duration_seconds,
+			r.recorded_at,
+			r.url,
+			r.processing_status,
+			r.processing_mode,
+			r.processing_error,
+			r.processing_started_at,
+			r.processed_at,
+			u.pseudo,
+			u.avatar
 		FROM recordings r
 		JOIN users u ON r.user_id = u.id
 		WHERE r.user_id = ? AND r.recorded_at >= ?
@@ -1126,7 +1360,7 @@ export function getUserRecordingsCount(userId: number): number {
 	return result.count;
 }
 
-export function getUserProfileImages(userId: number, limit = 8, offset = 0): ProfileImage[] {
+export function getUserProfileImages(userId: number, limit = 8, offset = 0, includeNonReady = false): ProfileImage[] {
 	const historyCutoff = getHistoryCutoffDate();
 	const stmt = db.prepare(`
 		SELECT
@@ -1141,6 +1375,7 @@ export function getUserProfileImages(userId: number, limit = 8, offset = 0): Pro
 		FROM recordings r
 		JOIN users u ON u.id = r.user_id
 		WHERE r.user_id = ? AND r.image_filename IS NOT NULL AND r.recorded_at >= ?
+		${includeNonReady ? '' : "AND r.processing_status = 'ready'"}
 		ORDER BY datetime(r.recorded_at) DESC, r.id DESC
 		LIMIT ? OFFSET ?
 	`);
@@ -1148,35 +1383,43 @@ export function getUserProfileImages(userId: number, limit = 8, offset = 0): Pro
 	return stmt.all(userId, historyCutoff.toISOString(), limit, offset) as ProfileImage[];
 }
 
-export function getUserProfileImagesCount(userId: number): number {
+export function getUserProfileImagesCount(userId: number, includeNonReady = false): number {
 	const historyCutoff = getHistoryCutoffDate();
 	const stmt = db.prepare(`
 		SELECT COUNT(*) as count
 		FROM recordings
 		WHERE user_id = ? AND image_filename IS NOT NULL AND recorded_at >= ?
+		${includeNonReady ? '' : "AND processing_status = 'ready'"}
 	`);
 
 	const result = stmt.get(userId, historyCutoff.toISOString()) as { count: number };
 	return result.count;
 }
 
-export function getUserRecentRecordings(userId: number, limit = 10): Recording[] {
+export function getUserRecentRecordings(userId: number, limit = 10, includeNonReady = false): Recording[] {
 	const historyCutoff = getHistoryCutoffDate();
 	const stmt = db.prepare(`
 		SELECT
 			r.id,
 			r.user_id,
 			r.filename,
+			r.processed_filename,
 			r.image_filename,
 			r.url,
 			r.duration_seconds,
 			r.recorded_at,
+			r.processing_status,
+			r.processing_mode,
+			r.processing_error,
+			r.processing_started_at,
+			r.processed_at,
 			0 as listened_by_user,
 			u.pseudo,
 			u.avatar
 		FROM recordings r
 		JOIN users u ON u.id = r.user_id
 		WHERE r.user_id = ? AND r.recorded_at >= ?
+		${includeNonReady ? '' : "AND r.processing_status = 'ready'"}
 		ORDER BY datetime(r.recorded_at) DESC, r.id DESC
 		LIMIT ?
 	`);
@@ -1208,7 +1451,7 @@ export function getRecordingsForUser(userId: number): Recording[] {
 			SELECT r.*, u.pseudo, u.avatar 
 			FROM recordings r 
 			JOIN users u ON r.user_id = u.id 
-			WHERE date(r.recorded_at) = ?
+			WHERE date(r.recorded_at) = ? AND r.processing_status = 'ready'
 			ORDER BY r.recorded_at DESC
 		`);
 		return stmt.all(today) as Recording[];
@@ -1217,7 +1460,7 @@ export function getRecordingsForUser(userId: number): Recording[] {
 			SELECT r.*, u.pseudo, u.avatar 
 			FROM recordings r 
 			JOIN users u ON r.user_id = u.id 
-			WHERE date(r.recorded_at) = ?
+			WHERE date(r.recorded_at) = ? AND r.processing_status = 'ready'
 			ORDER BY r.recorded_at DESC
 		`);
 		return stmt.all(yesterdayStr) as Recording[];
@@ -1236,7 +1479,7 @@ export function markLatestOtherRecordingsAsUnread(userId: number, limit = 5): { 
 	const recordingsStmt = db.prepare(`
 		SELECT id
 		FROM recordings
-		WHERE user_id != ?
+		WHERE user_id != ? AND processing_status = 'ready'
 		ORDER BY recorded_at DESC, id DESC
 		LIMIT ?
 	`);
@@ -1263,7 +1506,7 @@ export function markAllExistingOtherRecordingsAsListened(userId: number): { sele
 	const countStmt = db.prepare(`
 		SELECT COUNT(*) as count
 		FROM recordings
-		WHERE user_id != ?
+		WHERE user_id != ? AND processing_status = 'ready'
 	`);
 	const countResult = countStmt.get(userId) as { count: number } | undefined;
 	const selectedCount = countResult?.count ?? 0;
@@ -1272,7 +1515,7 @@ export function markAllExistingOtherRecordingsAsListened(userId: number): { sele
 		INSERT OR IGNORE INTO listening_history (user_id, recording_id)
 		SELECT ?, r.id
 		FROM recordings r
-		WHERE r.user_id != ?
+		WHERE r.user_id != ? AND r.processing_status = 'ready'
 	`);
 	const result = insertStmt.run(userId, userId);
 
@@ -1284,6 +1527,14 @@ export function markAllExistingOtherRecordingsAsListened(userId: number): { sele
 
 export function getRecordingFilePath(filename: string): string {
 	return join(uploadsDir, filename);
+}
+
+export function getRecordingPlaybackFilename(recording: Recording): string | null {
+	if (recording.processing_status !== 'ready') {
+		return null;
+	}
+
+	return recording.processed_filename || recording.filename;
 }
 
 export function upsertPushSubscription(
@@ -1623,5 +1874,10 @@ export function setAppConfig(key: string, value: string): void {
 
 export function isRegistrationAllowed(): boolean {
 	const value = getAppConfig('allow_registration');
+	return value === 'true';
+}
+
+export function isAudioProcessingEnabled(): boolean {
+	const value = getAppConfig('audio_processing_enabled');
 	return value === 'true';
 }

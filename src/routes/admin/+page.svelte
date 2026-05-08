@@ -25,6 +25,7 @@
 		historyMonths: number;
 		maxRecordingSeconds: number;
 		maxGroupNameLength: number;
+		audioProcessingEnabled: boolean;
 	};
 
 	type PushConfig = {
@@ -32,6 +33,15 @@
 		publicKey: string | null;
 		subject: string | null;
 		missingKeys: string[];
+	};
+
+	type AudioProcessingConfig = {
+		configured: boolean;
+		mode: string;
+		pythonBin: string | null;
+		scriptPath: string | null;
+		cacheHome: string | null;
+		missingRequirements: string[];
 	};
 
 	type PendingRegistration = {
@@ -44,7 +54,7 @@
 		status: string;
 	};
 
-	let { data, form }: { data: PageData & { currentUser?: User; csrfToken?: string; pendingRegistrations?: PendingRegistration[]; allowRegistration?: boolean; oldestAdminId?: number | null; appSettings: AppSettings; pushConfig: PushConfig }; form?: { success?: boolean; error?: string; message?: string } } = $props();
+	let { data, form }: { data: PageData & { currentUser?: User; csrfToken?: string; pendingRegistrations?: PendingRegistration[]; allowRegistration?: boolean; oldestAdminId?: number | null; appSettings: AppSettings; pushConfig: PushConfig; audioProcessingConfig: AudioProcessingConfig }; form?: { success?: boolean; error?: string; message?: string } } = $props();
 
 	const emojis = ['☕', '😀', '😎', '🤠', '🥳', '😇', '🤩', '😈', '👻', '🤖', '🎸', '🎮', '🚀', '🍕', '🍺', '🌈', '🔥', '⭐', '❤️'];
 	
@@ -59,6 +69,9 @@
 	let unreadMarkingMessage = $state<string | null>(null);
 	let unreadMarkingError = $state<string | null>(null);
 	let unreadMarkingLoading = $state(false);
+	let audioProcessingMessage = $state<string | null>(null);
+	let audioProcessingError = $state<string | null>(null);
+	let audioProcessingLoading = $state(false);
 	let groupConfigMessage = $state<string | null>(null);
 	let groupConfigError = $state<string | null>(null);
 	let isSavingGroupConfig = $state(false);
@@ -163,6 +176,62 @@
 				<p><strong>Variables requises :</strong> {data.pushConfig.missingKeys.join(', ')}</p>
 				<p><strong>À renseigner côté serveur :</strong> `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`</p>
 				<p><strong>Commande utile :</strong> `npx web-push generate-vapid-keys`</p>
+			</div>
+		{/if}
+	</section>
+
+	<section>
+		<h2>Amélioration audio</h2>
+		{#if data.audioProcessingConfig.configured}
+			<p class="super-text">
+				Quand elle est activée, chaque nouvelle capsule est nettoyée côté serveur avant diffusion. Les capsules déjà publiées restent inchangées.
+			</p>
+			<div class="config-status-card is-ready">
+				<p><strong>Mode :</strong> {data.audioProcessingConfig.mode}</p>
+				<p><strong>Traitement :</strong> {data.appSettings.audioProcessingEnabled ? 'activé pour les prochaines capsules' : 'désactivé'}</p>
+				<p><strong>Python :</strong> {data.audioProcessingConfig.pythonBin}</p>
+			</div>
+			<form method="POST" action="?/toggleAudioProcessing" use:enhance={() => {
+				audioProcessingLoading = true;
+				audioProcessingMessage = null;
+				audioProcessingError = null;
+
+				return async ({ result }) => {
+					audioProcessingLoading = false;
+
+					if (result.type === 'success') {
+						audioProcessingMessage = (result.data as any)?.message || 'Réglage audio enregistré';
+						window.location.reload();
+					} else if (result.type === 'failure') {
+						audioProcessingError = (result.data as any)?.error || 'Impossible de mettre à jour l’amélioration audio';
+					}
+				};
+			}}>
+				<input type="hidden" name="csrf_token" value={data.csrfToken} />
+				<input type="hidden" name="enabled" value={data.appSettings.audioProcessingEnabled ? 'false' : 'true'} />
+				<button type="submit" class="super-btn section-action-btn" disabled={audioProcessingLoading}>
+					{#if audioProcessingLoading}
+						Enregistrement...
+					{:else if data.appSettings.audioProcessingEnabled}
+						Désactiver l'amélioration du son
+					{:else}
+						Activer l'amélioration du son
+					{/if}
+				</button>
+				{#if audioProcessingMessage}
+					<p class="success-message">{audioProcessingMessage}</p>
+				{/if}
+				{#if audioProcessingError}
+					<p class="error-message">{audioProcessingError}</p>
+				{/if}
+			</form>
+		{:else}
+			<p class="super-text">
+				L’amélioration audio n’est pas configurée sur ce serveur. Activez le mode DeepFilter côté Docker pour afficher l’option d’activation.
+			</p>
+			<div class="config-status-card is-disabled">
+				<p><strong>Flag requis :</strong> `AUDIO_PROCESSING_MODE=deepfilter`</p>
+				<p><strong>Pré-requis manquants :</strong> {data.audioProcessingConfig.missingRequirements.join(', ')}</p>
 			</div>
 		{/if}
 	</section>

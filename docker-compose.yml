@@ -6,6 +6,7 @@ services:
     environment:
       - PORT=${PORT:-3001}
       - BODY_SIZE_LIMIT=20M
+      - AUDIO_PROCESSING_MODE=${AUDIO_PROCESSING_MODE:-basic}
     volumes:
       - ./data:/app/data
       - ./uploads:/app/uploads

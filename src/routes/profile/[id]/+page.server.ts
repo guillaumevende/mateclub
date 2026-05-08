@@ -17,9 +17,10 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		throw error(404, 'Profil introuvable');
 	}
 
-	const images = getUserProfileImages(userId, 8, 0);
-	const totalImages = getUserProfileImagesCount(userId);
-	const recordings = getUserRecentRecordings(userId, 10);
+	const isOwnProfile = locals.user.id === userId;
+	const images = getUserProfileImages(userId, 8, 0, isOwnProfile);
+	const totalImages = getUserProfileImagesCount(userId, isOwnProfile);
+	const recordings = getUserRecentRecordings(userId, 10, isOwnProfile);
 
 	return {
 		profileUser,
