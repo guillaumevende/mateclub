@@ -1,9 +1,10 @@
 import type { RequestHandler } from './$types';
 import { redirect, json } from '@sveltejs/kit';
-import { getRecordingById, getRecordingFilePath, markAsListened, deleteRecording } from '$lib/server/db';
+import { getRecordingById, getRecordingFilePath, markAsListened, deleteRecording, updateRecordingImage, updateRecordingUrl } from '$lib/server/db';
 import { existsSync, createReadStream, statSync, openSync, readSync, closeSync } from 'fs';
-import { detectAudioMimeType } from '$lib/server/fileValidation';
+import { detectAudioMimeType, isValidImageBuffer } from '$lib/server/fileValidation';
 import { Readable } from 'stream';
+import sharp from 'sharp';
 
 function parseRangeHeader(rangeHeader: string | null, fileSize: number) {
 	if (!rangeHeader) return null;
@@ -122,8 +123,8 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 		return json({ error: 'Enregistrement non trouvé' }, { status: 404 });
 	}
 
-	// Only allow users to delete their own recordings
-	if (recording.user_id !== locals.user.id) {
+	// Users can delete their own recordings; admins can clean up any recording
+	if (recording.user_id !== locals.user.id && !locals.user.is_admin) {
 		return json({ error: 'Non autorisé' }, { status: 403 });
 	}
 
@@ -133,5 +134,112 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 	} catch (error) {
 		console.error('Error deleting recording:', error);
 		return json({ error: 'Erreur lors de la suppression' }, { status: 500 });
+	}
+};
+
+export const PATCH: RequestHandler = async ({ request, params, locals }) => {
+	if (!locals.user) {
+		return json({ error: 'Unauthorized' }, { status: 401 });
+	}
+
+	const recordingId = parseInt(params.id, 10);
+	const recording = getRecordingById(recordingId);
+
+	if (!recording) {
+		return json({ error: 'Enregistrement non trouvé' }, { status: 404 });
+	}
+
+	if (recording.user_id !== locals.user.id) {
+		return json({ error: 'Non autorisé' }, { status: 403 });
+	}
+
+	const recordedAt = new Date(recording.recorded_at.includes('T') ? recording.recorded_at : `${recording.recorded_at.replace(' ', 'T')}Z`);
+	if (Number.isNaN(recordedAt.getTime()) || Date.now() - recordedAt.getTime() > 24 * 60 * 60 * 1000) {
+		return json({ error: 'Cette capsule n’est plus modifiable' }, { status: 400 });
+	}
+
+	let formData: FormData;
+	try {
+		formData = await request.formData();
+	} catch {
+		return json({ error: 'Requête invalide' }, { status: 400 });
+	}
+
+	const rawUrl = formData.get('url');
+	if (typeof rawUrl === 'string') {
+		const trimmedUrl = rawUrl.trim();
+
+		if (recording.url) {
+			return json({ error: 'Cette capsule a déjà un lien' }, { status: 400 });
+		}
+
+		if (!trimmedUrl) {
+			return json({ error: 'URL requise' }, { status: 400 });
+		}
+
+		try {
+			const parsed = new URL(trimmedUrl);
+			if (parsed.protocol !== 'https:') {
+				return json({ error: "L'URL doit commencer par https://" }, { status: 400 });
+			}
+		} catch {
+			return json({ error: 'URL invalide' }, { status: 400 });
+		}
+
+		try {
+			const updated = updateRecordingUrl(recordingId, trimmedUrl);
+			return json({ recording: updated });
+		} catch (error) {
+			console.error('Error updating recording url:', error);
+			return json({ error: 'Erreur lors de la mise à jour du lien' }, { status: 500 });
+		}
+	}
+
+	const image = formData.get('image');
+	if (!(image instanceof File) || image.size === 0) {
+		return json({ error: 'Image requise' }, { status: 400 });
+	}
+
+	if (recording.image_filename) {
+		return json({ error: 'Cette capsule a déjà une image' }, { status: 400 });
+	}
+
+	const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+	const isHeic = image.type === 'image/heic' || image.type === 'image/heif';
+	if (!validImageTypes.includes(image.type)) {
+		return json({ error: 'Type d’image non autorisé' }, { status: 400 });
+	}
+
+	let imageBuffer: Buffer;
+	try {
+		imageBuffer = Buffer.from(await image.arrayBuffer());
+	} catch {
+		return json({ error: 'Erreur lors de la lecture de l’image' }, { status: 500 });
+	}
+
+	if (isHeic) {
+		try {
+			imageBuffer = await sharp(imageBuffer)
+				.resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+				.jpeg({ quality: 85 })
+				.toBuffer();
+		} catch {
+			return json({ error: 'Erreur lors du traitement de l’image' }, { status: 400 });
+		}
+	} else if (!isValidImageBuffer(imageBuffer)) {
+		return json({ error: 'Le fichier ne semble pas être une image valide.' }, { status: 400 });
+	}
+
+	const maxImageSize = 10 * 1024 * 1024;
+	if (imageBuffer.length > maxImageSize) {
+		return json({ error: 'Image trop volumineuse (max 10 Mo)' }, { status: 400 });
+	}
+
+	try {
+		const updated = updateRecordingImage(recordingId, imageBuffer);
+		return json({ recording: updated });
+	} catch (error) {
+		console.error('Error updating recording image:', error);
+		return json({ error: 'Erreur lors de la mise à jour de l’image' }, { status: 500 });
 	}
 };

@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { redirect, json } from '@sveltejs/kit';
-import { saveRecording, getRecentRecordingByHash } from '$lib/server/db';
+import { saveRecording, getRecentRecordingByHash, getConfiguredMaxRecordingSeconds } from '$lib/server/db';
 import { detectAudioMimeType, isValidAudioBuffer, isValidImageBuffer } from '$lib/server/fileValidation';
 import { prepareAudioForStorage } from '$lib/server/audioCompatibility';
 import crypto from 'crypto';
@@ -45,9 +45,15 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	const durationSeconds = parseInt(duration || '0', 10);
-	if (durationSeconds > 180) {
+	const maxRecordingSeconds = getConfiguredMaxRecordingSeconds();
+	if (durationSeconds > maxRecordingSeconds) {
+		const maxMinutes = Math.floor(maxRecordingSeconds / 60);
+		const maxSeconds = maxRecordingSeconds % 60;
+		const maxDurationLabel = maxSeconds === 0
+			? `${maxMinutes} minute${maxMinutes > 1 ? 's' : ''}`
+			: `${maxMinutes} minute${maxMinutes > 1 ? 's' : ''} et ${maxSeconds} seconde${maxSeconds > 1 ? 's' : ''}`;
 		console.error('[RECORDINGS] Durée trop longue:', durationSeconds, 'user:', locals.user.id);
-		return json({ error: 'Durée maximale: 3 minutes' }, { status: 400 });
+		return json({ error: `Durée maximale: ${maxDurationLabel}` }, { status: 400 });
 	}
 
 	const maxAudioSize = 20 * 1024 * 1024;

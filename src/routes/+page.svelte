@@ -3,12 +3,12 @@
 	import { onMount } from 'svelte';
 	import type { PageData } from './$types';
 	import { generateCalendarMonths, type CalendarMonth } from '$lib/calendar';
-	import Avatar from '$lib/components/Avatar.svelte';
 	import ImageViewer from '$lib/components/ImageViewer.svelte';
 	import RecordingCard from '$lib/components/RecordingCard.svelte';
 	import TeamList from '$lib/components/TeamList.svelte';
 	import Calendar from '$lib/components/Calendar.svelte';
 	import CloseIconButton from '$lib/components/CloseIconButton.svelte';
+	import UserProfileAvatarLink from '$lib/components/UserProfileAvatarLink.svelte';
 	import { scrollLock } from '$lib/actions/scrollLock';
 	import { triggerHaptic, triggerLockedHaptic } from '$lib/utils/haptics';
 	import { playerStore, lastListenedRecordingId, type Recording, type DayRecordings, type PlayerState, playRecording, togglePlayPause, closePlayer, playNext } from '$lib/stores/player';
@@ -47,6 +47,13 @@
 		recording_count?: number;
 	};
 
+	type AppSettings = {
+		groupName: string;
+		historyMonths: number;
+		maxRecordingSeconds: number;
+		maxGroupNameLength: number;
+	};
+
 	type DateInfo = {
 		hasRecordings: boolean;
 		hasUnread: boolean;
@@ -72,7 +79,7 @@
 		count: number;
 	};
 
-	let { data }: { data: PageData & { user?: User; allUsers: UserList[]; threshold: number; unreadStats?: { count: number; totalSeconds: number }; hasMore?: boolean; pendingRegistrationsCount?: number } } = $props();
+	let { data }: { data: PageData & { user?: User; allUsers: UserList[]; threshold: string; unreadStats?: { count: number; totalSeconds: number }; hasMore?: boolean; pendingRegistrationsCount?: number; groupName?: string; appSettings?: AppSettings } } = $props();
 
 	function getInitialHomeState() {
 		const initialPage = data.page ?? 1;
@@ -218,9 +225,18 @@
 		const hasOnlyLockedUnread = hasResolvedPlayableState && totalCount > 0 && playableCount === 0;
 		const hasMixedUnread = hasResolvedPlayableState && playableCount > 0 && playableCount < totalCount;
 
+		if (!hasResolvedPlayableState && totalCount > 0) {
+			return {
+				title: `${totalCount} capsule${totalCount !== 1 ? 's' : ''} dispo à ${data.threshold}`,
+				duration: formatCompactDurationLabel(totalSeconds),
+				showPlayIcon: false,
+				showLockIcon: true
+			};
+		}
+
 		if (hasOnlyLockedUnread) {
 			return {
-				title: `${totalCount} capsule${totalCount !== 1 ? 's' : ''} pour ${data.threshold}`,
+				title: `${totalCount} capsule${totalCount !== 1 ? 's' : ''} dispo à ${data.threshold}`,
 				duration: formatCompactDurationLabel(totalSeconds),
 				showPlayIcon: false,
 				showLockIcon: true
@@ -1072,7 +1088,13 @@
 		{/if}
 		<img src="/icon-512x512.png" alt="Maté Club" class="logo" />
 		<p class="date">{getTodayDate()}</p>
-		<p class="welcome">Bienvenue, {data.user?.pseudo} !</p>
+		<p class="welcome">
+			{#if (data.groupName || data.appSettings?.groupName)}
+				Bienvenue chez {data.groupName || data.appSettings?.groupName}, {data.user?.pseudo} !
+			{:else}
+				Bienvenue, {data.user?.pseudo} !
+			{/if}
+		</p>
 		{#if unreadStats.count > 0}
 			<button
 				class="unread-summary-pill"
@@ -1229,12 +1251,8 @@
 							{#if showAuthors}
 							<div class="day-authors-header">
 								{#each displayAuthors as author, i}
-									<div 
-										class="author-avatar-header" 
-										title={author.pseudo}
-										style="margin-left: {i === 0 ? 0 : -17}px; z-index: {i}"
-									>
-										<Avatar avatar={author.avatar} size="small" />
+									<div class="author-avatar-header" title={author.pseudo} style="margin-left: {i === 0 ? 0 : -17}px; z-index: {i}">
+										<UserProfileAvatarLink userId={author.user_id} avatar={author.avatar} size="small" label={`Voir le profil de ${author.pseudo}`} />
 									</div>
 								{/each}
 								{#if hasMore}
@@ -1316,12 +1334,8 @@
 							{#if showAuthors}
 							<div class="day-authors-header">
 								{#each displayAuthors as author, i}
-									<div 
-										class="author-avatar-header" 
-										title={author.pseudo}
-										style="margin-left: {i === 0 ? 0 : -17}px; z-index: {i}"
-									>
-										<Avatar avatar={author.avatar} size="small" />
+									<div class="author-avatar-header" title={author.pseudo} style="margin-left: {i === 0 ? 0 : -17}px; z-index: {i}">
+										<UserProfileAvatarLink userId={author.user_id} avatar={author.avatar} size="small" label={`Voir le profil de ${author.pseudo}`} />
 									</div>
 								{/each}
 								{#if hasMore}
@@ -1388,12 +1402,8 @@
 						{#if showAuthors}
 						<div class="day-authors-header">
 							{#each displayAuthors as author, i}
-									<div 
-										class="author-avatar-header" 
-										title={author.pseudo}
-										style="margin-left: {i === 0 ? 0 : -17}px; z-index: {i}"
-									>
-										<Avatar avatar={author.avatar} size="small" />
+									<div class="author-avatar-header" title={author.pseudo} style="margin-left: {i === 0 ? 0 : -17}px; z-index: {i}">
+										<UserProfileAvatarLink userId={author.user_id} avatar={author.avatar} size="small" label={`Voir le profil de ${author.pseudo}`} />
 									</div>
 								{/each}
 								{#if hasMore}
@@ -1598,10 +1608,10 @@
 		margin: 0.6rem auto 0;
 		padding: 0.8rem 1rem 0.85rem;
 		display: grid;
-		grid-template-columns: 42px minmax(0, 1fr) 42px;
+		grid-template-columns: 38px minmax(0, 1fr) 38px;
 		align-items: center;
 		column-gap: 0.15rem;
-		width: min(100%, 290px);
+		width: min(100%, 320px);
 		border-radius: 999px;
 		border: 1px solid rgba(233, 69, 96, 0.28);
 		background:
@@ -1642,8 +1652,8 @@
 
 	.unread-summary-pill .pill-leading-slot,
 	.unread-summary-pill .pill-trailing-slot {
-		width: 34px;
-		height: 34px;
+		width: 30px;
+		height: 30px;
 		display: flex;
 		align-items: center;
 	}

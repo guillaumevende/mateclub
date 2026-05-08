@@ -20,6 +20,11 @@ if (!existsSync(uploadsDir)) {
 
 export const db = new Database(dbPath);
 
+const DEFAULT_HISTORY_MONTHS = 3;
+const DEFAULT_MAX_RECORDING_SECONDS = 180;
+const MAX_GROUP_NAME_LENGTH = 24;
+const DEFAULT_PUSH_CHECK_WINDOW_MINUTES = 120;
+
 // No automatic admin creation - first admin must be created via /setup page
 
 	db.exec(`
@@ -70,6 +75,32 @@ export const db = new Database(dbPath);
 		session_id TEXT,
 		expires_at DATETIME NOT NULL,
 		FOREIGN KEY (session_id) REFERENCES sessions(id)
+	);
+
+	CREATE TABLE IF NOT EXISTS push_subscriptions (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL,
+		endpoint TEXT NOT NULL UNIQUE,
+		p256dh TEXT NOT NULL,
+		auth TEXT NOT NULL,
+		user_agent TEXT,
+		created_at DATETIME DEFAULT (datetime('now')),
+		updated_at DATETIME DEFAULT (datetime('now')),
+		last_success_at DATETIME,
+		last_failure_at DATETIME,
+		disabled_at DATETIME,
+		FOREIGN KEY (user_id) REFERENCES users(id)
+	);
+
+	CREATE TABLE IF NOT EXISTS push_delivery_log (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL,
+		delivery_date TEXT NOT NULL,
+		notification_type TEXT NOT NULL,
+		sent INTEGER DEFAULT 0,
+		recorded_at DATETIME DEFAULT (datetime('now')),
+		FOREIGN KEY (user_id) REFERENCES users(id),
+		UNIQUE(user_id, delivery_date, notification_type)
 	);
 `);
 
@@ -128,6 +159,12 @@ try {
 }
 
 try {
+	db.exec('ALTER TABLE users ADD COLUMN push_notifications_enabled INTEGER DEFAULT 0');
+} catch (e) {
+	// Colonne déjà existante
+}
+
+try {
 	db.exec(`
 		CREATE TABLE IF NOT EXISTS login_attempts (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -158,7 +195,7 @@ try {
 	// Table déjà existante
 }
 
-try {
+	try {
 	db.exec(`
 		CREATE TABLE IF NOT EXISTS app_config (
 			key TEXT PRIMARY KEY,
@@ -168,8 +205,55 @@ try {
 	// Initialiser la configuration par défaut
 	const stmt = db.prepare('INSERT OR IGNORE INTO app_config (key, value) VALUES (?, ?)');
 	stmt.run('allow_registration', 'false');
+	stmt.run('group_name', '');
+	stmt.run('history_months', DEFAULT_HISTORY_MONTHS.toString());
+	stmt.run('max_recording_seconds', DEFAULT_MAX_RECORDING_SECONDS.toString());
+	stmt.run('push_check_window_minutes', DEFAULT_PUSH_CHECK_WINDOW_MINUTES.toString());
 } catch (e) {
 	// Table déjà existante
+}
+
+export type AppSettings = {
+	allowRegistration: boolean;
+	groupName: string;
+	historyMonths: number;
+	maxRecordingSeconds: number;
+	maxGroupNameLength: number;
+};
+
+function parseAppConfigInteger(value: string | null, fallback: number, min: number, max: number): number {
+	const parsed = Number.parseInt(value ?? '', 10);
+	if (!Number.isInteger(parsed)) return fallback;
+	return Math.min(max, Math.max(min, parsed));
+}
+
+function getHistoryCutoffDate(): Date {
+	const historyMonths = getConfiguredHistoryMonths();
+	const cutoff = new Date();
+	cutoff.setMonth(cutoff.getMonth() - historyMonths);
+	return cutoff;
+}
+
+export function getConfiguredHistoryMonths(): number {
+	return parseAppConfigInteger(getAppConfig('history_months'), DEFAULT_HISTORY_MONTHS, 1, 24);
+}
+
+export function getConfiguredMaxRecordingSeconds(): number {
+	return parseAppConfigInteger(getAppConfig('max_recording_seconds'), DEFAULT_MAX_RECORDING_SECONDS, 15, 60 * 60);
+}
+
+export function getConfiguredPushCheckWindowMinutes(): number {
+	return parseAppConfigInteger(getAppConfig('push_check_window_minutes'), DEFAULT_PUSH_CHECK_WINDOW_MINUTES, 1, 24 * 60);
+}
+
+export function getAppSettings(): AppSettings {
+	return {
+		allowRegistration: isRegistrationAllowed(),
+		groupName: (getAppConfig('group_name') ?? '').trim().slice(0, MAX_GROUP_NAME_LENGTH),
+		historyMonths: getConfiguredHistoryMonths(),
+		maxRecordingSeconds: getConfiguredMaxRecordingSeconds(),
+		maxGroupNameLength: MAX_GROUP_NAME_LENGTH
+	};
 }
 
 export type User = {
@@ -185,6 +269,7 @@ export type User = {
 	logs_enabled?: number;
 	jingles_enabled?: number;
 	pwa_tutorial_enabled?: number;
+	push_notifications_enabled?: number;
 };
 
 export type Recording = {
@@ -199,6 +284,47 @@ export type Recording = {
 	pseudo: string;
 	avatar: string;
 	audio_hash?: string | null;
+};
+
+export type ShortRecordingAuthor = {
+	id: number;
+	pseudo: string;
+	avatar: string;
+	short_recording_count: number;
+};
+
+export type ShortRecordingFilters = {
+	authorId?: number | null;
+	fromDate?: string | null;
+	toDate?: string | null;
+	maxDurationSeconds?: number;
+	limit?: number;
+	offset?: number;
+};
+
+export type ProfileImage = {
+	id: number;
+	user_id: number;
+	image_filename: string;
+	recorded_at: string;
+	duration_seconds: number;
+	url: string | null;
+	pseudo: string;
+	avatar: string;
+};
+
+export type PushSubscriptionRecord = {
+	id: number;
+	user_id: number;
+	endpoint: string;
+	p256dh: string;
+	auth: string;
+	user_agent: string | null;
+	created_at: string;
+	updated_at: string;
+	last_success_at: string | null;
+	last_failure_at: string | null;
+	disabled_at: string | null;
 };
 
 export type DayRecordings = {
@@ -288,8 +414,7 @@ export function getRecordingsByDate(userId: number, date: string): DayRecordings
 	if (!user) return null;
 
 	const timezone = user.timezone || 'Europe/Paris';
-	const threeMonthsAgo = new Date();
-	threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+	const historyCutoff = getHistoryCutoffDate();
 	const stmt = db.prepare(`
 		SELECT 
 			r.id, r.user_id, r.filename, r.image_filename, r.url, r.duration_seconds, r.recorded_at,
@@ -301,7 +426,7 @@ export function getRecordingsByDate(userId: number, date: string): DayRecordings
 		WHERE r.recorded_at >= ?
 		ORDER BY r.recorded_at ASC
 	`);
-	const results = stmt.all(userId, threeMonthsAgo.toISOString()) as Recording[];
+	const results = stmt.all(userId, historyCutoff.toISOString()) as Recording[];
 	const filteredResults = results.filter(
 		(recording) => getDateWithThreshold(recording.recorded_at, user.daily_notification_hour, timezone) === date
 	);
@@ -383,6 +508,7 @@ export function getRecordingsGroupedByDay(userId: number, limit = 7, page = 1, t
 
 	const userTimezone = timezone || user.timezone || 'Europe/Paris';
 	const threshold = user.daily_notification_hour;
+	const historyCutoff = getHistoryCutoffDate();
 
 	const offset = (page - 1) * limit;
 
@@ -394,10 +520,11 @@ export function getRecordingsGroupedByDay(userId: number, limit = 7, page = 1, t
 		FROM recordings r 
 		JOIN users u ON r.user_id = u.id 
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
+		WHERE r.recorded_at >= ?
 		ORDER BY r.recorded_at DESC
 		LIMIT ? OFFSET ?
 	`);
-	const results = stmt.all(userId, limit * 3, offset) as Recording[];
+	const results = stmt.all(userId, historyCutoff.toISOString(), limit * 3, offset) as Recording[];
 
 	const grouped: Record<string, Recording[]> = {};
 	for (const row of results) {
@@ -440,10 +567,8 @@ export function getRecordingsGroupedByDayWithHasMore(
 	const userTimezone = timezone || user.timezone || 'Europe/Paris';
 	const threshold = user.daily_notification_hour;
 
-	// Filtrer sur les 3 derniers mois
-	const threeMonthsAgo = new Date();
-	threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-	const threeMonthsAgoStr = threeMonthsAgo.toISOString();
+	const historyCutoff = getHistoryCutoffDate();
+	const historyCutoffStr = historyCutoff.toISOString();
 
 	const offset = (page - 1) * limit;
 
@@ -465,7 +590,7 @@ export function getRecordingsGroupedByDayWithHasMore(
 		LIMIT ? OFFSET ?
 	`);
 	// Demander enough records pour avoir tous les jours (limit * 10 par sécurité)
-	const results = stmt.all(userId, threeMonthsAgoStr, limit * 10, offset) as Recording[];
+	const results = stmt.all(userId, historyCutoffStr, limit * 10, offset) as Recording[];
 
 	const grouped: Record<string, Recording[]> = {};
 	for (const row of results) {
@@ -506,10 +631,7 @@ export function getRecordingsGroupedByDayWithHasMore(
 }
 
 export function getUnreadCount(userId: number): { count: number; totalSeconds: number } {
-	// Filtrer sur les 3 derniers mois pour correspondre à l'affichage
-	const threeMonthsAgo = new Date();
-	threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-	const threeMonthsAgoStr = threeMonthsAgo.toISOString();
+	const historyCutoffStr = getHistoryCutoffDate().toISOString();
 	
 	const stmt = db.prepare(`
 		SELECT 
@@ -519,8 +641,43 @@ export function getUnreadCount(userId: number): { count: number; totalSeconds: n
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
 		WHERE l.id IS NULL AND r.user_id != ? AND r.recorded_at >= ?
 	`);
-	const result = stmt.get(userId, userId, threeMonthsAgoStr) as { count: number; totalSeconds: number };
+	const result = stmt.get(userId, userId, historyCutoffStr) as { count: number; totalSeconds: number };
 	return result;
+}
+
+export function getAvailableUnreadCount(userId: number): { count: number; totalSeconds: number } {
+	const user = getUserById(userId);
+	if (!user) return { count: 0, totalSeconds: 0 };
+
+	const historyCutoffStr = getHistoryCutoffDate().toISOString();
+	const stmt = db.prepare(`
+		SELECT
+			r.id,
+			r.user_id,
+			r.filename,
+			r.image_filename,
+			r.url,
+			r.duration_seconds,
+			r.recorded_at,
+			CASE WHEN l.id IS NOT NULL THEN 1 ELSE 0 END as listened_by_user,
+			u.pseudo,
+			u.avatar
+		FROM recordings r
+		JOIN users u ON r.user_id = u.id
+		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
+		WHERE l.id IS NULL AND r.user_id != ? AND r.recorded_at >= ?
+		ORDER BY datetime(r.recorded_at) ASC, r.id ASC
+	`);
+
+	const unreadRecordings = stmt.all(userId, userId, historyCutoffStr) as Recording[];
+	const availableRecordings = unreadRecordings.filter((recording) =>
+		isDateAvailable(recording.recorded_at, user.super_powers === 1, user.daily_notification_hour, user.timezone || 'Europe/Paris')
+	);
+
+	return {
+		count: availableRecordings.length,
+		totalSeconds: availableRecordings.reduce((sum, recording) => sum + recording.duration_seconds, 0)
+	};
 }
 
 export function createUser(pseudo: string, password: string, isAdmin = false, avatar = '☕'): User {
@@ -541,8 +698,20 @@ export function hasAdmin(): boolean {
 }
 
 export function getUserById(id: number): User | undefined {
-	const stmt = db.prepare('SELECT id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, last_login, logs_enabled, jingles_enabled, pwa_tutorial_enabled FROM users WHERE id = ?');
+	const stmt = db.prepare('SELECT id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, last_login, logs_enabled, jingles_enabled, pwa_tutorial_enabled, push_notifications_enabled FROM users WHERE id = ?');
 	return stmt.get(id) as User | undefined;
+}
+
+export function getOldestAdminId(): number | null {
+	const stmt = db.prepare(`
+		SELECT id
+		FROM users
+		WHERE is_admin = 1
+		ORDER BY datetime(created_at) ASC, id ASC
+		LIMIT 1
+	`);
+	const result = stmt.get() as { id: number } | undefined;
+	return result?.id ?? null;
 }
 
 export function verifyPassword(hash: string, password: string): boolean {
@@ -552,13 +721,11 @@ export function verifyPassword(hash: string, password: string): boolean {
 export type UserWithCount = User & { recording_count: number };
 
 export function getAllUsers(): UserWithCount[] {
-	// Get all users with their recording count in the last 3 months
-	const threeMonthsAgo = new Date();
-	threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+	const historyCutoff = getHistoryCutoffDate();
 	
 	const stmt = db.prepare(`
 		SELECT 
-			u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled,
+			u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled, u.push_notifications_enabled,
 			COALESCE((
 				SELECT COUNT(*) 
 				FROM recordings r 
@@ -568,7 +735,7 @@ export function getAllUsers(): UserWithCount[] {
 		FROM users u
 		ORDER BY recording_count DESC, u.pseudo ASC
 	`);
-	return stmt.all(threeMonthsAgo.toISOString()) as UserWithCount[];
+	return stmt.all(historyCutoff.toISOString()) as UserWithCount[];
 }
 
 export function deleteUser(id: number): void {
@@ -684,6 +851,11 @@ export function togglePwaTutorialEnabled(userId: number, enabled: boolean): void
 	stmt.run(enabled ? 1 : 0, userId);
 }
 
+export function togglePushNotificationsEnabled(userId: number, enabled: boolean): void {
+	const stmt = db.prepare('UPDATE users SET push_notifications_enabled = ? WHERE id = ?');
+	stmt.run(enabled ? 1 : 0, userId);
+}
+
 export function setUserAdmin(userId: number, isAdmin: boolean): void {
 	const stmt = db.prepare('UPDATE users SET is_admin = ? WHERE id = ?');
 	stmt.run(isAdmin ? 1 : 0, userId);
@@ -704,7 +876,7 @@ export function updateLastLogin(userId: number): void {
 
 export function getSession(sessionId: string): User | undefined {
 	const stmt = db.prepare(`
-		SELECT u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled
+		SELECT u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled, u.push_notifications_enabled
 		FROM sessions s 
 		JOIN users u ON s.user_id = u.id 
 		WHERE s.id = ? AND s.expires_at > datetime('now')
@@ -760,6 +932,37 @@ export function saveRecording(userId: number, audioData: Buffer, durationSeconds
 	debug.db.log('Enregistrement créé - id:', result.lastInsertRowid);
 
 	return getRecordingById(result.lastInsertRowid as number)!;
+}
+
+export function updateRecordingImage(recordingId: number, imageData: Buffer): Recording | undefined {
+	const recording = getRecordingById(recordingId);
+	if (!recording) return undefined;
+
+	if (recording.image_filename) {
+		const existingImagePath = join(uploadsDir, recording.image_filename);
+		if (existsSync(existingImagePath)) {
+			unlinkSync(existingImagePath);
+		}
+	}
+
+	const imageFilename = `${Date.now()}-${crypto.randomUUID()}.jpg`;
+	const imagePath = join(uploadsDir, imageFilename);
+	writeFileSync(imagePath, imageData);
+
+	const stmt = db.prepare('UPDATE recordings SET image_filename = ? WHERE id = ?');
+	stmt.run(imageFilename, recordingId);
+
+	return getRecordingById(recordingId);
+}
+
+export function updateRecordingUrl(recordingId: number, url: string | null): Recording | undefined {
+	const recording = getRecordingById(recordingId);
+	if (!recording) return undefined;
+
+	const stmt = db.prepare('UPDATE recordings SET url = ? WHERE id = ?');
+	stmt.run(url, recordingId);
+
+	return getRecordingById(recordingId);
 }
 
 export function getRecordingById(id: number): Recording | undefined {
@@ -826,10 +1029,77 @@ export function deleteRecording(recordingId: number): void {
 	deleteStmt.run(recordingId);
 }
 
+function buildShortRecordingFilters(filters: ShortRecordingFilters = {}) {
+	const clauses = ['r.duration_seconds < ?'];
+	const params: (number | string)[] = [filters.maxDurationSeconds ?? 10];
+
+	if (filters.authorId) {
+		clauses.push('r.user_id = ?');
+		params.push(filters.authorId);
+	}
+
+	if (filters.fromDate) {
+		clauses.push("datetime(r.recorded_at) >= datetime(?)");
+		params.push(`${filters.fromDate} 00:00:00`);
+	}
+
+	if (filters.toDate) {
+		clauses.push("datetime(r.recorded_at) <= datetime(?)");
+		params.push(`${filters.toDate} 23:59:59`);
+	}
+
+	return {
+		whereClause: clauses.join(' AND '),
+		params
+	};
+}
+
+export function getShortRecordingAuthors(maxDurationSeconds = 10): ShortRecordingAuthor[] {
+	const stmt = db.prepare(`
+		SELECT
+			u.id,
+			u.pseudo,
+			u.avatar,
+			COUNT(r.id) as short_recording_count
+		FROM recordings r
+		JOIN users u ON u.id = r.user_id
+		WHERE r.duration_seconds < ?
+		GROUP BY u.id, u.pseudo, u.avatar
+		ORDER BY LOWER(u.pseudo) ASC
+	`);
+
+	return stmt.all(maxDurationSeconds) as ShortRecordingAuthor[];
+}
+
+export function getShortRecordings(filters: ShortRecordingFilters = {}): Recording[] {
+	const limit = filters.limit ?? 20;
+	const offset = filters.offset ?? 0;
+	const { whereClause, params } = buildShortRecordingFilters(filters);
+
+	const stmt = db.prepare(`
+		SELECT
+			r.id,
+			r.user_id,
+			r.filename,
+			r.image_filename,
+			r.url,
+			r.duration_seconds,
+			r.recorded_at,
+			u.pseudo,
+			u.avatar,
+			0 as listened_by_user
+		FROM recordings r
+		JOIN users u ON u.id = r.user_id
+		WHERE ${whereClause}
+		ORDER BY datetime(r.recorded_at) DESC, r.id DESC
+		LIMIT ? OFFSET ?
+	`);
+
+	return stmt.all(...params, limit, offset) as Recording[];
+}
+
 export function getUserRecordings(userId: number, limit = 5, offset = 0): Recording[] {
-	// Get recordings for a specific user within the last 3 months
-	const threeMonthsAgo = new Date();
-	threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+	const historyCutoff = getHistoryCutoffDate();
 	
 	const stmt = db.prepare(`
 		SELECT r.id, r.user_id, r.filename, r.image_filename, r.duration_seconds, r.recorded_at, r.url, u.pseudo, u.avatar
@@ -840,12 +1110,11 @@ export function getUserRecordings(userId: number, limit = 5, offset = 0): Record
 		LIMIT ? OFFSET ?
 	`);
 	
-	return stmt.all(userId, threeMonthsAgo.toISOString(), limit, offset) as Recording[];
+	return stmt.all(userId, historyCutoff.toISOString(), limit, offset) as Recording[];
 }
 
 export function getUserRecordingsCount(userId: number): number {
-	const threeMonthsAgo = new Date();
-	threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+	const historyCutoff = getHistoryCutoffDate();
 	
 	const stmt = db.prepare(`
 		SELECT COUNT(*) as count
@@ -853,8 +1122,66 @@ export function getUserRecordingsCount(userId: number): number {
 		WHERE user_id = ? AND recorded_at >= ?
 	`);
 	
-	const result = stmt.get(userId, threeMonthsAgo.toISOString()) as { count: number };
+	const result = stmt.get(userId, historyCutoff.toISOString()) as { count: number };
 	return result.count;
+}
+
+export function getUserProfileImages(userId: number, limit = 8, offset = 0): ProfileImage[] {
+	const historyCutoff = getHistoryCutoffDate();
+	const stmt = db.prepare(`
+		SELECT
+			r.id,
+			r.user_id,
+			r.image_filename,
+			r.recorded_at,
+			r.duration_seconds,
+			r.url,
+			u.pseudo,
+			u.avatar
+		FROM recordings r
+		JOIN users u ON u.id = r.user_id
+		WHERE r.user_id = ? AND r.image_filename IS NOT NULL AND r.recorded_at >= ?
+		ORDER BY datetime(r.recorded_at) DESC, r.id DESC
+		LIMIT ? OFFSET ?
+	`);
+
+	return stmt.all(userId, historyCutoff.toISOString(), limit, offset) as ProfileImage[];
+}
+
+export function getUserProfileImagesCount(userId: number): number {
+	const historyCutoff = getHistoryCutoffDate();
+	const stmt = db.prepare(`
+		SELECT COUNT(*) as count
+		FROM recordings
+		WHERE user_id = ? AND image_filename IS NOT NULL AND recorded_at >= ?
+	`);
+
+	const result = stmt.get(userId, historyCutoff.toISOString()) as { count: number };
+	return result.count;
+}
+
+export function getUserRecentRecordings(userId: number, limit = 10): Recording[] {
+	const historyCutoff = getHistoryCutoffDate();
+	const stmt = db.prepare(`
+		SELECT
+			r.id,
+			r.user_id,
+			r.filename,
+			r.image_filename,
+			r.url,
+			r.duration_seconds,
+			r.recorded_at,
+			0 as listened_by_user,
+			u.pseudo,
+			u.avatar
+		FROM recordings r
+		JOIN users u ON u.id = r.user_id
+		WHERE r.user_id = ? AND r.recorded_at >= ?
+		ORDER BY datetime(r.recorded_at) DESC, r.id DESC
+		LIMIT ?
+	`);
+
+	return stmt.all(userId, historyCutoff.toISOString(), limit) as Recording[];
 }
 
 export function getRecordingsForUser(userId: number): Recording[] {
@@ -932,8 +1259,158 @@ export function markLatestOtherRecordingsAsUnread(userId: number, limit = 5): { 
 	};
 }
 
+export function markAllExistingOtherRecordingsAsListened(userId: number): { selectedCount: number; changedCount: number } {
+	const countStmt = db.prepare(`
+		SELECT COUNT(*) as count
+		FROM recordings
+		WHERE user_id != ?
+	`);
+	const countResult = countStmt.get(userId) as { count: number } | undefined;
+	const selectedCount = countResult?.count ?? 0;
+
+	const insertStmt = db.prepare(`
+		INSERT OR IGNORE INTO listening_history (user_id, recording_id)
+		SELECT ?, r.id
+		FROM recordings r
+		WHERE r.user_id != ?
+	`);
+	const result = insertStmt.run(userId, userId);
+
+	return {
+		selectedCount,
+		changedCount: result.changes
+	};
+}
+
 export function getRecordingFilePath(filename: string): string {
 	return join(uploadsDir, filename);
+}
+
+export function upsertPushSubscription(
+	userId: number,
+	subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
+	userAgent?: string | null
+): PushSubscriptionRecord {
+	const stmt = db.prepare(`
+		INSERT INTO push_subscriptions (
+			user_id,
+			endpoint,
+			p256dh,
+			auth,
+			user_agent,
+			updated_at,
+			disabled_at
+		) VALUES (?, ?, ?, ?, ?, datetime('now'), NULL)
+		ON CONFLICT(endpoint) DO UPDATE SET
+			user_id = excluded.user_id,
+			p256dh = excluded.p256dh,
+			auth = excluded.auth,
+			user_agent = excluded.user_agent,
+			updated_at = datetime('now'),
+			disabled_at = NULL
+		RETURNING *
+	`);
+
+	return stmt.get(
+		userId,
+		subscription.endpoint,
+		subscription.keys.p256dh,
+		subscription.keys.auth,
+		userAgent ?? null
+	) as PushSubscriptionRecord;
+}
+
+export function getActivePushSubscriptionsForUser(userId: number): PushSubscriptionRecord[] {
+	const stmt = db.prepare(`
+		SELECT *
+		FROM push_subscriptions
+		WHERE user_id = ? AND disabled_at IS NULL
+		ORDER BY datetime(updated_at) DESC, id DESC
+	`);
+	return stmt.all(userId) as PushSubscriptionRecord[];
+}
+
+export function markPushSubscriptionSuccess(endpoint: string): void {
+	const stmt = db.prepare(`
+		UPDATE push_subscriptions
+		SET last_success_at = datetime('now'), updated_at = datetime('now')
+		WHERE endpoint = ?
+	`);
+	stmt.run(endpoint);
+}
+
+export function markPushSubscriptionFailure(endpoint: string): void {
+	const stmt = db.prepare(`
+		UPDATE push_subscriptions
+		SET last_failure_at = datetime('now'), updated_at = datetime('now')
+		WHERE endpoint = ?
+	`);
+	stmt.run(endpoint);
+}
+
+export function disablePushSubscription(endpoint: string): void {
+	const stmt = db.prepare(`
+		UPDATE push_subscriptions
+		SET disabled_at = datetime('now'), updated_at = datetime('now')
+		WHERE endpoint = ?
+	`);
+	stmt.run(endpoint);
+}
+
+export function disableAllPushSubscriptionsForUser(userId: number): void {
+	const stmt = db.prepare(`
+		UPDATE push_subscriptions
+		SET disabled_at = datetime('now'), updated_at = datetime('now')
+		WHERE user_id = ? AND disabled_at IS NULL
+	`);
+	stmt.run(userId);
+}
+
+export function hasPushDeliveryLog(userId: number, deliveryDate: string, notificationType = 'daily_delivery'): boolean {
+	const stmt = db.prepare(`
+		SELECT id
+		FROM push_delivery_log
+		WHERE user_id = ? AND delivery_date = ? AND notification_type = ?
+		LIMIT 1
+	`);
+	return !!stmt.get(userId, deliveryDate, notificationType);
+}
+
+export function recordPushDeliveryLog(userId: number, deliveryDate: string, sent: boolean, notificationType = 'daily_delivery'): void {
+	const stmt = db.prepare(`
+		INSERT OR REPLACE INTO push_delivery_log (
+			user_id,
+			delivery_date,
+			notification_type,
+			sent,
+			recorded_at
+		) VALUES (?, ?, ?, ?, datetime('now'))
+	`);
+	stmt.run(userId, deliveryDate, notificationType, sent ? 1 : 0);
+}
+
+export function getUsersWithPushNotificationsEnabled(): User[] {
+	const stmt = db.prepare(`
+		SELECT
+			id,
+			pseudo,
+			avatar,
+			is_admin,
+			super_powers,
+			daily_notification_hour,
+			timezone,
+			created_at,
+			last_login,
+			logs_enabled,
+			jingles_enabled,
+			pwa_tutorial_enabled,
+			push_notifications_enabled
+		FROM users
+		WHERE push_notifications_enabled = 1
+		ORDER BY id ASC
+	`);
+
+	return stmt.all() as User[];
 }
 
 // Rate limiting functions
@@ -1111,7 +1588,7 @@ export function approveRegistration(id: number, isAdmin: boolean = false): User 
 	const insertUserStmt = db.prepare(`
 		INSERT INTO users (pseudo, password_hash, avatar, timezone, is_admin, super_powers)
 		VALUES (?, ?, ?, ?, ?, 0)
-		RETURNING id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, logs_enabled, jingles_enabled
+		RETURNING id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, logs_enabled, jingles_enabled, push_notifications_enabled
 	`);
 	const user = insertUserStmt.get(
 		registration.pseudo, 

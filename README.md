@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.32.8-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.35.0-blue?style=for-the-badge)
 
 </div>
 
@@ -28,7 +28,7 @@
 
 ## Description
 
-Maté Club est une application web PWA permettant à un groupe d'amis d'enregistrer et partager des capsules audio quotidiennes. Chaque membre peut enregistrer des messages vocaux jusqu'à 3 minutes, avec possibilité d'ajouter une miniature image et un lien URL.
+Maté Club est une application web PWA permettant à un groupe d'amis d'enregistrer et partager des capsules audio quotidiennes. Chaque membre peut enregistrer des messages vocaux avec une durée maximum configurable (3 minutes par défaut), avec possibilité d'ajouter une miniature image et un lien URL.
 
 ## Versioning
 
@@ -72,7 +72,7 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 ## Fonctionnalités
 
 ### Audio & Lecture
-- **Enregistrement audio** - Durée max 3 minutes avec compression WebM
+- **Enregistrement audio** - Durée max configurable (3 minutes par défaut) avec compression WebM
 - **Pause / reprise** - Une capsule peut être mise en pause puis reprise avant validation finale
 - **Brouillons locaux** - Chaque capsule terminée est conservée localement pour pouvoir en enregistrer plusieurs avant l’envoi
 - **Rail de brouillons** - Les capsules prêtes à envoyer sont pilotées depuis un rail horizontal compact avec une capsule active détaillée
@@ -94,6 +94,8 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 
 ### Médias
 - **Miniatures** - Ajout d'images aux enregistrements (45x45px avec bordure)
+- **Photo ajoutable après coup** - Une capsule des 24 dernières heures peut recevoir une image après publication si elle a été envoyée sans photo
+- **Lien ajoutable après coup** - Une capsule des 24 dernières heures peut aussi recevoir une URL après publication si elle n’en a pas encore
 - **Compression automatique** - Images compressées avant upload (~100KB)
 - **Support HEIC/HEIF** - Conversion automatique des photos Apple (HEIC→JPEG)
 - **Visionneuse plein écran** - Affichage des images en grand
@@ -103,7 +105,10 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 ### Interface & UX
 - **Authentification** - Login par pseudo/mot de passe (pas d'email requis)
 - **PWA installable** - Installation sur mobile via manifest
+- **Notifications push quotidiennes** - Option utilisateur pour recevoir un rappel à l’heure de mise à disposition s’il reste des capsules non lues
 - **Tuto PWA désactivable** - Chaque utilisateur peut masquer les popups d’installation PWA depuis ses réglages
+- **Mise à jour rapide** - Un membre peut marquer en une fois toutes les publications existantes des autres utilisateurs comme lues
+- **Profils utilisateurs** - Chaque avatar ouvre une page profil avec galerie des images publiées et dernières capsules audio
 - **Pull-to-refresh** - Rechargement de la page d'accueil (désactivé sur modales)
 - **Scroll lock** - Empêche le scroll arrière-plan quand une modale est ouverte
 - **Navigation tactile** - Swipe horizontal pour changer de capsule
@@ -142,10 +147,14 @@ L'application gère automatiquement les conversions de fuseaux horaires pour gar
 
 ### Panel Admin
 - **Gestion des utilisateurs** - Liste, création, suppression des non-admins
+- **Configuration du groupe** - Nom du groupe, durée d’historique en mois et durée maximum des messages audio
+- **État des notifications push** - L’admin voit si le serveur est configuré pour les push VAPID ou quelles variables manquent encore
 - **Modification des seuils** - Heure de mise à disposition par utilisateur
 - **Super pouvoirs** - Attribution de privileges de lecture anticipée
 - **Promotion admin** - Un membre existant peut être promu administrateur
+- **Retrait contrôlé du statut admin** - Un administrateur secondaire peut être repassé membre, mais l’admin le plus ancien reste protégé
 - **Marquage non lu** - L'admin peut repasser les 5 dernières capsules d'autres utilisateurs en non lues pour ses propres tests
+- **Nettoyage admin** - Une page dédiée permet de lister, écouter et supprimer les capsules de moins de 10 secondes avec filtres par auteur et date
 - **Logs de debug** - Activation des logs audio / micro pour diagnostic, y compris pour un autre utilisateur
 - **Jingle d'intro** - Activation/désactivation du jingle musical
 - **Validation mobile clarifiée** - Les inscriptions en attente sont plus lisibles sur smartphone avec actions `Valider` / `Refuser` et la case `Admin` est respectée
@@ -353,6 +362,29 @@ Au premier lancement, si aucun administrateur n'existe, vous êtes redirigé ver
 3. Créez votre compte administrateur
 4. Après création, utilisez `/login` pour vous connecter
 
+#### Notifications push (optionnel)
+
+Si vous voulez activer les notifications push Web Push dans une instance auto-hébergée :
+
+1. **Générer les clés VAPID :**
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+
+2. **Ajouter les variables à `.env` :**
+   ```bash
+   echo "VAPID_PUBLIC_KEY=..." >> .env
+   echo "VAPID_PRIVATE_KEY=..." >> .env
+   echo "VAPID_SUBJECT=mailto:admin@example.com" >> .env
+   ```
+
+3. **Redémarrer l’application :**
+   ```bash
+   docker compose up -d --build
+   ```
+
+Quand ces variables sont absentes, l’admin affiche un bloc `Notifications push` grisé avec les instructions serveur et les utilisateurs ne voient pas l’option d’activation dans `Réglages`.
+
 #### Mise à jour
 
 Pour mettre à jour l'application avec la dernière version :
@@ -400,6 +432,9 @@ Après reset, l'application affichera `/setup` pour créer un nouvel administrat
 Variables d'environnement disponibles dans `.env`:
 - `PORT` - Port serveur (défaut: 3001)
 - `DATABASE_PATH` - Chemin de la BDD (défaut: ./data/mateclub.db)
+- `VAPID_PUBLIC_KEY` - Clé publique Web Push (optionnelle, requise pour activer les notifications push)
+- `VAPID_PRIVATE_KEY` - Clé privée Web Push (optionnelle, requise pour activer les notifications push)
+- `VAPID_SUBJECT` - Sujet VAPID, typiquement `mailto:admin@example.com`
 
 ### Manuel
 
@@ -519,7 +554,7 @@ Variables d'environnement:
 
 ### BODY_SIZE_LIMIT (important)
 
-Pour allow sending audio recordings up to 3 minutes with images, vous devez configurer cette variable:
+Pour allow sending audio recordings up to the default 3 minutes with images, vous devez configurer cette variable:
 
 ```yaml
 # docker-compose.yml
@@ -575,7 +610,7 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 ### Page enregistrer
 
 - Bouton d'enregistrement microphone
-- Durée maximale : 3 minutes
+- Durée maximale : configurable depuis l’admin (3 minutes par défaut)
 - Zone pour ajouter une image
 - Champ pour ajouter une URL (doit commencer par https://)
 - Liste des enregistrements personnels avec :
@@ -595,8 +630,10 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 - Création de nouveaux utilisateurs
 - Modification de l'heure de seuil quotidien
 - Promotion d'un utilisateur existant en admin
+- Retrait du statut admin pour un administrateur secondaire, avec protection de l'admin le plus ancien
 - Attribution des super_powers
 - Marquage des 5 dernières capsules d'autres utilisateurs comme non lues pour l'admin connecté
+- Nettoyage des capsules de moins de 10 secondes avec lecture, suppression et filtres auteur/date
 - Activation des logs de debug audio / micro, y compris pour un autre utilisateur
 - Activation du jingle d'intro
 

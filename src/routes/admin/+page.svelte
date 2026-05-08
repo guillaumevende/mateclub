@@ -2,7 +2,7 @@
 	import { enhance } from '$app/forms';
 	import type { PageData } from './$types';
 	import '$lib/shared.css';
-	import Avatar from '$lib/components/Avatar.svelte';
+	import UserProfileAvatarLink from '$lib/components/UserProfileAvatarLink.svelte';
 	import { scrollLock } from '$lib/actions/scrollLock';
 	import { onDestroy } from 'svelte';
 
@@ -20,6 +20,20 @@
 		jingles_enabled?: number;
 	};
 
+	type AppSettings = {
+		groupName: string;
+		historyMonths: number;
+		maxRecordingSeconds: number;
+		maxGroupNameLength: number;
+	};
+
+	type PushConfig = {
+		configured: boolean;
+		publicKey: string | null;
+		subject: string | null;
+		missingKeys: string[];
+	};
+
 	type PendingRegistration = {
 		id: number;
 		pseudo: string;
@@ -30,7 +44,7 @@
 		status: string;
 	};
 
-	let { data, form }: { data: PageData & { currentUser?: User; csrfToken?: string; pendingRegistrations?: PendingRegistration[]; allowRegistration?: boolean }; form?: { success?: boolean; error?: string; message?: string } } = $props();
+	let { data, form }: { data: PageData & { currentUser?: User; csrfToken?: string; pendingRegistrations?: PendingRegistration[]; allowRegistration?: boolean; oldestAdminId?: number | null; appSettings: AppSettings; pushConfig: PushConfig }; form?: { success?: boolean; error?: string; message?: string } } = $props();
 
 	const emojis = ['☕', '😀', '😎', '🤠', '🥳', '😇', '🤩', '😈', '👻', '🤖', '🎸', '🎮', '🚀', '🍕', '🍺', '🌈', '🔥', '⭐', '❤️'];
 	
@@ -45,6 +59,13 @@
 	let unreadMarkingMessage = $state<string | null>(null);
 	let unreadMarkingError = $state<string | null>(null);
 	let unreadMarkingLoading = $state(false);
+	let groupConfigMessage = $state<string | null>(null);
+	let groupConfigError = $state<string | null>(null);
+	let isSavingGroupConfig = $state(false);
+	let groupName = $state('');
+	let historyMonths = $state(3);
+	let maxRecordingMinutes = $state(3);
+	let maxRecordingSeconds = $state(0);
 	
 	// État du formulaire de création
 	let isCreatingUser = $state(false);
@@ -65,6 +86,11 @@
 	$effect(() => {
 		superPowersEnabled = data.currentUser?.super_powers === 1;
 		allowRegistrationEnabled = data.allowRegistration === true;
+		groupName = data.appSettings?.groupName ?? '';
+		historyMonths = data.appSettings?.historyMonths ?? 3;
+		const duration = data.appSettings?.maxRecordingSeconds ?? 180;
+		maxRecordingMinutes = Math.floor(duration / 60);
+		maxRecordingSeconds = duration % 60;
 	});
 
 	function openDeleteModal(user: User) {
@@ -117,6 +143,124 @@
 
 <div class="container">
 	<h1>Administration</h1>
+
+	<section>
+		<h2>Notifications push</h2>
+		{#if data.pushConfig.configured}
+			<p class="super-text">
+				Le serveur est configuré pour les notifications push. Les utilisateurs peuvent activer leur rappel quotidien depuis Réglages.
+			</p>
+			<div class="config-status-card is-ready">
+				<p><strong>Statut :</strong> configuré</p>
+				<p><strong>Clé publique :</strong> {data.pushConfig.publicKey?.slice(0, 18)}...</p>
+				<p><strong>Sujet VAPID :</strong> {data.pushConfig.subject}</p>
+			</div>
+		{:else}
+			<p class="super-text">
+				Les notifications push ne sont pas configurées sur ce serveur. Ajoutez les clés VAPID au déploiement Docker pour débloquer l’option dans les réglages utilisateurs.
+			</p>
+			<div class="config-status-card is-disabled">
+				<p><strong>Variables requises :</strong> {data.pushConfig.missingKeys.join(', ')}</p>
+				<p><strong>À renseigner côté serveur :</strong> `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`</p>
+				<p><strong>Commande utile :</strong> `npx web-push generate-vapid-keys`</p>
+			</div>
+		{/if}
+	</section>
+
+	<section>
+		<h2>Configuration du groupe</h2>
+		<form method="POST" action="?/saveGroupConfig" use:enhance={() => {
+			isSavingGroupConfig = true;
+			groupConfigMessage = null;
+			groupConfigError = null;
+
+			return async ({ result }) => {
+				isSavingGroupConfig = false;
+
+				if (result.type === 'success') {
+					groupConfigMessage = (result.data as any)?.message || 'Réglages enregistrés';
+					const savedSettings = (result.data as any)?.appSettings as AppSettings | undefined;
+					if (savedSettings) {
+						groupName = savedSettings.groupName;
+						historyMonths = savedSettings.historyMonths;
+						maxRecordingMinutes = Math.floor(savedSettings.maxRecordingSeconds / 60);
+						maxRecordingSeconds = savedSettings.maxRecordingSeconds % 60;
+					}
+				} else if (result.type === 'failure') {
+					groupConfigError = (result.data as any)?.error || 'Impossible d’enregistrer les réglages';
+				}
+			};
+		}} class="group-config-form">
+			<input type="hidden" name="csrf_token" value={data.csrfToken} />
+			<label class="config-field">
+				<span class="config-label">Nom du groupe :</span>
+				<input
+					type="text"
+					name="group_name"
+					maxlength={data.appSettings.maxGroupNameLength}
+					bind:value={groupName}
+					placeholder="Facultatif"
+				/>
+				<span class="config-hint">{data.appSettings.maxGroupNameLength} caractères maximum</span>
+			</label>
+
+			<label class="config-field">
+				<span class="config-label">Durée d'historique disponible en mois :</span>
+				<input
+					type="number"
+					name="history_months"
+					min="1"
+					max="24"
+					step="1"
+					bind:value={historyMonths}
+					required
+				/>
+				<span class="config-hint">Nombre entier entre 1 et 24. Valeur par défaut : 3.</span>
+			</label>
+
+			<div class="config-field">
+				<span class="config-label">Durée maximum des messages audio :</span>
+				<div class="duration-config-fields">
+					<label>
+						<span>Minutes</span>
+						<input
+							type="number"
+							name="max_recording_minutes"
+							min="0"
+							max="60"
+							step="1"
+							bind:value={maxRecordingMinutes}
+							required
+						/>
+					</label>
+					<label>
+						<span>Secondes</span>
+						<input
+							type="number"
+							name="max_recording_seconds"
+							min="0"
+							max="59"
+							step="1"
+							bind:value={maxRecordingSeconds}
+							required
+						/>
+					</label>
+				</div>
+				<span class="config-hint">Valeur par défaut : 3 minutes et 0 seconde.</span>
+			</div>
+
+			{#if groupConfigMessage}
+				<p class="success-message">{groupConfigMessage}</p>
+			{/if}
+			{#if groupConfigError}
+				<p class="error-message">{groupConfigError}</p>
+			{/if}
+
+			<button type="submit" class="super-btn section-action-btn" disabled={isSavingGroupConfig}>
+				{isSavingGroupConfig ? 'Enregistrement...' : 'Enregistrer les réglages'}
+			</button>
+		</form>
+	</section>
 
 	<section>
 		<h2>Mes super pouvoirs</h2>
@@ -180,6 +324,14 @@
 			{/if}
 		</form>
  	</section>
+
+	<section>
+		<h2>Nettoyage</h2>
+		<p class="super-text">
+			Supprimez des messages courts enregistrés par erreur.
+		</p>
+		<a class="super-btn cleanup-link section-action-btn" href="/admin/cleanup">Vérifier</a>
+	</section>
 
 	<section>
 		<h2>Logs</h2>
@@ -464,12 +616,13 @@
 			{#each data.users as user}
 				{@const isSelf = user.id === data.currentUser?.id}
 				{@const canDelete = !user.is_admin && !isSelf}
+				{@const canRemoveAdmin = user.is_admin && user.id !== data.oldestAdminId}
 				{@const createdAt = user.created_at.includes('T') || user.created_at.includes('Z') ? new Date(user.created_at) : new Date(user.created_at.replace(' ', 'T') + 'Z')}
 				{@const lastLogin = user.last_login ? (user.last_login.includes('T') || user.last_login.includes('Z') ? new Date(user.last_login) : new Date(user.last_login.replace(' ', 'T') + 'Z')) : null}
 				<div class="user-card">
 					<div class="user-row">
 						<div class="user-left">
-							<Avatar avatar={user.avatar} size="small" />
+							<UserProfileAvatarLink userId={user.id} avatar={user.avatar} size="small" label={`Voir le profil de ${user.pseudo}`} />
 							<span class="user-pseudo">{user.pseudo}</span>
 						</div>
 						<div class="user-right">
@@ -529,6 +682,20 @@
 								<input type="hidden" name="user_id" value={user.id} />
 								<button type="submit" class="promote-admin">
 									👑 Rendre admin
+								</button>
+							</form>
+						{:else if canRemoveAdmin}
+							<form method="POST" action="?/removeAdmin" use:enhance={() => {
+								return async ({ result }) => {
+									if (result.type === 'success') {
+										window.location.reload();
+									}
+								};
+							}}>
+								<input type="hidden" name="csrf_token" value={data.csrfToken} />
+								<input type="hidden" name="user_id" value={user.id} />
+								<button type="submit" class="demote-admin">
+									⬇️ Retirer admin
 								</button>
 							</form>
 						{/if}
@@ -750,7 +917,8 @@
 	}
 
 	.logs-toggle-user,
-	.promote-admin {
+	.promote-admin,
+	.demote-admin {
 		padding: 0.5rem 1rem;
 		font-size: 0.875rem;
 	}
@@ -761,6 +929,10 @@
 
 	.promote-admin {
 		background: #9b59b6;
+	}
+
+	.demote-admin {
+		background: #7a5f2a;
 	}
 
 	.delete {
@@ -888,6 +1060,80 @@
 
 	.super-btn:hover {
 		background: #d63650;
+	}
+
+	.cleanup-link {
+		text-decoration: none;
+	}
+
+	.section-action-btn {
+		display: block;
+		width: 100%;
+		box-sizing: border-box;
+		text-align: center;
+	}
+
+	.group-config-form {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.config-status-card {
+		border-radius: 12px;
+		padding: 1rem;
+		border: 1px solid rgba(255, 255, 255, 0.12);
+		background: rgba(255, 255, 255, 0.04);
+		display: flex;
+		flex-direction: column;
+		gap: 0.4rem;
+	}
+
+	.config-status-card p {
+		margin: 0;
+		color: #ddd;
+		line-height: 1.45;
+	}
+
+	.config-status-card.is-ready {
+		border-color: rgba(74, 222, 128, 0.35);
+		background: rgba(74, 222, 128, 0.08);
+	}
+
+	.config-status-card.is-disabled {
+		border-color: rgba(233, 69, 96, 0.35);
+		background: rgba(233, 69, 96, 0.08);
+	}
+
+	.config-field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.45rem;
+	}
+
+	.config-label {
+		color: #eee;
+		font-weight: 600;
+	}
+
+	.config-hint {
+		color: #8e8aa8;
+		font-size: 0.9rem;
+		line-height: 1.4;
+	}
+
+	.duration-config-fields {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 0.75rem;
+	}
+
+	.duration-config-fields label {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		color: #cfcde6;
+		font-size: 0.95rem;
 	}
 
 	/* Modal de confirmation */

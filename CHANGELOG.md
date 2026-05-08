@@ -2,6 +2,148 @@
 
 ---
 
+## v0.35.0 (2026-05-07) - Notifications push quotidiennes
+
+### ✨ Nouvelles fonctionnalités
+
+#### Notifications push
+- **Support Web Push / VAPID** : Maté Club peut désormais enregistrer des abonnements push navigateur et envoyer des notifications quotidiennes depuis un serveur auto-hébergé
+- **Opt-in utilisateur** : un nouveau bouton dans `Réglages`, juste sous l’heure de mise à disposition, permet d’activer ou désactiver les notifications push
+- **Message quotidien ciblé** : à l’heure de livraison quotidienne, une notification `C'est l'heure de venir profiter de ton Yerba Maté !` est envoyée uniquement s’il reste des capsules non lues disponibles
+- **Déclenchement sans doublon** : un journal interne empêche les réenvois multiples la même journée pour un même utilisateur
+
+#### Administration
+- **Bloc `Notifications push`** : l’admin voit immédiatement si le serveur est prêt pour les push
+- **État serveur explicite** : si les clés VAPID sont absentes, le bloc explique quelles variables renseigner côté Docker et rappelle la commande de génération
+
+### 🔧 Technique
+- **Service Worker enrichi** : prise en charge des événements `push` et `notificationclick` pour afficher les notifications et rouvrir l’application
+- **Scheduler serveur léger** : un contrôle périodique intégré au runtime Node vérifie les livraisons quotidiennes seulement quand la configuration VAPID est disponible
+- **Abonnements persistés** : stockage SQLite des abonnements push, de leur état et de l’historique journalier d’envoi
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.35.0`
+- README.md : ajout de la configuration VAPID et du comportement des notifications push
+- package.json / package-lock.json : version portée en `0.35.0`
+
+## v0.34.0 (2026-05-07) - Configuration globale du groupe
+
+### ✨ Nouvelles fonctionnalités
+
+#### Administration
+- **Bloc `Configuration du groupe`** : un nouvel espace en tête de l’admin centralise les réglages transverses du groupe
+- **Nom du groupe** : un nom facultatif peut être saisi pour personnaliser l’accueil avec `Bienvenue chez [nom du groupe], [utilisateur] !`
+- **Historique configurable** : la durée d’historique disponible n’est plus figée à 3 mois et devient pilotable en nombre entier de mois
+- **Durée max configurable** : la durée maximum des messages audio peut être définie en minutes et secondes depuis l’admin
+
+#### Application
+- **Accueil personnalisé** : le message de bienvenue affiche le nom du groupe quand il est renseigné
+- **Historique unifié** : l’accueil, le calendrier, `Charger plus`, `Mes enregistrements` et les profils utilisent désormais la même fenêtre d’historique
+- **Enregistrement synchronisé** : le minuteur, l’arrêt automatique et la validation serveur d’upload suivent la durée max configurée
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.34.0`
+- README.md : ajout de la configuration globale du groupe et des valeurs par défaut configurables
+
+## v0.33.0 (2026-05-07) - Profils utilisateurs et enrichissement post-publication
+
+### ✨ Nouvelles fonctionnalités
+
+#### Profils
+- **Page profil utilisateur** : cliquer sur un avatar ouvre désormais une page dédiée avec avatar, pseudo, galerie d’images et dernières capsules audio
+- **Galerie paginée** : les 8 dernières images publiées sont affichées, avec un bouton pour charger 8 images supplémentaires
+- **Zoom image** : chaque image de galerie peut être ouverte en grand
+- **Retour accueil** : un bouton dédié permet de revenir à l’accueil sans transformer le profil en entrée de navigation principale
+
+#### Capsules récentes
+- **Ajout d’image après publication** : depuis `Mes enregistrements` et depuis son propre profil, une capsule de moins de 24h sans photo affiche une zone pointillée `+` qui ouvre le composant photo existant
+- **Ajout de lien après publication** : depuis `Mes enregistrements` et depuis son propre profil, une capsule de moins de 24h sans lien affiche un bouton rond pointillé `+` pour ajouter une URL `https://`
+- **Navigation avatar généralisée** : les avatars cliquables sont maintenant reliés au profil utilisateur depuis les capsules, la page Réglages, la page Admin et la modale `La team`
+
+### 🐛 Corrections
+
+#### Réglages
+- **CTA principal mieux positionné** : le bouton `Sauvegarder` reste au-dessus du bloc `Tuto PWA`
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.33.0`
+- README.md : ajout de la page profil, de la galerie utilisateur et de l’enrichissement post-publication des capsules récentes
+
+## v0.32.12 (2026-05-07) - Ajout d’image sur capsules récentes
+
+### ✨ Nouvelles fonctionnalités
+
+#### Enregistrements
+- **Ajout d’image après publication** : dans `Mes enregistrements`, les capsules des 24 dernières heures sans photo affichent désormais une zone pointillée `+`
+- **Réutilisation de l’interface existante** : un clic sur cette zone ouvre le même composant d’ajout photo que pour une capsule en cours de préparation
+- **Mise à jour ciblée** : l’image peut être ajoutée directement à la capsule existante sans repasser par un nouvel envoi
+
+### 🐛 Corrections
+
+#### Réglages
+- **Bouton `Sauvegarder` remonté** : le CTA principal des réglages repasse au-dessus du bloc `Tuto PWA` pour retrouver une hiérarchie plus cohérente
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.12`
+- README.md : ajout de la possibilité d’enrichir une capsule récente avec une image après publication
+
+## v0.32.11 (2026-05-07) - Marquage global des publications comme lues
+
+### ✨ Nouvelles fonctionnalités
+
+#### Réglages
+- **Section `Se mettre à jour`** : un nouveau bloc en bas de la page Réglages permet de marquer d’un coup toutes les publications existantes comme lues
+- **Confirmation explicite** : le bouton `Tout marquer comme lu` ouvre une modale de confirmation avec validation irréversible mise en avant
+
+### 🔧 Technique
+- **Marquage massif serveur** : insertion en bloc dans `listening_history` pour toutes les publications d’autres utilisateurs, sans toucher aux propres capsules du membre connecté
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.11`
+- README.md : ajout de la fonction de mise à jour rapide dans les réglages utilisateur
+
+---
+
+## v0.32.10 (2026-05-07) - Retrait contrôlé du statut admin
+
+### ✨ Nouvelles fonctionnalités
+
+#### Administration
+- **Retrait du statut admin** : un bouton `Retirer admin` est disponible pour les administrateurs secondaires afin de repasser un compte admin en membre
+- **Protection de l’admin historique** : l’administrateur le plus ancien n’affiche jamais ce bouton et reste protégé côté serveur contre toute tentative de rétrogradation
+
+### 🐛 Corrections
+
+#### Accueil
+- **Pastille non lue stabilisée au chargement** : l’état verrouillé s’affiche directement pendant la résolution des capsules disponibles, sans flash intermédiaire
+- **Libellé verrouillé ajusté** : la pastille affiche désormais `N capsule(s) dispo à Th`
+
+#### Administration
+- **Bouton `Vérifier` harmonisé** : le CTA de la section `Nettoyage` utilise désormais la même largeur visuelle que les autres boutons pleine largeur de la page admin
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.10`
+- README.md : ajout du retrait contrôlé du statut admin dans les fonctionnalités admin
+
+---
+
+## v0.32.9 (2026-05-07) - Nettoyage admin des capsules courtes
+
+### ✨ Nouvelles fonctionnalités
+
+#### Administration
+- **Section `Nettoyage`** : une nouvelle entrée dans l'admin ouvre un espace dédié à la suppression des messages très courts enregistrés par erreur
+- **Liste ciblée des capsules courtes** : la page de nettoyage affiche les enregistrements de moins de 10 secondes par ordre antéchronologique
+- **Recherche multicritère** : filtrage par auteur et plage de dates pour retrouver rapidement une capsule précise
+- **Pagination incrémentale** : chargement initial limité à 20 résultats, puis extension par lots de 20 via `Charger plus...`
+- **Actions directes** : lecture et suppression depuis la liste admin, avec aperçu visuel quand une vignette image est présente
+
+### 📚 Documentation
+- README.md : version mise à jour en `0.32.9`
+- README.md : ajout du nettoyage admin des capsules courtes dans les fonctionnalités
+
+---
+
 ## v0.32.8 (2026-05-06) - Enchaînement arrière-plan non bloquant
 
 ### 🐛 Corrections

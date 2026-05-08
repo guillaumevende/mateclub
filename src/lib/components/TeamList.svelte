@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Avatar from './Avatar.svelte';
+	import UserProfileAvatarLink from './UserProfileAvatarLink.svelte';
 	import CloseIconButton from './CloseIconButton.svelte';
 	import { scrollLock } from '$lib/actions/scrollLock';
 
@@ -49,7 +49,7 @@
 				{#each allUsers as user}
 					{@const count = user.recording_count ?? 0}
 					<li>
-						<Avatar avatar={user.avatar} size="small" />
+						<UserProfileAvatarLink userId={user.id} avatar={user.avatar} size="small" label={`Voir le profil de ${user.pseudo}`} />
 						<span class="team-pseudo">{user.pseudo}</span>
 						<span class="team-count">({count} capsule{count !== 1 ? 's' : ''})</span>
 					</li>
