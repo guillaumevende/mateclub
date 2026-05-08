@@ -2,6 +2,18 @@
 
 ---
 
+## v0.35.1 (2026-05-08) - Visibilite GitHub du changelog
+
+### 📚 Documentation
+
+- **README clarifie sur GitHub** : ajout d'un bloc visible en haut de la page d'accueil du depot avec des liens directs vers la derniere release, le `CHANGELOG.md` complet et la branche `develop`
+- **Version badge mise a jour** : le badge de version du README suit maintenant `0.35.1`
+- **Release documentaire** : cette version sert a rendre les mises a jour recentes beaucoup plus visibles depuis la homepage GitHub du projet
+
+### 🔀 Synchronisation
+
+- **Base de release preparee** : `develop` et `fix` doivent rester alignes sur cette version documentaire avant la resynchronisation de `main`
+
 ## v0.35.0 (2026-05-07) - Notifications push quotidiennes
 
 ### ✨ Nouvelles fonctionnalités
