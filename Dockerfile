@@ -3,12 +3,13 @@ FROM node:20-bookworm-slim
 WORKDIR /app
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends \
-		ffmpeg \
-		python3.11 \
-		python3-pip \
-		python3.11-venv \
-		ca-certificates \
+ && apt-get install -y --no-install-recommends \
+  ffmpeg \
+  git \
+  python3.11 \
+  python3-pip \
+  python3.11-venv \
+  ca-certificates \
 		curl \
 	&& rm -rf /var/lib/apt/lists/*
 

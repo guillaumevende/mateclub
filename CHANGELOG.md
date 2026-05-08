@@ -2,6 +2,17 @@
 
 ---
 
+## v0.36.3 (2026-05-08) - Correctif conteneur DeepFilter
+
+### 🐛 Corrections
+
+- **Git installé dans l'image Docker** : DeepFilter appelle `git` au runtime pour ses métadonnées internes ; le conteneur embarque désormais ce binaire, ce qui évite l'échec immédiat `No such file or directory: 'git'`
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.36.3`
+- package.json / package-lock.json : version portée en `0.36.3`
+
 ## v0.36.2 (2026-05-08) - Ajustement UI admin audio
 
 ### 🐛 Corrections
