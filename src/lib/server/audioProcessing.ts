@@ -1,6 +1,6 @@
 import { execFile } from 'child_process';
 import { existsSync, mkdirSync, rmSync } from 'fs';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { promisify } from 'util';
 import {
 	getNextRecordingForProcessing,
@@ -94,22 +94,47 @@ async function processRecording(recording: Recording, config: AudioProcessingRun
 			{
 				env: {
 					...process.env,
-					HOME: config.cacheHome
+					HOME: config.cacheHome,
+					XDG_CACHE_HOME: config.cacheHome,
+					PATH: `${dirname(config.pythonBin)}:${process.env.PATH ?? ''}`
 				}
 			}
 		);
 		markRecordingProcessingReady(recording.id, processedFilename);
 	} catch (error) {
 		rmSync(processedPath, { force: true });
-		const message =
-			error instanceof Error
-				? error.message
-				: typeof error === 'string'
-					? error
-					: 'Traitement audio impossible';
+		const message = getProcessingErrorMessage(error);
 		markRecordingProcessingFailed(recording.id, message);
 		console.error('[AUDIO_PROCESSING] Échec du traitement', recording.id, error);
 	}
+}
+
+function getProcessingErrorMessage(error: unknown): string {
+	if (typeof error === 'string') {
+		return error.slice(0, 500);
+	}
+
+	if (error && typeof error === 'object') {
+		const errorLike = error as {
+			message?: string;
+			stderr?: string;
+			stdout?: string;
+		};
+		const details = [errorLike.message, errorLike.stderr, errorLike.stdout]
+			.filter((value): value is string => Boolean(value && value.trim()))
+			.map((value) => value.trim())
+			.join(' | ');
+
+		if (details) {
+			return details.slice(0, 500);
+		}
+	}
+
+	if (error instanceof Error) {
+		return error.message.slice(0, 500);
+	}
+
+	return 'Traitement audio impossible';
 }
 
 export async function processPendingAudioRecordings(): Promise<void> {

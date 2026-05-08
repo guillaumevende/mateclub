@@ -2,6 +2,19 @@
 
 ---
 
+## v0.36.1 (2026-05-08) - Correctif DeepFilter runtime
+
+### 🐛 Corrections
+
+- **Binaire `dfm` résolu correctement** : le script de traitement audio cherche désormais `dfm` dans le même environnement virtuel Python que DeepFilter, au lieu de dépendre du `PATH` global du conteneur
+- **`PATH` du worker renforcé** : le worker serveur préfixe explicitement le dossier `bin` de l’environnement audio pour éviter les échecs “binaire introuvable” après upload
+- **Erreurs plus utiles** : les capsules en échec de traitement conservent maintenant le stderr/stdout significatif de la commande, ce qui facilitera le diagnostic si un second problème survient
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.36.1`
+- package.json / package-lock.json : version portée en `0.36.1`
+
 ## v0.36.0 (2026-05-08) - Traitement audio serveur optionnel
 
 ### ✨ Nouvelles fonctionnalités

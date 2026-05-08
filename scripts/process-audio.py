@@ -27,9 +27,16 @@ def ensure_binary(name: str) -> str:
     return resolved
 
 
+def resolve_dfm_binary() -> str:
+    sibling = Path(sys.executable).resolve().with_name("dfm")
+    if sibling.exists():
+        return str(sibling)
+    return ensure_binary("dfm")
+
+
 def process_audio(input_path: Path, output_path: Path) -> None:
     ffmpeg_bin = ensure_binary("ffmpeg")
-    dfm_bin = ensure_binary("dfm")
+    dfm_bin = resolve_dfm_binary()
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
