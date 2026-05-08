@@ -2,6 +2,17 @@
 
 ---
 
+## v0.36.2 (2026-05-08) - Ajustement UI admin audio
+
+### 🐛 Corrections
+
+- **Espacement du bloc `Amélioration audio`** : le bouton d’activation/désactivation n’est plus collé à l’encadré de résumé dans l’admin
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.36.2`
+- package.json / package-lock.json : version portée en `0.36.2`
+
 ## v0.36.1 (2026-05-08) - Correctif DeepFilter runtime
 
 ### 🐛 Corrections

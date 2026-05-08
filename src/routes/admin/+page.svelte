@@ -191,7 +191,7 @@
 				<p><strong>Traitement :</strong> {data.appSettings.audioProcessingEnabled ? 'activé pour les prochaines capsules' : 'désactivé'}</p>
 				<p><strong>Python :</strong> {data.audioProcessingConfig.pythonBin}</p>
 			</div>
-			<form method="POST" action="?/toggleAudioProcessing" use:enhance={() => {
+			<form method="POST" action="?/toggleAudioProcessing" class="config-card-action" use:enhance={() => {
 				audioProcessingLoading = true;
 				audioProcessingMessage = null;
 				audioProcessingError = null;
@@ -1140,6 +1140,10 @@
 		width: 100%;
 		box-sizing: border-box;
 		text-align: center;
+	}
+
+	.config-card-action {
+		margin-top: 0.85rem;
 	}
 
 	.group-config-form {
