@@ -2,6 +2,19 @@
 
 ---
 
+## v0.36.4 (2026-05-13) - Spinner de traitement et README nettoyé
+
+### ✨ Améliorations
+
+- **Traitement audio plus lisible** : les capsules en cours d’optimisation audio n’affichent plus la pastille texte `En traitement serveur` ; un spinner SVG jaune animé prend désormais sa place dans `Mes enregistrements` et sur le profil personnel
+
+### 📚 Documentation
+
+- **README nettoyé** : suppression de l’ancien faux “Journal des modifications” obsolète sur la page d’accueil GitHub
+- **Lien vers la vraie source** : la homepage renvoie désormais explicitement vers `CHANGELOG.md` pour l’historique complet des versions
+- README.md : badge de version mis à jour en `0.36.4`
+- package.json / package-lock.json : version portée en `0.36.4`
+
 ## v0.36.3 (2026-05-08) - Correctif conteneur DeepFilter
 
 ### 🐛 Corrections

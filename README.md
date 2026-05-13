@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.36.3-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.36.4-blue?style=for-the-badge)
 
 </div>
 
@@ -18,6 +18,7 @@
 - [Derniere release GitHub](https://github.com/guillaumevende/mateclub/releases/latest)
 - [Journal des modifications complet](./CHANGELOG.md)
 - [Branche `develop` (developpements en cours)](https://github.com/guillaumevende/mateclub/tree/develop)
+- L’ancien résumé de versions affiché ici a été retiré : le seul historique fiable est désormais [CHANGELOG.md](./CHANGELOG.md)
 
 ---
 
@@ -713,60 +714,9 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 ### Debug
 - `POST /api/debug` - Logging automatique des erreurs côté client
 
-## Journal des modifications
+## Historique des versions
 
-### v2.7.1 (2026-04-02)
-
-#### ✨ Nouvelles fonctionnalités
-- **Sons de fin de capsule** : Ding.mp3 (après chaque capsule) et Doudoudou.mp3 (dernière capsule du jour)
-- **Installation PWA facilitée** : Composant @khmyznikov/pwa-install avec dialog d'installation
-- **Visualiseur audio** : 8 barres verticales animées pendant l'enregistrement
-- **Navigation améliorée** : Clic sur date dans FloatingPlayer pour scroller vers le jour
-
-#### 🐛 Corrections de bugs
-- **Stabilité enregistrement** : Timeout 5s pour appareils lents, indicateur "Finalisation..."
-- **Accessibilité (A11y)** : Tous les composants avec attributs ARIA, navigation clavier complète
-- **API** : Renommage endpoint `/listen` → `/listened`
-
-#### 🔧 Migrations
-- Migration fuseau horaire (CRITIQUE) : Conversion CEST → UTC
-- Ajout colonne last_login
-
-### v2.7.0 (2026-04-01)
-
-#### ✨ Fonctionnalités
-- Sons de fin de capsule (Ding/Doudoudou)
-- Installation PWA facilitée
-- Visualiseur audio
-
-#### 🐛 Corrections
-- Stabilité enregistrement
-- Accessibilité complète
-- API endpoint renommé
-
-### v2.6.1 (2026-03-31)
-
-#### 🐛 Corrections de bugs critiques
-- **Gestion des fuseaux horaires** : Migration timestamps CEST → UTC, résolution décalage 2h
-
-### v2.6.0 (2026-03-29)
-
-#### 🎨 Nouvelle identité visuelle
-- Régénération de tous les assets (logo, favicons, icônes PWA)
-- Nettoyage fichiers obsolètes
-
-### v2.5.0-beta (2026-03-27)
-
-#### ✨ Système d'inscription Beta
-- Page d'inscription publique avec formulaire sécurisé
-- Toggle inscriptions dans le panel admin
-- Liste et validation des demandes d'inscription
-
-#### 🐛 Corrections
-- Fix noms de mois dans le calendrier
-- Fix bouton "Charger plus"
-
-### v2.4.7 (2026-03-23)
+Le journal détaillé des versions, y compris l’historique de transition depuis les anciennes versions `2.x`, est maintenu uniquement dans [CHANGELOG.md](./CHANGELOG.md).
 
 #### 🐛 Corrections
 - Fix preview HEIC sur page enregistrement

@@ -145,9 +145,6 @@
 	}
 
 	function getRecordingStatusLabel(recording: ProfileRecording) {
-		if (isServerProcessingRecording(recording)) {
-			return 'En traitement serveur';
-		}
 		if (hasServerProcessingFailed(recording)) {
 			return 'Traitement audio à relancer';
 		}
@@ -442,10 +439,9 @@
 								</div>
 								<div class="recording-bottomline">
 									<span class="recording-duration">{formatDuration(recording.duration_seconds)}</span>
-									{#if getRecordingStatusLabel(recording)}
+									{#if hasServerProcessingFailed(recording)}
 										<span
 											class="recording-status-badge"
-											class:is-processing={isServerProcessingRecording(recording)}
 											class:is-failed={hasServerProcessingFailed(recording)}
 										>
 											{getRecordingStatusLabel(recording)}
@@ -486,7 +482,16 @@
 									disabled={!canPlayRecording(recording)}
 								>
 									{#if !canPlayRecording(recording)}
-										{hasServerProcessingFailed(recording) ? '⚠️' : '⏳'}
+										{#if hasServerProcessingFailed(recording)}
+											⚠️
+										{:else}
+											<span class="processing-glyph" aria-hidden="true">
+												<svg viewBox="0 0 24 24" class="processing-spinner-icon">
+													<circle class="processing-spinner-track" cx="12" cy="12" r="8.5"></circle>
+													<path class="processing-spinner-head" d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5"></path>
+												</svg>
+											</span>
+										{/if}
 									{:else}
 										{isCurrentlyPlaying ? '⏸️' : '▶️'}
 									{/if}
@@ -734,11 +739,6 @@
 		color: #cfd3ff;
 	}
 
-	.recording-status-badge.is-processing {
-		background: rgba(255, 196, 76, 0.14);
-		color: #ffd77c;
-	}
-
 	.recording-status-badge.is-failed {
 		background: rgba(255, 107, 129, 0.14);
 		color: #ff8ea2;
@@ -771,6 +771,45 @@
 	.listen-btn:disabled {
 		opacity: 0.45;
 		cursor: not-allowed;
+	}
+
+	.processing-glyph {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 22px;
+		height: 22px;
+		color: #ffd56d;
+		filter: drop-shadow(0 0 10px rgba(255, 213, 109, 0.22));
+	}
+
+	.processing-spinner-icon {
+		width: 22px;
+		height: 22px;
+		display: block;
+		animation: recording-processing-spin 0.95s linear infinite;
+	}
+
+	.processing-spinner-track,
+	.processing-spinner-head {
+		fill: none;
+		stroke-linecap: round;
+	}
+
+	.processing-spinner-track {
+		stroke: rgba(255, 213, 109, 0.24);
+		stroke-width: 2.4;
+	}
+
+	.processing-spinner-head {
+		stroke: currentColor;
+		stroke-width: 2.8;
+	}
+
+	@keyframes recording-processing-spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	.url-add-btn {
