@@ -239,9 +239,9 @@
 				onclick={openBroadcastInfoModal}
 			>
 				<span class="broadcast-info-pill-icon" aria-hidden="true">📣</span>
-				<span class="broadcast-info-pill-copy">
-					{broadcastInfoRead ? 'Information déjà lue' : 'Nouvelle information du groupe'}
-				</span>
+				{#if !broadcastInfoRead}
+					<span class="broadcast-info-pill-copy">Nouvelle information du groupe</span>
+				{/if}
 			</button>
 		</div>
 	{/if}
