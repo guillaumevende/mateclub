@@ -709,9 +709,9 @@
 					{#if pushToggleLoading}
 						Mise à jour...
 					{:else if pushEnabled}
-						Désactiver les notifications push
+						Désactiver les notifications push sur cet appareil
 					{:else}
-						Activer les notifications push
+						Activer les notifications push sur cet appareil
 					{/if}
 				</button>
 				{#if pushPermission === 'denied' && !pushEnabled}
