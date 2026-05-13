@@ -1023,6 +1023,7 @@ export type SaveRecordingOptions = {
 	imageData?: Buffer;
 	url?: string | null;
 	audioHash?: string;
+	filenameBase?: string | null;
 	processedFilename?: string | null;
 	processingStatus?: RecordingProcessingStatus;
 	processingMode?: RecordingProcessingMode;
@@ -1043,6 +1044,7 @@ export function saveRecording(
 		imageData,
 		url,
 		audioHash,
+		filenameBase = null,
 		processedFilename = null,
 		processingStatus = 'ready',
 		processingMode = 'none',
@@ -1054,7 +1056,8 @@ export function saveRecording(
 
 	debug.db.log('saveRecording - audioData:', audioData.length, 'bytes, imageData:', imageData?.length || 'none');
 
-	const filename = `${Date.now()}-${crypto.randomUUID()}.${audioExtension}`;
+	const uniqueSuffix = crypto.randomUUID().replace(/-/g, '').slice(0, 6);
+	const filename = `${filenameBase ?? Date.now()}_${uniqueSuffix}.${audioExtension}`;
 	const effectiveProcessedFilename =
 		processedFilename ?? (processingStatus === 'ready' ? filename : null);
 	const filepath = join(uploadsDir, filename);

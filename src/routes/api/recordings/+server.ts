@@ -9,6 +9,31 @@ import sharp from 'sharp';
 
 const DUPLICATE_THRESHOLD_SECONDS = 30;
 
+function buildRecordingFilenameBase(recordedAt: Date, pseudo: string, timezone: string): string {
+	const timestampParts = new Intl.DateTimeFormat('sv-SE', {
+		timeZone: timezone,
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+		hour: '2-digit',
+		minute: '2-digit',
+		hour12: false
+	}).formatToParts(recordedAt);
+
+	const getPart = (type: Intl.DateTimeFormatPartTypes) =>
+		timestampParts.find((part) => part.type === type)?.value ?? '';
+
+	const compactTimestamp = `${getPart('year')}${getPart('month')}${getPart('day')}${getPart('hour')}${getPart('minute')}`;
+	const pseudoPrefix = pseudo
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.toLowerCase()
+		.replace(/[^a-z0-9]/g, '')
+		.slice(0, 3) || 'usr';
+
+	return `${compactTimestamp}_${pseudoPrefix}`;
+}
+
 export const POST: RequestHandler = async ({ request, locals }) => {
 	if (!locals.user) {
 		throw redirect(303, '/login');
@@ -106,6 +131,11 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	if (recordedAtRaw && (!recordedAt || Number.isNaN(recordedAt.getTime()))) {
 		return json({ error: 'Horodatage d’enregistrement invalide' }, { status: 400 });
 	}
+	const filenameBase = buildRecordingFilenameBase(
+		recordedAt ?? new Date(),
+		locals.user.pseudo,
+		locals.user.timezone || 'Europe/Paris'
+	);
 
 	let imageBuffer: Buffer | undefined;
 	if (image && image.size > 0) {
@@ -161,6 +191,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				imageData: imageBuffer,
 				url: url || null,
 				audioHash,
+				filenameBase,
 				processedFilename: useAudioProcessing ? null : undefined,
 				processingStatus: useAudioProcessing ? 'processing' : 'ready',
 				processingMode: useAudioProcessing ? 'deepfilter' : 'none',
