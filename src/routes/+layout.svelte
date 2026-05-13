@@ -2,15 +2,22 @@
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/stores';
 	import { playerStore, initPlayer, debugLogs, logsEnabled, jinglesEnabled } from '$lib/stores/player';
-	import { initHaptics, destroyHaptics } from '$lib/utils/haptics';
+	import { initHaptics } from '$lib/utils/haptics';
 	import FloatingPlayer from '$lib/components/FloatingPlayer.svelte';
-	import { onMount, onDestroy } from 'svelte';
+	import { scrollLock } from '$lib/actions/scrollLock';
+	import { onMount } from 'svelte';
 	import '@khmyznikov/pwa-install';
 
-	let { children, data }: { children: Snippet, data: { user?: { avatar: string; is_admin: number; pseudo: string; logs_enabled?: number; jingles_enabled?: number; pwa_tutorial_enabled?: number }; appSettings?: { groupName: string; historyMonths: number; maxRecordingSeconds: number; maxGroupNameLength: number; audioProcessingEnabled?: boolean } } } = $props();
+	let { children, data }: { children: Snippet, data: { user?: { avatar: string; is_admin: number; pseudo: string; logs_enabled?: number; jingles_enabled?: number; pwa_tutorial_enabled?: number }; appSettings?: { groupName: string; historyMonths: number; maxRecordingSeconds: number; maxGroupNameLength: number; audioProcessingEnabled?: boolean }; broadcastInfo?: { message: string; revision: number; read: boolean } | null } } = $props();
 
 	let debugVisible = $state(false);
 	let logsEnabledValue = $state(false);
+	let showBroadcastInfoModal = $state(false);
+	let locallyReadBroadcastRevision = $state<number | null>(null);
+	let broadcastInfoRead = $derived(
+		(data.broadcastInfo?.read ?? true) ||
+		(data.broadcastInfo?.revision != null && locallyReadBroadcastRevision === data.broadcastInfo.revision)
+	);
 
 	function updateViewportBottomOffset() {
 		if (typeof window === 'undefined') return;
@@ -101,6 +108,30 @@
 
 	function closeDebug() {
 		debugVisible = false;
+	}
+
+	async function openBroadcastInfoModal() {
+		showBroadcastInfoModal = true;
+
+		if (!data.broadcastInfo || broadcastInfoRead) return;
+
+		try {
+			const response = await fetch('/api/broadcast-info/read', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ revision: data.broadcastInfo.revision })
+			});
+
+			if (response.ok) {
+				locallyReadBroadcastRevision = data.broadcastInfo.revision;
+			}
+		} catch (error) {
+			console.warn('Impossible de marquer l’information comme lue', error);
+		}
+	}
+
+	function closeBroadcastInfoModal() {
+		showBroadcastInfoModal = false;
 	}
 
 	function copyLogs() {
@@ -199,8 +230,51 @@
 {/if}
 
 <main class:logged-in={!!data.user} class:with-player={showPlayer}>
+	{#if data.broadcastInfo?.message}
+		<div class="broadcast-info-shell">
+			<button
+				type="button"
+				class="broadcast-info-pill"
+				class:is-read={broadcastInfoRead}
+				onclick={openBroadcastInfoModal}
+			>
+				<span class="broadcast-info-pill-icon" aria-hidden="true">📣</span>
+				<span class="broadcast-info-pill-copy">
+					{broadcastInfoRead ? 'Information déjà lue' : 'Nouvelle information du groupe'}
+				</span>
+			</button>
+		</div>
+	{/if}
 	{@render children()}
 </main>
+
+{#if showBroadcastInfoModal && data.broadcastInfo?.message}
+	<div
+		class="modal-overlay broadcast-modal-overlay"
+		use:scrollLock={showBroadcastInfoModal}
+		onclick={closeBroadcastInfoModal}
+		onkeydown={(e) => e.key === 'Escape' && closeBroadcastInfoModal()}
+		role="button"
+		tabindex="0"
+		aria-label="Fermer la modale d’information"
+	>
+		<div
+			class="modal broadcast-info-modal"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.key === 'Escape' && closeBroadcastInfoModal()}
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="broadcast-info-title"
+			tabindex="-1"
+		>
+			<button type="button" class="broadcast-close-btn" onclick={closeBroadcastInfoModal} aria-label="Fermer">✕</button>
+			<h2 id="broadcast-info-title">Information du groupe</h2>
+			<div class="broadcast-info-content">
+				<p>{data.broadcastInfo.message}</p>
+			</div>
+		</div>
+	</div>
+{/if}
 
 <style>
 	:global(*) {
@@ -237,6 +311,103 @@
 		width: 100%;
 		background: #1a1a2e;
 		color: white;
+	}
+
+	:global(textarea) {
+		width: 100%;
+		background: #1a1a2e;
+		color: white;
+		border: none;
+		border-radius: 12px;
+		padding: 0.9rem 1rem;
+		font: inherit;
+		resize: vertical;
+	}
+
+	.broadcast-info-shell {
+		width: min(100%, 820px);
+		margin: 0 auto;
+		padding: 0 1rem 1rem;
+	}
+
+	.broadcast-info-pill {
+		width: 100%;
+		display: flex;
+		align-items: center;
+		gap: 0.9rem;
+		padding: 0.95rem 1rem;
+		border-radius: 20px;
+		background: linear-gradient(135deg, rgba(233, 69, 96, 0.18), rgba(145, 77, 240, 0.18));
+		border: 1px solid rgba(233, 69, 96, 0.32);
+		color: #fff6f8;
+		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.broadcast-info-pill.is-read {
+		background: rgba(94, 102, 140, 0.18);
+		border-color: rgba(160, 160, 192, 0.18);
+		color: #d7d8ea;
+	}
+
+	.broadcast-info-pill-icon {
+		font-size: 1.2rem;
+	}
+
+	.broadcast-info-pill-copy {
+		font-weight: 700;
+		line-height: 1.3;
+	}
+
+	.broadcast-modal-overlay {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.86);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+		z-index: 1200;
+	}
+
+	.modal {
+		background: #1f2140;
+		border-radius: 20px;
+		width: min(100%, 560px);
+		position: relative;
+		border: 1px solid rgba(255, 255, 255, 0.06);
+		box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
+	}
+
+	.broadcast-info-modal {
+		max-width: 560px;
+		padding: 1.35rem 1.2rem 1.2rem;
+	}
+
+	.broadcast-close-btn {
+		position: absolute;
+		top: 0.85rem;
+		right: 0.85rem;
+		width: 38px;
+		height: 38px;
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.08);
+		color: #fff;
+		padding: 0;
+	}
+
+	.broadcast-info-content {
+		margin-top: 1rem;
+		max-height: min(55vh, 420px);
+		overflow-y: auto;
+		padding-right: 0.25rem;
+	}
+
+	.broadcast-info-content p {
+		white-space: pre-wrap;
+		line-height: 1.55;
+		color: #f5f6ff;
 	}
 
 	:global(button) {

@@ -44,6 +44,11 @@
 		missingRequirements: string[];
 	};
 
+	type BroadcastInfo = {
+		message: string;
+		revision: number;
+	};
+
 	type PendingRegistration = {
 		id: number;
 		pseudo: string;
@@ -54,7 +59,7 @@
 		status: string;
 	};
 
-	let { data, form }: { data: PageData & { currentUser?: User; csrfToken?: string; pendingRegistrations?: PendingRegistration[]; allowRegistration?: boolean; oldestAdminId?: number | null; appSettings: AppSettings; pushConfig: PushConfig; audioProcessingConfig: AudioProcessingConfig }; form?: { success?: boolean; error?: string; message?: string } } = $props();
+	let { data, form }: { data: PageData & { currentUser?: User; csrfToken?: string; pendingRegistrations?: PendingRegistration[]; allowRegistration?: boolean; oldestAdminId?: number | null; appSettings: AppSettings; broadcastInfo: BroadcastInfo; pushConfig: PushConfig; audioProcessingConfig: AudioProcessingConfig }; form?: { success?: boolean; error?: string; message?: string } } = $props();
 
 	const emojis = ['☕', '😀', '😎', '🤠', '🥳', '😇', '🤩', '😈', '👻', '🤖', '🎸', '🎮', '🚀', '🍕', '🍺', '🌈', '🔥', '⭐', '❤️'];
 	
@@ -79,6 +84,10 @@
 	let historyMonths = $state(3);
 	let maxRecordingMinutes = $state(3);
 	let maxRecordingSeconds = $state(0);
+	let broadcastInfoMessage = $state('');
+	let broadcastInfoSuccess = $state<string | null>(null);
+	let broadcastInfoError = $state<string | null>(null);
+	let isSavingBroadcastInfo = $state(false);
 	
 	// État du formulaire de création
 	let isCreatingUser = $state(false);
@@ -104,6 +113,7 @@
 		const duration = data.appSettings?.maxRecordingSeconds ?? 180;
 		maxRecordingMinutes = Math.floor(duration / 60);
 		maxRecordingSeconds = duration % 60;
+		broadcastInfoMessage = data.broadcastInfo?.message ?? '';
 	});
 
 	function openDeleteModal(user: User) {
@@ -156,6 +166,53 @@
 
 <div class="container">
 	<h1>Administration</h1>
+
+	<section>
+		<h2>Informations aux utilisateurs</h2>
+		<p class="super-text">
+			Informez les utilisateurs d’une mise à jour ou d’une information groupée.
+		</p>
+		<form method="POST" action="?/saveBroadcastInfo" use:enhance={() => {
+			isSavingBroadcastInfo = true;
+			broadcastInfoSuccess = null;
+			broadcastInfoError = null;
+
+			return async ({ result }) => {
+				isSavingBroadcastInfo = false;
+
+				if (result.type === 'success') {
+					broadcastInfoSuccess = (result.data as any)?.message || 'Information enregistrée';
+					const savedInfo = (result.data as any)?.broadcastInfo as BroadcastInfo | undefined;
+					if (savedInfo) {
+						broadcastInfoMessage = savedInfo.message;
+					}
+				} else if (result.type === 'failure') {
+					broadcastInfoError = (result.data as any)?.error || 'Impossible d’enregistrer cette information';
+				}
+			};
+		}} class="group-config-form">
+			<input type="hidden" name="csrf_token" value={data.csrfToken} />
+			<label class="config-field">
+				<span class="config-label">Texte diffusé :</span>
+				<textarea
+					name="broadcast_info_message"
+					bind:value={broadcastInfoMessage}
+					rows="6"
+					placeholder="Exemple : maintenance à 22h, nouvelle fonctionnalité disponible, pensez à mettre à jour votre PWA..."
+				></textarea>
+				<span class="config-hint">Laissez vide puis diffusez pour supprimer l’information en cours.</span>
+			</label>
+			{#if broadcastInfoSuccess}
+				<p class="success-message">{broadcastInfoSuccess}</p>
+			{/if}
+			{#if broadcastInfoError}
+				<p class="error-message">{broadcastInfoError}</p>
+			{/if}
+			<button type="submit" class="super-btn section-action-btn" disabled={isSavingBroadcastInfo}>
+				{isSavingBroadcastInfo ? 'Diffusion...' : 'Diffuser'}
+			</button>
+		</form>
+	</section>
 
 	<section>
 		<h2>Notifications push</h2>

@@ -117,6 +117,7 @@
 	let hasMoreRecordings = $state(true);
 	let isLoadingRecordings = $state(false);
 	let showRecordingsList = $state(true);
+	let recordingsPollingInterval: ReturnType<typeof setInterval> | null = null;
 
 	// Delete modal state
 	let showDeleteModal = $state(false);
@@ -172,6 +173,30 @@
 		if (!selectedDraftId || !draftQueue.some((draft) => draft.id === selectedDraftId)) {
 			selectedDraftId = draftQueue.at(-1)?.id ?? null;
 		}
+	});
+
+	$effect(() => {
+		const hasProcessingRecordings = userRecordings.some((recording) => isServerProcessingRecording(recording));
+		if (!hasProcessingRecordings || typeof window === 'undefined') {
+			if (recordingsPollingInterval) {
+				clearInterval(recordingsPollingInterval);
+				recordingsPollingInterval = null;
+			}
+			return;
+		}
+
+		if (recordingsPollingInterval) return;
+
+		recordingsPollingInterval = setInterval(() => {
+			void loadRecordings({ refresh: true });
+		}, 5000);
+
+		return () => {
+			if (recordingsPollingInterval) {
+				clearInterval(recordingsPollingInterval);
+				recordingsPollingInterval = null;
+			}
+		};
 	});
 
 	// Load recordings on mount
@@ -383,15 +408,18 @@
 		}
 	}
 
-	async function loadRecordings() {
+	async function loadRecordings(options: { refresh?: boolean } = {}) {
 		if (isLoadingRecordings) return;
 		isLoadingRecordings = true;
 		
 		try {
-			const res = await fetch(`/api/recordings/mine?limit=${RECORDINGS_LIMIT}&offset=${recordingsOffset}`);
+			const refresh = options.refresh === true;
+			const limit = refresh ? Math.max(userRecordings.length || RECORDINGS_LIMIT, RECORDINGS_LIMIT) : RECORDINGS_LIMIT;
+			const offset = refresh ? 0 : recordingsOffset;
+			const res = await fetch(`/api/recordings/mine?limit=${limit}&offset=${offset}`);
 			const data = await res.json();
 			
-			if (recordingsOffset === 0) {
+			if (refresh || recordingsOffset === 0) {
 				userRecordings = data.recordings || [];
 			} else {
 				userRecordings = [...userRecordings, ...(data.recordings || [])];
@@ -1225,6 +1253,7 @@
 		const formData = new FormData();
 		formData.append('audio', draft.audioBlob, getAudioFilename(draft.audioMimeType));
 		formData.append('duration', draft.durationSeconds.toString());
+		formData.append('recorded_at', draft.createdAt);
 
 		if (draft.imageBlob) {
 			formData.append('image', draft.imageBlob, getImageFilename(draft.imageBlob));
@@ -1317,7 +1346,9 @@
 
 		isSending = true;
 		queueNotice = null;
-		const ids = draftQueue.map((draft) => draft.id);
+		const ids = [...draftQueue]
+			.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+			.map((draft) => draft.id);
 		let successCount = 0;
 
 		for (const [index, id] of ids.entries()) {

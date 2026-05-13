@@ -6,8 +6,8 @@ import {
 	getNextRecordingForProcessing,
 	getRecordingFilePath,
 	markRecordingProcessingFailed,
-	markRecordingProcessingReady,
 	markRecordingProcessingStarted,
+	replaceRecordingAudioFile,
 	type Recording
 } from '$lib/server/db';
 
@@ -72,7 +72,8 @@ function scheduleProcessingRun(delayMs = 500): void {
 }
 
 function buildProcessedFilename(recording: Recording): string {
-	return `${Date.now()}-${crypto.randomUUID()}-processed.m4a`;
+	const extension = recording.filename.split('.').pop() || 'm4a';
+	return `${recording.filename.replace(/\.[^.]+$/, '')}.processing-${crypto.randomUUID()}.${extension}`;
 }
 
 async function processRecording(recording: Recording, config: AudioProcessingRuntimeConfig): Promise<void> {
@@ -100,7 +101,7 @@ async function processRecording(recording: Recording, config: AudioProcessingRun
 				}
 			}
 		);
-		markRecordingProcessingReady(recording.id, processedFilename);
+		replaceRecordingAudioFile(recording.id, processedFilename);
 	} catch (error) {
 		rmSync(processedPath, { force: true });
 		const message = getProcessingErrorMessage(error);

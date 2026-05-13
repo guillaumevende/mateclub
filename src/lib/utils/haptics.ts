@@ -12,7 +12,7 @@ export function triggerHaptic(pattern: Parameters<WebHaptics['trigger']>[0] = 'n
 	if (!haptics || typeof window === 'undefined') return;
 	
 	try {
-		haptics.trigger(pattern);
+		void haptics.trigger(pattern);
 	} catch (e) {
 		console.warn('Haptic feedback failed:', e);
 	}
@@ -22,9 +22,7 @@ export function triggerLockedHaptic() {
 	if (!haptics || typeof window === 'undefined') return;
 	
 	try {
-		haptics.trigger('nudge');
-		setTimeout(() => haptics?.trigger('nudge'), 100);
-		setTimeout(() => haptics?.trigger('nudge'), 200);
+		void haptics.trigger('warning' as Parameters<WebHaptics['trigger']>[0]);
 	} catch (e) {
 		console.warn('Locked haptic feedback failed:', e);
 	}

@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.36.4-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.37.0-blue?style=for-the-badge)
 
 </div>
 
@@ -113,8 +113,10 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 - **Authentification** - Login par pseudo/mot de passe (pas d'email requis)
 - **PWA installable** - Installation sur mobile via manifest
 - **Notifications push quotidiennes** - Option utilisateur pour recevoir un rappel à l’heure de mise à disposition s’il reste des capsules non lues
+- **Notifications push par appareil** - Chaque PWA ou navigateur peut être abonné indépendamment, sans désactiver les autres appareils du même compte
 - **Tuto PWA désactivable** - Chaque utilisateur peut masquer les popups d’installation PWA depuis ses réglages
 - **Mise à jour rapide** - Un membre peut marquer en une fois toutes les publications existantes des autres utilisateurs comme lues
+- **Information groupée** - L’admin peut diffuser une information persistante visible par tous les membres dans une bulle dédiée
 - **Profils utilisateurs** - Chaque avatar ouvre une page profil avec galerie des images publiées et dernières capsules audio
 - **Pull-to-refresh** - Rechargement de la page d'accueil (désactivé sur modales)
 - **Scroll lock** - Empêche le scroll arrière-plan quand une modale est ouverte

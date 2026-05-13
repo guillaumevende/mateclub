@@ -2,6 +2,31 @@
 
 ---
 
+## v0.37.0 (2026-05-13) - Correctifs UX et diffusion des informations
+
+### ✨ Nouvelles fonctionnalités
+
+- **Bloc `Informations aux utilisateurs`** : l’admin peut désormais diffuser un message groupé persistant depuis le haut de l’administration
+- **Bulle d’information globale** : tous les membres, admins compris, voient une bulle d’information en haut de l’app et peuvent ouvrir son contenu dans une modale dédiée
+- **Lecture mémorisée par utilisateur** : une information consultée change d’apparence uniquement pour l’utilisateur qui l’a déjà lue, sans empêcher sa réouverture
+
+### 🐛 Corrections
+
+- **Retours haptiques verrouillage restaurés** : l’accès à une capsule verrouillée retrigger désormais le retour haptique via la bibliothèque `web-haptics`
+- **Push multi-appareils fiabilisé** : la désactivation des notifications depuis un appareil ne coupe plus automatiquement les abonnements actifs sur les autres appareils du même compte
+- **Réglages push cohérents par appareil** : le bouton d’activation des notifications se base maintenant sur l’abonnement réel du smartphone courant, pas seulement sur le flag global du compte
+- **Traitement audio avec identifiant stable** : une capsule optimisée côté serveur conserve désormais le même nom de fichier publié une fois le traitement terminé
+- **Statut de traitement auto-rafraîchi** : `Mes enregistrements` et le profil personnel se rafraîchissent automatiquement tant qu’une capsule est en cours d’optimisation
+- **Spinner de traitement conservé** : la pastille texte de traitement reste supprimée au profit de l’icône animée dans la liste d’enregistrements
+- **Miniature de couverture agrandie** : le bouton d’aperçu d’image d’une publication est plus grand et mieux ancré en bas à gauche de la carte
+- **Envoi groupé ordonné** : les capsules envoyées en lot conservent désormais leur horodatage réel d’enregistrement, ce qui fiabilise leur ordre de diffusion
+
+### 📚 Documentation
+
+- README.md : version mise à jour en `0.37.0`
+- README.md : ajout du bloc d’information utilisateurs et précision sur les notifications push par appareil
+- package.json / package-lock.json : version portée en `0.37.0`
+
 ## v0.36.4 (2026-05-13) - Spinner de traitement et README nettoyé
 
 ### ✨ Améliorations

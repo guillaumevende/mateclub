@@ -372,7 +372,9 @@
 
 	.card-bottom-player {
 		margin-top: auto;
-		text-align: center;
+		display: flex;
+		justify-content: flex-start;
+		align-items: flex-end;
 	}
 
 	.status-indicator {
@@ -404,9 +406,9 @@
 	}
 
 	.card-thumbnail {
-		width: 45px;
-		height: 45px;
-		border-radius: 8px;
+		width: 90px;
+		height: 90px;
+		border-radius: 14px;
 		overflow: hidden;
 		border: 2px solid rgba(255, 255, 255, 0.5);
 		padding: 0;
@@ -419,6 +421,6 @@
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
-		border-radius: 6px;
+		border-radius: 12px;
 	}
 </style>
