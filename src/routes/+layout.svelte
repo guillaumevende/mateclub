@@ -353,8 +353,8 @@
 	}
 
 	.broadcast-info-pill.home-compact {
-		width: 32px;
-		height: 32px;
+		width: 36px;
+		height: 36px;
 		padding: 0;
 		border-radius: 999px;
 		justify-content: center;
@@ -366,7 +366,7 @@
 	}
 
 	.broadcast-info-pill.home-compact .broadcast-info-pill-icon {
-		font-size: 0.92rem;
+		font-size: 1rem;
 	}
 
 	.broadcast-info-pill-copy {
@@ -375,16 +375,24 @@
 	}
 
 	.broadcast-info-shell.home-compact-shell {
-		position: relative;
-		padding-bottom: 0;
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		width: auto;
+		margin: 0;
+		padding: 0;
+		pointer-events: none;
+		z-index: 25;
 	}
 
 	.broadcast-info-shell.home-compact-shell .broadcast-info-pill.home-compact {
 		position: absolute;
-		top: 1.45rem;
-		right: 4.35rem;
+		top: 1.5rem;
+		right: 4.1rem;
 		z-index: 6;
 		box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
+		pointer-events: auto;
 	}
 
 	.broadcast-modal-overlay {
@@ -563,6 +571,7 @@
 		margin: 0 auto;
 		min-height: 100vh;
 		background: #1a1a2e;
+		position: relative;
 	}
 
 	main.logged-in {

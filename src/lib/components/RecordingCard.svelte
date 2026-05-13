@@ -2,6 +2,7 @@
 	import UserProfileAvatarLink from './UserProfileAvatarLink.svelte';
 	import type { Recording } from '$lib/stores/player';
 	import type { PlayerState } from '$lib/stores/player';
+	import { triggerLockedHaptic } from '$lib/utils/haptics';
 
 	interface Props {
 		recording: Recording & { pseudo?: string; avatar?: string };
@@ -45,6 +46,14 @@
 	const isListened = $derived(isRecordingListened(recording));
 	const isPlaying = $derived(isCurrentPlaying(recording.id));
 	const isCurrent = $derived(isCurrentRecording(recording.id));
+
+	function handleActivate() {
+		if (cardSwiped) return;
+		if (!available) {
+			triggerLockedHaptic();
+		}
+		onplay(index);
+	}
 </script>
 
 <div 
@@ -54,12 +63,12 @@
 	class:playing={isCurrent && available}
 	class:with-bg={hasImage}
 	style:--bg-image={hasImage ? `url(/uploads/${hasImage})` : null}
-	onclick={() => { if (!cardSwiped) onplay(index); }}
+	onclick={handleActivate}
 	ontouchstart={(e) => ontouchstart(e)}
 	ontouchend={(e) => ontouchend(e)}
 	role="button"
 	tabindex="0"
-	onkeydown={(e) => e.key === 'Enter' && onplay(index)}
+	onkeydown={(e) => e.key === 'Enter' && handleActivate()}
 >
 	<div class="card-top">
 		<div class="card-meta">

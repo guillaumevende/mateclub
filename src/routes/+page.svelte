@@ -695,7 +695,6 @@
 
 	function playFromRecording(day: DayRecordings, index: number) {
 		if (!day.available) {
-			triggerLockedHaptic();
 			return;
 		}
 		triggerHaptic('nudge');
