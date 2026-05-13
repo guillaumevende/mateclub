@@ -89,10 +89,15 @@
 			refreshViewportBottomOffset();
 		};
 
+		const handleOpenBroadcastInfo = () => {
+			openBroadcastInfoModal();
+		};
+
 		window.addEventListener('resize', handleViewportChange);
 		window.addEventListener('orientationchange', handleViewportChange);
 		window.addEventListener('focus', handleViewportChange);
 		window.addEventListener('pageshow', handleViewportChange);
+		window.addEventListener('mateclub:open-broadcast-info', handleOpenBroadcastInfo);
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 		window.visualViewport?.addEventListener('resize', handleViewportChange);
 
@@ -101,6 +106,7 @@
 			window.removeEventListener('orientationchange', handleViewportChange);
 			window.removeEventListener('focus', handleViewportChange);
 			window.removeEventListener('pageshow', handleViewportChange);
+			window.removeEventListener('mateclub:open-broadcast-info', handleOpenBroadcastInfo);
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
 			window.visualViewport?.removeEventListener('resize', handleViewportChange);
 		};
@@ -124,6 +130,7 @@
 
 			if (response.ok) {
 				locallyReadBroadcastRevision = data.broadcastInfo.revision;
+				window.dispatchEvent(new window.CustomEvent('mateclub:broadcast-info-read', { detail: data.broadcastInfo.revision }));
 			}
 		} catch (error) {
 			console.warn('Impossible de marquer l’information comme lue', error);
@@ -231,22 +238,16 @@
 
 <main class:logged-in={!!data.user} class:with-player={showPlayer}>
 	{#if data.broadcastInfo?.message}
-		<div
-			class="broadcast-info-shell"
-			class:home-compact-shell={$page.url.pathname === '/' && broadcastInfoRead}
-			class:with-admin-badge={$page.url.pathname === '/' && broadcastInfoRead && !!(data.user?.is_admin && $page.data.pendingRegistrationsCount && $page.data.pendingRegistrationsCount > 0)}
-		>
+		<div class="broadcast-info-shell">
 			<button
 				type="button"
 				class="broadcast-info-pill"
-				class:home-compact={$page.url.pathname === '/' && broadcastInfoRead}
 				class:is-read={broadcastInfoRead}
 				onclick={openBroadcastInfoModal}
+				hidden={$page.url.pathname === '/' && broadcastInfoRead}
 			>
 				<span class="broadcast-info-pill-icon" aria-hidden="true">📣</span>
-				{#if !broadcastInfoRead}
-					<span class="broadcast-info-pill-copy">Nouvelle information du groupe</span>
-				{/if}
+				<span class="broadcast-info-pill-copy">Nouvelle information du groupe</span>
 			</button>
 		</div>
 	{/if}

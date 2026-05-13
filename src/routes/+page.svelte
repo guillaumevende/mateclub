@@ -80,7 +80,14 @@
 		count: number;
 	};
 
-	let { data }: { data: PageData & { user?: User; allUsers: UserList[]; threshold: string; unreadStats?: { count: number; totalSeconds: number }; hasMore?: boolean; pendingRegistrationsCount?: number; groupName?: string; appSettings?: AppSettings } } = $props();
+	let { data }: { data: PageData & { user?: User; allUsers: UserList[]; threshold: string; unreadStats?: { count: number; totalSeconds: number }; hasMore?: boolean; pendingRegistrationsCount?: number; groupName?: string; appSettings?: AppSettings; broadcastInfo?: { message: string; revision: number; read: boolean } | null } } = $props();
+
+	let locallyReadBroadcastRevision = $state<number | null>(null);
+	let showReadBroadcastInfoButton = $derived.by(() => {
+		const info = data.broadcastInfo;
+		if (!info?.message) return false;
+		return info.read || locallyReadBroadcastRevision === info.revision;
+	});
 
 	function getInitialHomeState() {
 		const initialPage = data.page ?? 1;
@@ -419,6 +426,17 @@
 		if (data.unreadStats?.count) {
 			void syncUnreadPlaylistSession();
 		}
+
+		const handleBroadcastInfoRead = (event: Event) => {
+			const customEvent = event as CustomEvent<number>;
+			locallyReadBroadcastRevision = customEvent.detail;
+		};
+
+		window.addEventListener('mateclub:broadcast-info-read', handleBroadcastInfoRead);
+
+		return () => {
+			window.removeEventListener('mateclub:broadcast-info-read', handleBroadcastInfoRead);
+		};
 	});
 
 	// Sync data to component state - only when page changes
@@ -636,6 +654,10 @@
 
 	async function openUnreadPlaylist() {
 		if (unreadStats.count === 0 || openingUnreadSummary) return;
+		if (!canPlayUnreadSummary) {
+			triggerLockedHaptic();
+			return;
+		}
 
 		openingUnreadSummary = true;
 		try {
@@ -682,6 +704,10 @@
 
 	function closeUnreadPlaylistModal() {
 		unreadPlaylistModal = null;
+	}
+
+	function openBroadcastInfoFromHeader() {
+		window.dispatchEvent(new window.CustomEvent('mateclub:open-broadcast-info'));
 	}
 
 	// Player helper functions
@@ -1086,6 +1112,16 @@
 				<span class="badge-count">{data.pendingRegistrationsCount}</span>
 			</a>
 		{/if}
+		{#if showReadBroadcastInfoButton}
+			<button
+				class="home-broadcast-button"
+				class:with-admin-badge={!!(data.user?.is_admin && data.pendingRegistrationsCount && data.pendingRegistrationsCount > 0)}
+				onclick={openBroadcastInfoFromHeader}
+				aria-label="Voir l'information du groupe"
+			>
+				📣
+			</button>
+		{/if}
 		<img src="/icon-512x512.png" alt="Maté Club" class="logo" />
 		<p class="date">{getTodayDate()}</p>
 		<p class="welcome">
@@ -1100,7 +1136,7 @@
 				class="unread-summary-pill"
 				class:is-passive={!canPlayUnreadSummary}
 				onclick={openUnreadPlaylist}
-				disabled={openingUnreadSummary || !canPlayUnreadSummary}
+				disabled={openingUnreadSummary}
 			>
 				<span class="pill-leading-slot" aria-hidden="true">
 					{#if unreadSummaryPresentation.showPlayIcon}
@@ -1553,6 +1589,34 @@
 		line-height: 1;
 		margin-top: 1rem;
 		transition: transform 0.2s, background 0.2s;
+	}
+
+	.home-broadcast-button {
+		position: absolute;
+		top: 0.5rem;
+		left: 0;
+		width: 44px;
+		height: 44px;
+		border-radius: 50%;
+		background: #2a2a4e;
+		border: none;
+		font-size: 1.2rem;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		line-height: 1;
+		margin-top: 1rem;
+		transition: transform 0.2s, background 0.2s;
+		z-index: 90;
+	}
+
+	.home-broadcast-button.with-admin-badge {
+		left: 3.5rem;
+	}
+
+	.home-broadcast-button:hover {
+		transform: scale(1.1);
 	}
 
 	.team-button:hover {
