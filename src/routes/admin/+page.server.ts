@@ -13,9 +13,11 @@ import {
 	toggleLogsEnabled, 
 	toggleJinglesEnabled,
 	getPendingRegistrations,
+	getBroadcastInfo,
 	approveRegistration,
 	rejectRegistration,
 	isRegistrationAllowed,
+	saveBroadcastInfoMessage,
 	setAppConfig,
 	setUserAdmin,
 	updateUserPassword,
@@ -40,6 +42,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const allowRegistration = isRegistrationAllowed();
 	const oldestAdminId = getOldestAdminId();
 	const appSettings = getAppSettings();
+	const broadcastInfo = getBroadcastInfo();
 	const pushConfig = getPushRuntimeConfig();
 	const audioProcessingConfig = getAudioProcessingRuntimeConfig();
 	return {
@@ -50,6 +53,7 @@ export const load: PageServerLoad = async ({ locals }) => {
 		allowRegistration,
 		oldestAdminId,
 		appSettings,
+		broadcastInfo,
 		pushConfig,
 		audioProcessingConfig
 	};
@@ -194,6 +198,24 @@ export const actions: Actions = {
 			success: true,
 			message: 'Réglages du groupe enregistrés',
 			appSettings: getAppSettings()
+		};
+	},
+
+	saveBroadcastInfo: async ({ request, locals }) => {
+		if (!locals.user?.is_admin) {
+			return fail(403, { error: 'Non autorisé' });
+		}
+
+		const data = await request.formData();
+		const message = data.get('broadcast_info_message')?.toString() ?? '';
+		const result = saveBroadcastInfoMessage(message);
+
+		return {
+			success: true,
+			message: result.message
+				? 'Information utilisateurs diffusée'
+				: 'Information utilisateurs supprimée',
+			broadcastInfo: result
 		};
 	},
 

@@ -68,7 +68,7 @@
 	let pushToggleError = $state<string | null>(null);
 	let pushSupported = $state(false);
 	let pushPermission = $state<BrowserNotificationPermission>('default');
-	let pushEnabled = $state(data.user?.push_notifications_enabled === 1);
+	let pushEnabled = $state(false);
 	
 	// Convertir daily_notification_hour (minutes ou heures) en format HH:mm pour l'input time
 	function minutesToHHmm(value: number): string {
@@ -143,8 +143,25 @@
 			&& 'PushManager' in window;
 		if (pushSupported) {
 			pushPermission = window.Notification.permission as BrowserNotificationPermission;
+			void syncPushSubscriptionState();
 		}
 	});
+
+	async function syncPushSubscriptionState() {
+		if (!pushSupported) {
+			pushEnabled = false;
+			return;
+		}
+
+		try {
+			const registration = await navigator.serviceWorker.ready;
+			const subscription = await registration.pushManager.getSubscription();
+			pushEnabled = Boolean(subscription);
+		} catch (error) {
+			console.warn('Impossible de déterminer l’état push local', error);
+			pushEnabled = false;
+		}
+	}
 
 	function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
 		const padding = '='.repeat((4 - base64String.length % 4) % 4);
@@ -194,7 +211,7 @@
 				throw new Error(result.error || 'Impossible d’activer les notifications push');
 			}
 
-			pushEnabled = true;
+			await syncPushSubscriptionState();
 			pushToggleMessage = 'Notifications push activées. Vous recevrez un rappel à votre heure de mise à disposition.';
 		} catch (error) {
 			pushToggleError = error instanceof Error ? error.message : 'Impossible d’activer les notifications push';
@@ -228,7 +245,7 @@
 				throw new Error(result.error || 'Impossible de désactiver les notifications push');
 			}
 
-			pushEnabled = false;
+			await syncPushSubscriptionState();
 			pushToggleMessage = 'Notifications push désactivées.';
 		} catch (error) {
 			pushToggleError = error instanceof Error ? error.message : 'Impossible de désactiver les notifications push';

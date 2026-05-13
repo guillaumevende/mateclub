@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { hashSync, compareSync } from 'bcrypt';
-import { writeFileSync, existsSync, mkdirSync, unlinkSync, copyFileSync } from 'fs';
+import { writeFileSync, readFileSync, existsSync, mkdirSync, unlinkSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { debug } from '$lib/debug';
 
@@ -112,6 +112,15 @@ const DEFAULT_AUDIO_PROCESSING_ENABLED = false;
 		recorded_at DATETIME DEFAULT (datetime('now')),
 		FOREIGN KEY (user_id) REFERENCES users(id),
 		UNIQUE(user_id, delivery_date, notification_type)
+	);
+
+	CREATE TABLE IF NOT EXISTS info_message_reads (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL,
+		revision INTEGER NOT NULL,
+		read_at DATETIME DEFAULT (datetime('now')),
+		FOREIGN KEY (user_id) REFERENCES users(id),
+		UNIQUE(user_id, revision)
 	);
 `);
 
@@ -267,6 +276,8 @@ try {
 	stmt.run('max_recording_seconds', DEFAULT_MAX_RECORDING_SECONDS.toString());
 	stmt.run('push_check_window_minutes', DEFAULT_PUSH_CHECK_WINDOW_MINUTES.toString());
 	stmt.run('audio_processing_enabled', DEFAULT_AUDIO_PROCESSING_ENABLED ? 'true' : 'false');
+	stmt.run('broadcast_info_message', '');
+	stmt.run('broadcast_info_revision', '0');
 } catch (e) {
 	// Table déjà existante
 }
@@ -278,6 +289,11 @@ export type AppSettings = {
 	maxRecordingSeconds: number;
 	maxGroupNameLength: number;
 	audioProcessingEnabled: boolean;
+};
+
+export type BroadcastInfo = {
+	message: string;
+	revision: number;
 };
 
 export type RecordingProcessingStatus = 'ready' | 'processing' | 'failed';
@@ -316,6 +332,13 @@ export function getAppSettings(): AppSettings {
 		maxRecordingSeconds: getConfiguredMaxRecordingSeconds(),
 		maxGroupNameLength: MAX_GROUP_NAME_LENGTH,
 		audioProcessingEnabled: isAudioProcessingEnabled()
+	};
+}
+
+export function getBroadcastInfo(): BroadcastInfo {
+	return {
+		message: (getAppConfig('broadcast_info_message') ?? '').trim(),
+		revision: parseAppConfigInteger(getAppConfig('broadcast_info_revision'), 0, 0, Number.MAX_SAFE_INTEGER)
 	};
 }
 
@@ -1014,6 +1037,7 @@ export type SaveRecordingOptions = {
 	processingError?: string | null;
 	processingStartedAt?: string | null;
 	processedAt?: string | null;
+	recordedAt?: string | null;
 };
 
 export function saveRecording(
@@ -1032,7 +1056,8 @@ export function saveRecording(
 		processingMode = 'none',
 		processingError = null,
 		processingStartedAt = null,
-		processedAt = processingStatus === 'ready' ? new Date().toISOString() : null
+		processedAt = processingStatus === 'ready' ? new Date().toISOString() : null,
+		recordedAt = new Date().toISOString()
 	} = options;
 
 	debug.db.log('saveRecording - audioData:', audioData.length, 'bytes, imageData:', imageData?.length || 'none');
@@ -1065,8 +1090,9 @@ export function saveRecording(
 			processing_mode,
 			processing_error,
 			processing_started_at,
-			processed_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			processed_at,
+			recorded_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`);
 	const result = stmt.run(
 		userId,
@@ -1080,7 +1106,8 @@ export function saveRecording(
 		processingMode,
 		processingError,
 		processingStartedAt,
-		processedAt
+		processedAt,
+		recordedAt
 	);
 	debug.db.log('Enregistrement créé - id:', result.lastInsertRowid);
 
@@ -1172,6 +1199,32 @@ export function preserveOriginalRecordingFile(filename: string): void {
 	}
 
 	copyFileSync(sourcePath, archivedPath);
+}
+
+export function replaceRecordingAudioFile(recordingId: number, processedFilename: string): Recording | undefined {
+	const recording = getRecordingById(recordingId);
+	if (!recording) return undefined;
+
+	if (recording.processed_filename && recording.processed_filename !== recording.filename) {
+		const previousProcessedPath = join(uploadsDir, recording.processed_filename);
+		if (existsSync(previousProcessedPath)) {
+			unlinkSync(previousProcessedPath);
+		}
+	}
+
+	const sourcePath = join(uploadsDir, recording.filename);
+	const processedPath = join(uploadsDir, processedFilename);
+
+	if (existsSync(sourcePath)) {
+		unlinkSync(sourcePath);
+	}
+
+	if (existsSync(processedPath)) {
+		writeFileSync(sourcePath, readFileSync(processedPath));
+		unlinkSync(processedPath);
+	}
+
+	return markRecordingProcessingReady(recordingId, recording.filename);
 }
 
 export function markRecordingProcessingFailed(recordingId: number, errorMessage: string): Recording | undefined {
@@ -1635,6 +1688,15 @@ export function disablePushSubscription(endpoint: string): void {
 	stmt.run(endpoint);
 }
 
+export function disablePushSubscriptionForUser(userId: number, endpoint: string): void {
+	const stmt = db.prepare(`
+		UPDATE push_subscriptions
+		SET disabled_at = datetime('now'), updated_at = datetime('now')
+		WHERE user_id = ? AND endpoint = ? AND disabled_at IS NULL
+	`);
+	stmt.run(userId, endpoint);
+}
+
 export function disableAllPushSubscriptionsForUser(userId: number): void {
 	const stmt = db.prepare(`
 		UPDATE push_subscriptions
@@ -1642,6 +1704,16 @@ export function disableAllPushSubscriptionsForUser(userId: number): void {
 		WHERE user_id = ? AND disabled_at IS NULL
 	`);
 	stmt.run(userId);
+}
+
+export function countActivePushSubscriptionsForUser(userId: number): number {
+	const stmt = db.prepare(`
+		SELECT COUNT(*) as count
+		FROM push_subscriptions
+		WHERE user_id = ? AND disabled_at IS NULL
+	`);
+	const result = stmt.get(userId) as { count: number } | undefined;
+	return result?.count ?? 0;
 }
 
 export function hasPushDeliveryLog(userId: number, deliveryDate: string, notificationType = 'daily_delivery'): boolean {
@@ -1689,6 +1761,42 @@ export function getUsersWithPushNotificationsEnabled(): User[] {
 	`);
 
 	return stmt.all() as User[];
+}
+
+export function markBroadcastInfoAsRead(userId: number, revision: number): void {
+	const stmt = db.prepare(`
+		INSERT OR IGNORE INTO info_message_reads (user_id, revision)
+		VALUES (?, ?)
+	`);
+	stmt.run(userId, revision);
+}
+
+export function hasBroadcastInfoBeenRead(userId: number, revision: number): boolean {
+	if (revision <= 0) return false;
+	const stmt = db.prepare(`
+		SELECT id
+		FROM info_message_reads
+		WHERE user_id = ? AND revision = ?
+		LIMIT 1
+	`);
+	return Boolean(stmt.get(userId, revision));
+}
+
+export function saveBroadcastInfoMessage(message: string): BroadcastInfo {
+	const normalized = message.trim();
+	const current = getBroadcastInfo();
+	if (!normalized) {
+		setAppConfig('broadcast_info_message', '');
+		return { ...current, message: '' };
+	}
+
+	const nextRevision = current.revision + 1;
+	setAppConfig('broadcast_info_message', normalized);
+	setAppConfig('broadcast_info_revision', nextRevision.toString());
+	return {
+		message: normalized,
+		revision: nextRevision
+	};
 }
 
 // Rate limiting functions
