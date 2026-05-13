@@ -22,7 +22,7 @@ export function triggerLockedHaptic() {
 	if (!haptics || typeof window === 'undefined') return;
 	
 	try {
-		void haptics.trigger('warning' as Parameters<WebHaptics['trigger']>[0]);
+		void haptics.trigger('error');
 	} catch (e) {
 		console.warn('Locked haptic feedback failed:', e);
 	}
