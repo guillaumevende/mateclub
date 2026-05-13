@@ -237,14 +237,14 @@
 {/if}
 
 <main class:logged-in={!!data.user} class:with-player={showPlayer}>
-	{#if data.broadcastInfo?.message}
+	{#if data.broadcastInfo?.message && $page.url.pathname === '/'}
 		<div class="broadcast-info-shell">
 			<button
 				type="button"
 				class="broadcast-info-pill"
 				class:is-read={broadcastInfoRead}
 				onclick={openBroadcastInfoModal}
-				hidden={$page.url.pathname === '/' && broadcastInfoRead}
+				hidden={broadcastInfoRead}
 			>
 				<span class="broadcast-info-pill-icon" aria-hidden="true">📣</span>
 				<span class="broadcast-info-pill-copy">Nouvelle information du groupe</span>
@@ -254,7 +254,7 @@
 	{@render children()}
 </main>
 
-{#if showBroadcastInfoModal && data.broadcastInfo?.message}
+{#if showBroadcastInfoModal && data.broadcastInfo?.message && $page.url.pathname === '/'}
 	<div
 		class="modal-overlay broadcast-modal-overlay"
 		use:scrollLock={showBroadcastInfoModal}
