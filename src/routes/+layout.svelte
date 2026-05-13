@@ -231,10 +231,11 @@
 
 <main class:logged-in={!!data.user} class:with-player={showPlayer}>
 	{#if data.broadcastInfo?.message}
-		<div class="broadcast-info-shell">
+		<div class="broadcast-info-shell" class:home-compact-shell={$page.url.pathname === '/' && broadcastInfoRead}>
 			<button
 				type="button"
 				class="broadcast-info-pill"
+				class:home-compact={$page.url.pathname === '/' && broadcastInfoRead}
 				class:is-read={broadcastInfoRead}
 				onclick={openBroadcastInfoModal}
 			>
@@ -351,13 +352,39 @@
 		color: #d7d8ea;
 	}
 
+	.broadcast-info-pill.home-compact {
+		width: 38px;
+		height: 38px;
+		padding: 0;
+		border-radius: 999px;
+		justify-content: center;
+		gap: 0;
+	}
+
 	.broadcast-info-pill-icon {
 		font-size: 1.2rem;
+	}
+
+	.broadcast-info-pill.home-compact .broadcast-info-pill-icon {
+		font-size: 1rem;
 	}
 
 	.broadcast-info-pill-copy {
 		font-weight: 700;
 		line-height: 1.3;
+	}
+
+	.broadcast-info-shell.home-compact-shell {
+		position: relative;
+		padding-bottom: 0;
+	}
+
+	.broadcast-info-shell.home-compact-shell .broadcast-info-pill.home-compact {
+		position: absolute;
+		top: 0.7rem;
+		right: 4.2rem;
+		z-index: 6;
+		box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
 	}
 
 	.broadcast-modal-overlay {

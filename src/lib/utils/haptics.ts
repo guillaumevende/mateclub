@@ -22,7 +22,9 @@ export function triggerLockedHaptic() {
 	if (!haptics || typeof window === 'undefined') return;
 	
 	try {
-		void haptics.trigger('error');
+		void haptics.trigger('nudge');
+		window.setTimeout(() => void haptics?.trigger('nudge'), 100);
+		window.setTimeout(() => void haptics?.trigger('nudge'), 200);
 	} catch (e) {
 		console.warn('Locked haptic feedback failed:', e);
 	}
