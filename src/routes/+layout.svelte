@@ -237,14 +237,13 @@
 {/if}
 
 <main class:logged-in={!!data.user} class:with-player={showPlayer}>
-	{#if data.broadcastInfo?.message && $page.url.pathname === '/'}
+	{#if data.broadcastInfo?.message && $page.url.pathname === '/' && !broadcastInfoRead}
 		<div class="broadcast-info-shell">
 			<button
 				type="button"
 				class="broadcast-info-pill"
 				class:is-read={broadcastInfoRead}
 				onclick={openBroadcastInfoModal}
-				hidden={broadcastInfoRead}
 			>
 				<span class="broadcast-info-pill-icon" aria-hidden="true">📣</span>
 				<span class="broadcast-info-pill-copy">Nouvelle information du groupe</span>
@@ -357,51 +356,13 @@
 		color: #d7d8ea;
 	}
 
-	.broadcast-info-pill.home-compact {
-		width: 36px;
-		height: 36px;
-		padding: 0;
-		border-radius: 999px;
-		justify-content: center;
-		gap: 0;
-	}
-
 	.broadcast-info-pill-icon {
 		font-size: 1.2rem;
-	}
-
-	.broadcast-info-pill.home-compact .broadcast-info-pill-icon {
-		font-size: 1rem;
 	}
 
 	.broadcast-info-pill-copy {
 		font-weight: 700;
 		line-height: 1.3;
-	}
-
-	.broadcast-info-shell.home-compact-shell {
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		width: auto;
-		margin: 0;
-		padding: 0;
-		pointer-events: none;
-		z-index: 25;
-	}
-
-	.broadcast-info-shell.home-compact-shell .broadcast-info-pill.home-compact {
-		position: absolute;
-		top: 1.5rem;
-		left: 0;
-		z-index: 6;
-		box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
-		pointer-events: auto;
-	}
-
-	.broadcast-info-shell.home-compact-shell.with-admin-badge .broadcast-info-pill.home-compact {
-		left: 3.5rem;
 	}
 
 	.broadcast-modal-overlay {
