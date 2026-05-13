@@ -231,7 +231,11 @@
 
 <main class:logged-in={!!data.user} class:with-player={showPlayer}>
 	{#if data.broadcastInfo?.message}
-		<div class="broadcast-info-shell" class:home-compact-shell={$page.url.pathname === '/' && broadcastInfoRead}>
+		<div
+			class="broadcast-info-shell"
+			class:home-compact-shell={$page.url.pathname === '/' && broadcastInfoRead}
+			class:with-admin-badge={$page.url.pathname === '/' && broadcastInfoRead && !!(data.user?.is_admin && $page.data.pendingRegistrationsCount && $page.data.pendingRegistrationsCount > 0)}
+		>
 			<button
 				type="button"
 				class="broadcast-info-pill"
@@ -389,10 +393,14 @@
 	.broadcast-info-shell.home-compact-shell .broadcast-info-pill.home-compact {
 		position: absolute;
 		top: 1.5rem;
-		right: 4.1rem;
+		left: 0;
 		z-index: 6;
 		box-shadow: 0 8px 18px rgba(0, 0, 0, 0.18);
 		pointer-events: auto;
+	}
+
+	.broadcast-info-shell.home-compact-shell.with-admin-badge .broadcast-info-pill.home-compact {
+		left: 3.5rem;
 	}
 
 	.broadcast-modal-overlay {
