@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.35.1-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.36.4-blue?style=for-the-badge)
 
 </div>
 
@@ -18,6 +18,7 @@
 - [Derniere release GitHub](https://github.com/guillaumevende/mateclub/releases/latest)
 - [Journal des modifications complet](./CHANGELOG.md)
 - [Branche `develop` (developpements en cours)](https://github.com/guillaumevende/mateclub/tree/develop)
+- L’ancien résumé de versions affiché ici a été retiré : le seul historique fiable est désormais [CHANGELOG.md](./CHANGELOG.md)
 
 ---
 
@@ -86,6 +87,7 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 - **Alertes de fin d’enregistrement** - Un son et un retour haptique préviennent à 15, 10 et 5 secondes de la fin
 - **Visualiseur rééquilibré** - Waveform d'enregistrement plus doux, plus bas et mieux réparti sur la voix
 - **Compatibilité Safari renforcée** - Les capsules Android WebM/OGG sont converties côté serveur en AAC/M4A si nécessaire pour rester lisibles dans Safari
+- **Amélioration audio serveur optionnelle** - Une instance auto-hébergée peut activer DeepFilter + normalisation de volume pour les nouveaux messages
 - **Streaming audio HTTP Range** - Les capsules répondent aux requêtes partielles `206 Partial Content` pour fiabiliser Safari/iOS et les longues lectures
 - **Screen Wake Lock** - Anti-veille pendant l'enregistrement et l'écoute des capsules (empêche le smartphone de se verrouiller)
 - **Player séquentiel** - Lecture automatique d'une capsule à la suivante
@@ -153,6 +155,7 @@ L'application gère automatiquement les conversions de fuseaux horaires pour gar
 ### Panel Admin
 - **Gestion des utilisateurs** - Liste, création, suppression des non-admins
 - **Configuration du groupe** - Nom du groupe, durée d’historique en mois et durée maximum des messages audio
+- **Amélioration audio** - L’admin voit si le serveur est compatible DeepFilter et peut activer ou désactiver le traitement des nouveaux messages
 - **État des notifications push** - L’admin voit si le serveur est configuré pour les push VAPID ou quelles variables manquent encore
 - **Modification des seuils** - Heure de mise à disposition par utilisateur
 - **Super pouvoirs** - Attribution de privileges de lecture anticipée
@@ -168,6 +171,7 @@ L'application gère automatiquement les conversions de fuseaux horaires pour gar
 - **Headers de sécurité** - CSP, HSTS, X-Content-Type-Options, COOP, CORP
 - **Validation des fichiers** - Vérification des magic numbers pour audio et images (évite les faux fichiers)
 - **Transcodage serveur ciblé** - Conversion automatique des formats audio Android incompatibles Safari via `ffmpeg`
+- **Traitement audio asynchrone** - Les nouveaux messages peuvent être optimisés en arrière-plan avec DeepFilter et normalisation de volume, sans bloquer l’envoi
 - **Protection path traversal** - Validation stricte des chemins de fichiers
 - **Rate limiting** - 5 tentatives max par IP sur 15 minutes (protection brute-force)
 - **Cookies sécurisés** - Détection automatique HTTPS via proxy (Caddy/Nginx)
@@ -390,6 +394,33 @@ Si vous voulez activer les notifications push Web Push dans une instance auto-h�
 
 Quand ces variables sont absentes, l’admin affiche un bloc `Notifications push` grisé avec les instructions serveur et les utilisateurs ne voient pas l’option d’activation dans `Réglages`.
 
+#### Amélioration audio serveur (optionnel)
+
+Si vous voulez activer l’amélioration audio DeepFilter sur votre instance auto-hébergée :
+
+1. **Laissez l’image Docker reconstruire l’environnement audio :**
+   ```bash
+   docker compose up -d --build
+   ```
+
+2. **Ajoutez le mode DeepFilter à `.env` :**
+   ```bash
+   echo "AUDIO_PROCESSING_MODE=deepfilter" >> .env
+   ```
+
+3. **Redémarrez l’application :**
+   ```bash
+   docker compose up -d --build
+   ```
+
+Quand cette variable est absente, l’admin affiche un bloc `Amélioration audio` grisé avec les instructions serveur et l’option n’est pas activable.
+
+Comportement à retenir :
+- seuls les **nouveaux messages** sont traités automatiquement ;
+- l’historique déjà présent reste inchangé ;
+- pendant le traitement, l’auteur voit `En traitement serveur` sur sa capsule ;
+- la capsule n’est diffusée aux autres qu’une fois le traitement terminé.
+
 #### Mise à jour
 
 Pour mettre à jour l'application avec la dernière version :
@@ -440,6 +471,8 @@ Variables d'environnement disponibles dans `.env`:
 - `VAPID_PUBLIC_KEY` - Clé publique Web Push (optionnelle, requise pour activer les notifications push)
 - `VAPID_PRIVATE_KEY` - Clé privée Web Push (optionnelle, requise pour activer les notifications push)
 - `VAPID_SUBJECT` - Sujet VAPID, typiquement `mailto:admin@example.com`
+- `AUDIO_PROCESSING_MODE` - Mode de traitement audio serveur (`basic` par défaut, `deepfilter` pour activer DeepFilter)
+- `AUDIO_PROCESSING_PYTHON_BIN` - Chemin Python de l’environnement DeepFilter (défaut Docker : `/opt/mateclub-audio/bin/python`)
 
 ### Manuel
 
@@ -681,60 +714,9 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 ### Debug
 - `POST /api/debug` - Logging automatique des erreurs côté client
 
-## Journal des modifications
+## Historique des versions
 
-### v2.7.1 (2026-04-02)
-
-#### ✨ Nouvelles fonctionnalités
-- **Sons de fin de capsule** : Ding.mp3 (après chaque capsule) et Doudoudou.mp3 (dernière capsule du jour)
-- **Installation PWA facilitée** : Composant @khmyznikov/pwa-install avec dialog d'installation
-- **Visualiseur audio** : 8 barres verticales animées pendant l'enregistrement
-- **Navigation améliorée** : Clic sur date dans FloatingPlayer pour scroller vers le jour
-
-#### 🐛 Corrections de bugs
-- **Stabilité enregistrement** : Timeout 5s pour appareils lents, indicateur "Finalisation..."
-- **Accessibilité (A11y)** : Tous les composants avec attributs ARIA, navigation clavier complète
-- **API** : Renommage endpoint `/listen` → `/listened`
-
-#### 🔧 Migrations
-- Migration fuseau horaire (CRITIQUE) : Conversion CEST → UTC
-- Ajout colonne last_login
-
-### v2.7.0 (2026-04-01)
-
-#### ✨ Fonctionnalités
-- Sons de fin de capsule (Ding/Doudoudou)
-- Installation PWA facilitée
-- Visualiseur audio
-
-#### 🐛 Corrections
-- Stabilité enregistrement
-- Accessibilité complète
-- API endpoint renommé
-
-### v2.6.1 (2026-03-31)
-
-#### 🐛 Corrections de bugs critiques
-- **Gestion des fuseaux horaires** : Migration timestamps CEST → UTC, résolution décalage 2h
-
-### v2.6.0 (2026-03-29)
-
-#### 🎨 Nouvelle identité visuelle
-- Régénération de tous les assets (logo, favicons, icônes PWA)
-- Nettoyage fichiers obsolètes
-
-### v2.5.0-beta (2026-03-27)
-
-#### ✨ Système d'inscription Beta
-- Page d'inscription publique avec formulaire sécurisé
-- Toggle inscriptions dans le panel admin
-- Liste et validation des demandes d'inscription
-
-#### 🐛 Corrections
-- Fix noms de mois dans le calendrier
-- Fix bouton "Charger plus"
-
-### v2.4.7 (2026-03-23)
+Le journal détaillé des versions, y compris l’historique de transition depuis les anciennes versions `2.x`, est maintenu uniquement dans [CHANGELOG.md](./CHANGELOG.md).
 
 #### 🐛 Corrections
 - Fix preview HEIC sur page enregistrement
