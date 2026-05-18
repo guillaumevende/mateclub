@@ -8,6 +8,7 @@ import {
 	markRecordingProcessingFailed,
 	markRecordingProcessingReady,
 	markRecordingProcessingStarted,
+	preserveOriginalRecordingFile,
 	type Recording
 } from '$lib/server/db';
 
@@ -82,6 +83,7 @@ async function processRecording(recording: Recording, config: AudioProcessingRun
 
 	mkdirSync(config.cacheHome, { recursive: true });
 	markRecordingProcessingStarted(recording.id);
+	preserveOriginalRecordingFile(recording.filename);
 
 	const sourcePath = getRecordingFilePath(recording.filename);
 	const processedFilename = buildProcessedFilename(recording);

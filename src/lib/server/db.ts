@@ -1,12 +1,13 @@
 import Database from 'better-sqlite3';
 import { hashSync, compareSync } from 'bcrypt';
-import { writeFileSync, existsSync, mkdirSync, unlinkSync } from 'fs';
+import { writeFileSync, existsSync, mkdirSync, unlinkSync, copyFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { debug } from '$lib/debug';
 
 const projectRoot = process.cwd();
 const dbPath = process.env.DATABASE_PATH || join(projectRoot, 'data/mateclub.db');
 const uploadsDir = join(projectRoot, 'uploads');
+const originalUploadsDir = join(uploadsDir, 'originals');
 
 if (!existsSync(dbPath)) {
 	const dataDir = dirname(dbPath);
@@ -16,6 +17,9 @@ if (!existsSync(dbPath)) {
 }
 if (!existsSync(uploadsDir)) {
 	mkdirSync(uploadsDir, { recursive: true });
+}
+if (!existsSync(originalUploadsDir)) {
+	mkdirSync(originalUploadsDir, { recursive: true });
 }
 
 export const db = new Database(dbPath);
@@ -827,6 +831,10 @@ export function deleteUser(id: number): void {
 		if (existsSync(audioPath)) {
 			unlinkSync(audioPath);
 		}
+		const originalAudioPath = join(originalUploadsDir, recording.filename);
+		if (existsSync(originalAudioPath)) {
+			unlinkSync(originalAudioPath);
+		}
 		if (recording.processed_filename && recording.processed_filename !== recording.filename) {
 			const processedPath = join(uploadsDir, recording.processed_filename);
 			if (existsSync(processedPath)) {
@@ -1155,6 +1163,17 @@ export function markRecordingProcessingReady(recordingId: number, processedFilen
 	return getRecordingById(recordingId);
 }
 
+export function preserveOriginalRecordingFile(filename: string): void {
+	const sourcePath = join(uploadsDir, filename);
+	const archivedPath = join(originalUploadsDir, filename);
+
+	if (!existsSync(sourcePath) || existsSync(archivedPath)) {
+		return;
+	}
+
+	copyFileSync(sourcePath, archivedPath);
+}
+
 export function markRecordingProcessingFailed(recordingId: number, errorMessage: string): Recording | undefined {
 	const stmt = db.prepare(`
 		UPDATE recordings
@@ -1217,6 +1236,10 @@ export function deleteRecording(recordingId: number): void {
 	const audioPath = join(uploadsDir, recording.filename);
 	if (existsSync(audioPath)) {
 		unlinkSync(audioPath);
+	}
+	const originalAudioPath = join(originalUploadsDir, recording.filename);
+	if (existsSync(originalAudioPath)) {
+		unlinkSync(originalAudioPath);
 	}
 
 	if (recording.processed_filename && recording.processed_filename !== recording.filename) {
@@ -1527,6 +1550,10 @@ export function markAllExistingOtherRecordingsAsListened(userId: number): { sele
 
 export function getRecordingFilePath(filename: string): string {
 	return join(uploadsDir, filename);
+}
+
+export function getOriginalRecordingFilePath(filename: string): string {
+	return join(originalUploadsDir, filename);
 }
 
 export function getRecordingPlaybackFilename(recording: Recording): string | null {

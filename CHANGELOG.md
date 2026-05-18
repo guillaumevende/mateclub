@@ -2,6 +2,19 @@
 
 ---
 
+## v0.36.5 (2026-05-18) - Conservation des originaux audio
+
+### ✨ Améliorations
+
+- **Archivage des sources audio** : lorsqu’une capsule passe dans le traitement audio serveur, son fichier source avant optimisation est maintenant conservé dans `uploads/originals/`
+- **Nettoyage cohérent** : la suppression d’une capsule ou d’un utilisateur supprime aussi la copie archivée correspondante dans `uploads/originals/`
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.36.5`
+- README.md : ajout de la conservation des originaux audio dans la liste des fonctionnalités
+- package.json / package-lock.json : version portée en `0.36.5`
+
 ## v0.36.4 (2026-05-13) - Spinner de traitement et README nettoyé
 
 ### ✨ Améliorations
