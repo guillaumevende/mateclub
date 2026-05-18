@@ -21,16 +21,23 @@
 		id: number;
 		user_id: number;
 		filename: string;
+		processed_filename: string | null;
 		image_filename: string | null;
 		url: string | null;
 		duration_seconds: number;
 		recorded_at: string;
+		processing_status?: 'ready' | 'processing' | 'failed';
+		processing_mode?: 'none' | 'deepfilter';
+		processing_error?: string | null;
+		processing_started_at?: string | null;
+		processed_at?: string | null;
 		avatar?: string;
 		pseudo?: string;
 	};
 
 	type AppSettings = {
 		maxRecordingSeconds: number;
+		audioProcessingEnabled?: boolean;
 	};
 
 	type RecordingImageEditorState = {
@@ -410,6 +417,25 @@
 		if (Number.isNaN(recordedAt.getTime())) return false;
 
 		return !recording.image_filename && Date.now() - recordedAt.getTime() <= 24 * 60 * 60 * 1000;
+	}
+
+	function isServerProcessingRecording(recording: UserRecording) {
+		return recording.processing_status === 'processing';
+	}
+
+	function hasServerProcessingFailed(recording: UserRecording) {
+		return recording.processing_status === 'failed';
+	}
+
+	function canPlayRecording(recording: UserRecording) {
+		return !recording.processing_status || recording.processing_status === 'ready';
+	}
+
+	function getRecordingStatusLabel(recording: UserRecording) {
+		if (hasServerProcessingFailed(recording)) {
+			return 'Traitement audio à relancer';
+		}
+		return null;
 	}
 
 	function canAddUrlToRecording(recording: UserRecording) {
@@ -1339,6 +1365,13 @@
 	}
 
 	async function playRecording(recording: UserRecording) {
+		if (!canPlayRecording(recording)) {
+			queueNotice = hasServerProcessingFailed(recording)
+				? 'Cette capsule n’a pas encore pu être optimisée côté serveur.'
+				: 'Cette capsule est encore en traitement serveur.';
+			return;
+		}
+
 		const audioElement = getAudioElement();
 		
 		const fakeDayData: DayRecordings = {
@@ -1602,6 +1635,14 @@
 						<div class="recording-info">
 							<span class="recording-date">{formatDate(recording.recorded_at)} ({formatTime(recording.recorded_at)})</span>
 							<span class="recording-duration">{formatDuration(recording.duration_seconds)}</span>
+							{#if hasServerProcessingFailed(recording)}
+								<span
+									class="recording-status-badge"
+									class:is-failed={hasServerProcessingFailed(recording)}
+								>
+									{getRecordingStatusLabel(recording)}
+								</span>
+							{/if}
 						</div>
 						<div class="recording-item-actions">
 							{#if recording.url}
@@ -1630,8 +1671,22 @@
 								class="listen-btn"
 								onclick={() => playRecording(recording)}
 								aria-label="Écouter"
+								disabled={!canPlayRecording(recording)}
 							>
-								{isCurrentlyPlaying ? '⏸️' : '▶️'}
+								{#if !canPlayRecording(recording)}
+									{#if hasServerProcessingFailed(recording)}
+										⚠️
+									{:else}
+										<span class="processing-glyph" aria-hidden="true">
+											<svg viewBox="0 0 24 24" class="processing-spinner-icon">
+												<circle class="processing-spinner-track" cx="12" cy="12" r="8.5"></circle>
+												<path class="processing-spinner-head" d="M12 3.5a8.5 8.5 0 0 1 8.5 8.5"></path>
+											</svg>
+										</span>
+									{/if}
+								{:else}
+									{isCurrentlyPlaying ? '⏸️' : '▶️'}
+								{/if}
 							</button>
 							<button class="delete-btn" onclick={() => confirmDelete(recording)} aria-label="Supprimer">
 								🗑️
@@ -2432,6 +2487,24 @@
 		font-size: 0.85rem;
 	}
 
+	.recording-status-badge {
+		display: inline-flex;
+		align-items: center;
+		width: fit-content;
+		padding: 0.2rem 0.55rem;
+		border-radius: 999px;
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.01em;
+		background: rgba(255, 255, 255, 0.08);
+		color: #cfd3ff;
+	}
+
+	.recording-status-badge.is-failed {
+		background: rgba(255, 107, 129, 0.14);
+		color: #ff8ea2;
+	}
+
 	.recording-item-actions {
 		display: flex;
 		align-items: center;
@@ -2473,6 +2546,50 @@
 
 	.listen-btn:hover {
 		opacity: 1;
+	}
+
+	.listen-btn:disabled {
+		cursor: not-allowed;
+		opacity: 0.45;
+	}
+
+	.processing-glyph {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		width: 22px;
+		height: 22px;
+		color: #ffd56d;
+		filter: drop-shadow(0 0 10px rgba(255, 213, 109, 0.22));
+	}
+
+	.processing-spinner-icon {
+		width: 22px;
+		height: 22px;
+		display: block;
+		animation: recording-processing-spin 0.95s linear infinite;
+	}
+
+	.processing-spinner-track,
+	.processing-spinner-head {
+		fill: none;
+		stroke-linecap: round;
+	}
+
+	.processing-spinner-track {
+		stroke: rgba(255, 213, 109, 0.24);
+		stroke-width: 2.4;
+	}
+
+	.processing-spinner-head {
+		stroke: currentColor;
+		stroke-width: 2.8;
+	}
+
+	@keyframes recording-processing-spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	.delete-btn {
