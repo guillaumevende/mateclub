@@ -2,6 +2,18 @@
 
 ---
 
+## v0.37.2 (2026-05-27) - Restauration exacte du retour haptique verrouillé
+
+### 🐛 Corrections
+
+- **Retour haptique verrouillé rétabli à l’identique** : `triggerLockedHaptic()` réutilise exactement le comportement historique qui fonctionnait en PWA, avec trois déclenchements `nudge` successifs via `web-haptics`
+- **Conservation du lot `0.37.1`** : toutes les restaurations et corrections déjà remises dans `0.37.1` restent inchangées
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.2`
+- package.json / package-lock.json : version portée en `0.37.2`
+
 ## v0.37.1 (2026-05-24) - Restauration du lot 0.37 et archivage des originaux
 
 ### ✨ Nouvelles fonctionnalités
