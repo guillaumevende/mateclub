@@ -4,15 +4,17 @@ let haptics: WebHaptics | null = null;
 
 export function initHaptics() {
 	if (typeof window === 'undefined') return;
-	
+
+	if (haptics) return;
+
 	haptics = new WebHaptics();
 }
 
 export function triggerHaptic(pattern: Parameters<WebHaptics['trigger']>[0] = 'nudge') {
 	if (!haptics || typeof window === 'undefined') return;
-	
+
 	try {
-		haptics.trigger(pattern);
+		void haptics.trigger(pattern);
 	} catch (e) {
 		console.warn('Haptic feedback failed:', e);
 	}
@@ -20,7 +22,7 @@ export function triggerHaptic(pattern: Parameters<WebHaptics['trigger']>[0] = 'n
 
 export function triggerLockedHaptic() {
 	if (!haptics || typeof window === 'undefined') return;
-	
+
 	try {
 		haptics.trigger('nudge');
 		setTimeout(() => haptics?.trigger('nudge'), 100);

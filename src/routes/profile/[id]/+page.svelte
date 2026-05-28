@@ -65,6 +65,7 @@
 	let imageOffset = $state(0);
 	let isLoadingMoreImages = $state(false);
 	let recordings = $state<ProfileRecording[]>([]);
+	let recordingsPollingInterval: ReturnType<typeof setInterval> | null = null;
 	let selectedImageUrl = $state<string | null>(null);
 	let imageEditor = $state<ImageEditorState | null>(null);
 	let linkEditor = $state<LinkEditorState | null>(null);
@@ -86,6 +87,30 @@
 		imageOffset = data.images.length;
 		recordings = data.recordings;
 		profileStateInitialized = true;
+	});
+
+	$effect(() => {
+		const hasProcessingRecordings = isOwnProfile && recordings.some((recording) => isServerProcessingRecording(recording));
+		if (!hasProcessingRecordings || typeof window === 'undefined') {
+			if (recordingsPollingInterval) {
+				clearInterval(recordingsPollingInterval);
+				recordingsPollingInterval = null;
+			}
+			return;
+		}
+
+		if (recordingsPollingInterval) return;
+
+		recordingsPollingInterval = setInterval(() => {
+			void refreshOwnRecordings();
+		}, 5000);
+
+		return () => {
+			if (recordingsPollingInterval) {
+				clearInterval(recordingsPollingInterval);
+				recordingsPollingInterval = null;
+			}
+		};
 	});
 
 	function formatDate(dateStr: string): string {
@@ -166,6 +191,19 @@
 			console.error('Failed to load more images:', error);
 		} finally {
 			isLoadingMoreImages = false;
+		}
+	}
+
+	async function refreshOwnRecordings() {
+		if (!isOwnProfile) return;
+
+		try {
+			const res = await fetch(`/api/users/${data.profileUser.id}/recordings?limit=10`);
+			const payload = await res.json();
+			if (!res.ok) throw new Error(payload.error || 'Impossible de rafraîchir les capsules');
+			recordings = payload.recordings || [];
+		} catch (error) {
+			console.error('Failed to refresh profile recordings:', error);
 		}
 	}
 

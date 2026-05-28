@@ -1,6 +1,7 @@
 import type { RequestHandler } from './$types';
 import { redirect, json } from '@sveltejs/kit';
-import { saveRecording, getRecentRecordingByHash, getConfiguredMaxRecordingSeconds } from '$lib/server/db';
+import { saveRecording, getRecentRecordingByHash, getConfiguredMaxRecordingSeconds, isAudioProcessingEnabled } from '$lib/server/db';
+import { getAudioProcessingRuntimeConfig, pokeAudioProcessingWorker } from '$lib/server/audioProcessing';
 import { detectAudioMimeType, isValidAudioBuffer, isValidImageBuffer } from '$lib/server/fileValidation';
 import { prepareAudioForStorage } from '$lib/server/audioCompatibility';
 import crypto from 'crypto';
@@ -25,6 +26,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	const duration = formData.get('duration')?.toString();
 	const image = formData.get('image') as File | null;
 	const url = formData.get('url')?.toString();
+	const recordedAtRaw = formData.get('recorded_at')?.toString();
 
 	if (!audio || audio.size === 0) {
 		console.error('[RECORDINGS] Audio vide ou absent, user:', locals.user.id);
@@ -97,6 +99,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	const buffer = preparedAudio.buffer;
+	const recordedAt = recordedAtRaw ? new Date(recordedAtRaw) : null;
+	const normalizedRecordedAt = recordedAt
+		? recordedAt.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '')
+		: null;
+	if (recordedAtRaw && (!recordedAt || Number.isNaN(recordedAt.getTime()))) {
+		return json({ error: 'Horodatage d’enregistrement invalide' }, { status: 400 });
+	}
 
 	let imageBuffer: Buffer | undefined;
 	if (image && image.size > 0) {
@@ -141,19 +150,35 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 
 	let recording;
 	try {
+		const audioProcessingRuntime = getAudioProcessingRuntimeConfig();
+		const useAudioProcessing = audioProcessingRuntime.configured && isAudioProcessingEnabled();
 		recording = saveRecording(
 			locals.user.id,
 			buffer,
 			durationSeconds,
-			preparedAudio.extension,
-			imageBuffer,
-			url || null,
-			audioHash
+			{
+				audioExtension: preparedAudio.extension,
+				imageData: imageBuffer,
+				url: url || null,
+				audioHash,
+				processedFilename: useAudioProcessing ? null : undefined,
+				processingStatus: useAudioProcessing ? 'processing' : 'ready',
+				processingMode: useAudioProcessing ? 'deepfilter' : 'none',
+				processedAt: useAudioProcessing ? null : undefined,
+				recordedAt: normalizedRecordedAt
+			}
 		);
+		if (useAudioProcessing) {
+			pokeAudioProcessingWorker();
+		}
 	} catch (err) {
 		console.error('[RECORDINGS] Error saving recording:', err);
 		return json({ error: 'Erreur interne' }, { status: 500 });
 	}
 
-	return json({ id: recording.id });
+	return json({
+		id: recording.id,
+		processingStatus: recording.processing_status,
+		processingMode: recording.processing_mode
+	});
 };

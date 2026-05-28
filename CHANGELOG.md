@@ -2,6 +2,83 @@
 
 ---
 
+## v0.37.2 (2026-05-27) - Restauration exacte du retour haptique verrouillé
+
+### 🐛 Corrections
+
+- **Retour haptique verrouillé rétabli à l’identique** : `triggerLockedHaptic()` réutilise exactement le comportement historique qui fonctionnait en PWA, avec trois déclenchements `nudge` successifs via `web-haptics`
+- **Conservation du lot `0.37.1`** : toutes les restaurations et corrections déjà remises dans `0.37.1` restent inchangées
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.2`
+- package.json / package-lock.json : version portée en `0.37.2`
+
+## v0.37.1 (2026-05-24) - Restauration du lot 0.37 et archivage des originaux
+
+### ✨ Nouvelles fonctionnalités
+
+- **Bloc `Informations aux utilisateurs` restauré** : l’admin peut à nouveau diffuser un message groupé persistant depuis le haut de l’administration
+- **Bulle d’information globale restaurée** : tous les membres, admins compris, revoient la bulle d’information en haut de l’app et peuvent ouvrir son contenu dans une modale dédiée
+- **Lecture mémorisée par utilisateur restaurée** : une information consultée change d’apparence uniquement pour l’utilisateur qui l’a déjà lue, sans empêcher sa réouverture
+
+### 🐛 Corrections
+
+- **Retours haptiques verrouillage restaurés** : l’accès à une capsule verrouillée retrigger à nouveau le retour haptique via la bibliothèque `web-haptics`
+- **Push multi-appareils restauré** : la désactivation des notifications depuis un appareil ne coupe plus automatiquement les abonnements actifs sur les autres appareils du même compte
+- **Réglages push cohérents par appareil restaurés** : le bouton d’activation des notifications se base à nouveau sur l’abonnement réel du smartphone courant
+- **Traitement audio avec identifiant stable restauré** : une capsule optimisée côté serveur conserve à nouveau le même nom de fichier publié une fois le traitement terminé
+- **Statut de traitement auto-rafraîchi restauré** : `Mes enregistrements` et le profil personnel se rafraîchissent automatiquement tant qu’une capsule est en cours d’optimisation
+- **Miniature de couverture agrandie restaurée** : le bouton d’aperçu d’image d’une publication redevient plus grand et mieux ancré en bas à gauche de la carte
+- **Envoi groupé ordonné restauré** : les capsules envoyées en lot conservent à nouveau leur horodatage réel d’enregistrement
+- **Archivage des sources audio** : lorsqu’une capsule passe dans le traitement audio serveur, son fichier source avant optimisation est maintenant conservé dans `uploads/originals/`
+- **Nettoyage cohérent** : la suppression d’une capsule ou d’un utilisateur supprime aussi la copie archivée correspondante dans `uploads/originals/`
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.1`
+- README.md : restauration du bloc d’information utilisateurs et précision sur les notifications push par appareil
+- README.md : ajout de la conservation des originaux audio dans la liste des fonctionnalités
+- package.json / package-lock.json : version portée en `0.37.1`
+
+## v0.37.0 (2026-05-13) - Correctifs UX et diffusion des informations
+
+### ✨ Nouvelles fonctionnalités
+
+- **Bloc `Informations aux utilisateurs`** : l’admin peut désormais diffuser un message groupé persistant depuis le haut de l’administration
+- **Bulle d’information globale** : tous les membres, admins compris, voient une bulle d’information en haut de l’app et peuvent ouvrir son contenu dans une modale dédiée
+- **Lecture mémorisée par utilisateur** : une information consultée change d’apparence uniquement pour l’utilisateur qui l’a déjà lue, sans empêcher sa réouverture
+
+### 🐛 Corrections
+
+- **Retours haptiques verrouillage restaurés** : l’accès à une capsule verrouillée retrigger désormais le retour haptique via la bibliothèque `web-haptics`
+- **Push multi-appareils fiabilisé** : la désactivation des notifications depuis un appareil ne coupe plus automatiquement les abonnements actifs sur les autres appareils du même compte
+- **Réglages push cohérents par appareil** : le bouton d’activation des notifications se base maintenant sur l’abonnement réel du smartphone courant, pas seulement sur le flag global du compte
+- **Traitement audio avec identifiant stable** : une capsule optimisée côté serveur conserve désormais le même nom de fichier publié une fois le traitement terminé
+- **Statut de traitement auto-rafraîchi** : `Mes enregistrements` et le profil personnel se rafraîchissent automatiquement tant qu’une capsule est en cours d’optimisation
+- **Spinner de traitement conservé** : la pastille texte de traitement reste supprimée au profit de l’icône animée dans la liste d’enregistrements
+- **Miniature de couverture agrandie** : le bouton d’aperçu d’image d’une publication est plus grand et mieux ancré en bas à gauche de la carte
+- **Envoi groupé ordonné** : les capsules envoyées en lot conservent désormais leur horodatage réel d’enregistrement, ce qui fiabilise leur ordre de diffusion
+
+### 📚 Documentation
+
+- README.md : version mise à jour en `0.37.0`
+- README.md : ajout du bloc d’information utilisateurs et précision sur les notifications push par appareil
+- package.json / package-lock.json : version portée en `0.37.0`
+
+## v0.36.5 (2026-05-18) - Conservation des originaux audio
+
+### ✨ Améliorations
+
+- **Archivage des sources audio** : lorsqu’une capsule passe dans le traitement audio serveur, son fichier source avant optimisation est maintenant conservé dans `uploads/originals/`
+- **Nettoyage cohérent** : la suppression d’une capsule ou d’un utilisateur supprime aussi la copie archivée correspondante dans `uploads/originals/`
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.36.5`
+- README.md : ajout de la conservation des originaux audio dans la liste des fonctionnalités
+- package.json / package-lock.json : version portée en `0.36.5`
+
 ## v0.36.4 (2026-05-13) - Spinner de traitement et README nettoyé
 
 ### ✨ Améliorations

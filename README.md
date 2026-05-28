@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.36.4-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.37.2-blue?style=for-the-badge)
 
 </div>
 
@@ -88,6 +88,7 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 - **Visualiseur rééquilibré** - Waveform d'enregistrement plus doux, plus bas et mieux réparti sur la voix
 - **Compatibilité Safari renforcée** - Les capsules Android WebM/OGG sont converties côté serveur en AAC/M4A si nécessaire pour rester lisibles dans Safari
 - **Amélioration audio serveur optionnelle** - Une instance auto-hébergée peut activer DeepFilter + normalisation de volume pour les nouveaux messages
+- **Originaux audio archivés** - Quand l’amélioration audio serveur traite une nouvelle capsule, le fichier source avant traitement est conservé dans `uploads/originals/`
 - **Streaming audio HTTP Range** - Les capsules répondent aux requêtes partielles `206 Partial Content` pour fiabiliser Safari/iOS et les longues lectures
 - **Screen Wake Lock** - Anti-veille pendant l'enregistrement et l'écoute des capsules (empêche le smartphone de se verrouiller)
 - **Player séquentiel** - Lecture automatique d'une capsule à la suivante
@@ -113,8 +114,10 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 - **Authentification** - Login par pseudo/mot de passe (pas d'email requis)
 - **PWA installable** - Installation sur mobile via manifest
 - **Notifications push quotidiennes** - Option utilisateur pour recevoir un rappel à l’heure de mise à disposition s’il reste des capsules non lues
+- **Notifications push par appareil** - Chaque PWA ou navigateur peut être abonné indépendamment, sans désactiver les autres appareils du même compte
 - **Tuto PWA désactivable** - Chaque utilisateur peut masquer les popups d’installation PWA depuis ses réglages
 - **Mise à jour rapide** - Un membre peut marquer en une fois toutes les publications existantes des autres utilisateurs comme lues
+- **Information groupée** - L’admin peut diffuser une information persistante visible par tous les membres dans une bulle dédiée
 - **Profils utilisateurs** - Chaque avatar ouvre une page profil avec galerie des images publiées et dernières capsules audio
 - **Pull-to-refresh** - Rechargement de la page d'accueil (désactivé sur modales)
 - **Scroll lock** - Empêche le scroll arrière-plan quand une modale est ouverte

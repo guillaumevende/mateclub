@@ -54,6 +54,12 @@
 		maxGroupNameLength: number;
 	};
 
+	type BroadcastInfo = {
+		message: string;
+		revision: number;
+		read: boolean;
+	};
+
 	type DateInfo = {
 		hasRecordings: boolean;
 		hasUnread: boolean;
@@ -79,7 +85,7 @@
 		count: number;
 	};
 
-	let { data }: { data: PageData & { user?: User; allUsers: UserList[]; threshold: string; unreadStats?: { count: number; totalSeconds: number }; hasMore?: boolean; pendingRegistrationsCount?: number; groupName?: string; appSettings?: AppSettings } } = $props();
+	let { data }: { data: PageData & { user?: User; allUsers: UserList[]; threshold: string; unreadStats?: { count: number; totalSeconds: number }; hasMore?: boolean; pendingRegistrationsCount?: number; groupName?: string; appSettings?: AppSettings; broadcastInfo?: BroadcastInfo | null } } = $props();
 
 	function getInitialHomeState() {
 		const initialPage = data.page ?? 1;
@@ -97,6 +103,8 @@
 
 	const initialHomeState = getInitialHomeState();
 	let showTeam = $state(false);
+	let showBroadcastInfoModal = $state(false);
+	let locallyReadBroadcastRevision = $state<number | null>(null);
 	let currentPage = $state(initialHomeState.initialPage);
 	let allDays = $state<DayRecordings[]>(initialHomeState.initialPastDays);
 	let loadingMore = $state(false);
@@ -214,6 +222,10 @@
 	});
 
 	let canPlayUnreadSummary = $derived(playableUnreadSummaryStats.count > 0);
+	let broadcastInfoRead = $derived(
+		(data.broadcastInfo?.read ?? true) ||
+		(data.broadcastInfo?.revision != null && locallyReadBroadcastRevision === data.broadcastInfo.revision)
+	);
 
 	let unreadSummaryPresentation = $derived.by(() => {
 		const totalCount = unreadStats.count;
@@ -635,6 +647,10 @@
 
 	async function openUnreadPlaylist() {
 		if (unreadStats.count === 0 || openingUnreadSummary) return;
+		if (!canPlayUnreadSummary) {
+			triggerLockedHaptic();
+			return;
+		}
 
 		openingUnreadSummary = true;
 		try {
@@ -681,6 +697,30 @@
 
 	function closeUnreadPlaylistModal() {
 		unreadPlaylistModal = null;
+	}
+
+	async function openBroadcastInfoModal() {
+		showBroadcastInfoModal = true;
+
+		if (!data.broadcastInfo || broadcastInfoRead) return;
+
+		try {
+			const response = await fetch('/api/broadcast-info/read', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ revision: data.broadcastInfo.revision })
+			});
+
+			if (response.ok) {
+				locallyReadBroadcastRevision = data.broadcastInfo.revision;
+			}
+		} catch (error) {
+			console.warn('Impossible de marquer l’information comme lue', error);
+		}
+	}
+
+	function closeBroadcastInfoModal() {
+		showBroadcastInfoModal = false;
 	}
 
 	// Player helper functions
@@ -1081,10 +1121,32 @@
 	aria-label="Page principale"
 >
 	<header>
+		{#if data.broadcastInfo?.message && broadcastInfoRead}
+			<button
+				type="button"
+				class="broadcast-info-compact-button"
+				class:with-admin-badge={data.user?.is_admin && !!(data.pendingRegistrationsCount && data.pendingRegistrationsCount > 0)}
+				onclick={openBroadcastInfoModal}
+				aria-label="Afficher l’information du groupe"
+				title="Afficher l’information du groupe"
+			>
+				<span aria-hidden="true">📣</span>
+			</button>
+		{/if}
 		{#if data.user?.is_admin && data.pendingRegistrationsCount && data.pendingRegistrationsCount > 0}
 			<a href="/admin" class="admin-badge" title="{data.pendingRegistrationsCount} inscription{data.pendingRegistrationsCount !== 1 ? 's' : ''} en attente">
 				<span class="badge-count">{data.pendingRegistrationsCount}</span>
 			</a>
+		{/if}
+		{#if data.broadcastInfo?.message && !broadcastInfoRead}
+			<button
+				type="button"
+				class="broadcast-info-banner"
+				onclick={openBroadcastInfoModal}
+			>
+				<span class="broadcast-info-banner-icon" aria-hidden="true">📣</span>
+				<span class="broadcast-info-banner-copy">Nouvelle information du groupe</span>
+			</button>
 		{/if}
 		<img src="/icon-512x512.png" alt="Maté Club" class="logo" />
 		<p class="date">{getTodayDate()}</p>
@@ -1100,7 +1162,7 @@
 				class="unread-summary-pill"
 				class:is-passive={!canPlayUnreadSummary}
 				onclick={openUnreadPlaylist}
-				disabled={openingUnreadSummary || !canPlayUnreadSummary}
+				aria-disabled={openingUnreadSummary || !canPlayUnreadSummary}
 			>
 				<span class="pill-leading-slot" aria-hidden="true">
 					{#if unreadSummaryPresentation.showPlayIcon}
@@ -1128,6 +1190,39 @@
 	</header>
 
 	<TeamList allUsers={data.allUsers} bind:showTeam />
+
+	{#if showBroadcastInfoModal && data.broadcastInfo?.message}
+		<div
+			class="modal-overlay broadcast-modal-overlay"
+			use:scrollLock={showBroadcastInfoModal}
+			onclick={closeBroadcastInfoModal}
+			onkeydown={(e) => e.key === 'Escape' && closeBroadcastInfoModal()}
+			role="button"
+			tabindex="0"
+			aria-label="Fermer la modale d’information"
+		>
+			<div
+				class="modal broadcast-info-modal"
+				onclick={(e) => e.stopPropagation()}
+				onkeydown={(e) => e.key === 'Escape' && closeBroadcastInfoModal()}
+				role="dialog"
+				aria-modal="true"
+				aria-labelledby="broadcast-info-title"
+				tabindex="-1"
+			>
+				<CloseIconButton
+					onclick={closeBroadcastInfoModal}
+					ariaLabel="Fermer la modale d’information"
+					size="md"
+					extraClass="modal-close-outer-btn"
+				/>
+				<h2 id="broadcast-info-title">Information du groupe</h2>
+				<div class="broadcast-info-content">
+					<p>{data.broadcastInfo.message}</p>
+				</div>
+			</div>
+		</div>
+	{/if}
 
 	{#if unreadPlaylistModal}
 		<div
@@ -1499,6 +1594,35 @@
 		position: relative;
 	}
 
+	.broadcast-info-compact-button {
+		position: absolute;
+		top: 0.5rem;
+		left: 0;
+		width: 44px;
+		height: 44px;
+		border-radius: 50%;
+		background: #2a2a4e;
+		border: none;
+		font-size: 1.25rem;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		line-height: 1;
+		margin-top: 1rem;
+		transition: transform 0.2s, background 0.2s;
+		z-index: 95;
+	}
+
+	.broadcast-info-compact-button.with-admin-badge {
+		top: 3.4rem;
+		margin-top: 0;
+	}
+
+	.broadcast-info-compact-button:hover {
+		transform: scale(1.08);
+	}
+
 	.admin-badge {
 		position: absolute;
 		top: 0.5rem;
@@ -1534,6 +1658,31 @@
 		max-width: 200px;
 		height: auto;
 		margin-bottom: 0.5rem;
+	}
+
+	.broadcast-info-banner {
+		width: min(100%, 820px);
+		margin: 0 auto 1.25rem;
+		display: flex;
+		align-items: center;
+		gap: 0.9rem;
+		padding: 0.95rem 1rem;
+		border-radius: 20px;
+		background: linear-gradient(135deg, rgba(233, 69, 96, 0.18), rgba(145, 77, 240, 0.18));
+		border: 1px solid rgba(233, 69, 96, 0.32);
+		color: #fff6f8;
+		box-shadow: 0 16px 40px rgba(0, 0, 0, 0.24);
+		text-align: left;
+		cursor: pointer;
+	}
+
+	.broadcast-info-banner-icon {
+		font-size: 1.2rem;
+	}
+
+	.broadcast-info-banner-copy {
+		font-weight: 700;
+		line-height: 1.3;
 	}
 
 	.team-button {
@@ -1626,17 +1775,17 @@
 		text-align: center;
 	}
 
-	.unread-summary-pill:hover:not(:disabled) {
+	.unread-summary-pill:hover:not([aria-disabled='true']) {
 		transform: translateY(-1px);
 		border-color: rgba(233, 69, 96, 0.45);
 		box-shadow: 0 18px 38px rgba(11, 11, 24, 0.32);
 	}
 
-	.unread-summary-pill:disabled {
-		cursor: default;
+	.unread-summary-pill[aria-disabled='true'] {
+		cursor: pointer;
 	}
 
-	.unread-summary-pill:disabled:not(.is-passive) {
+	.unread-summary-pill[aria-disabled='true']:not(.is-passive) {
 		opacity: 0.8;
 		cursor: wait;
 	}
@@ -1727,6 +1876,35 @@
 		font-weight: 500;
 		color: #ffd7df;
 		white-space: nowrap;
+	}
+
+	.broadcast-modal-overlay {
+		position: fixed;
+		inset: 0;
+		background: rgba(0, 0, 0, 0.86);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: 1rem;
+		z-index: 1200;
+	}
+
+	.broadcast-info-modal {
+		max-width: 560px;
+		padding: 1.35rem 1.2rem 1.2rem;
+	}
+
+	.broadcast-info-content {
+		margin-top: 1rem;
+		max-height: min(55vh, 420px);
+		overflow-y: auto;
+		padding-right: 0.25rem;
+	}
+
+	.broadcast-info-content p {
+		white-space: pre-wrap;
+		line-height: 1.55;
+		color: #f5f6ff;
 	}
 
 	.date {

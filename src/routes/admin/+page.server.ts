@@ -1,6 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { redirect, fail } from '@sveltejs/kit';
 import { hashSync } from 'bcrypt';
+import { getAudioProcessingRuntimeConfig } from '$lib/server/audioProcessing';
 import {
 	getAllUsers, 
 	createUser, 
@@ -12,9 +13,11 @@ import {
 	toggleLogsEnabled, 
 	toggleJinglesEnabled,
 	getPendingRegistrations,
+	getBroadcastInfo,
 	approveRegistration,
 	rejectRegistration,
 	isRegistrationAllowed,
+	saveBroadcastInfoMessage,
 	setAppConfig,
 	setUserAdmin,
 	updateUserPassword,
@@ -39,8 +42,21 @@ export const load: PageServerLoad = async ({ locals }) => {
 	const allowRegistration = isRegistrationAllowed();
 	const oldestAdminId = getOldestAdminId();
 	const appSettings = getAppSettings();
+	const broadcastInfo = getBroadcastInfo();
 	const pushConfig = getPushRuntimeConfig();
-	return { users, currentUser, csrfToken: locals.csrfToken, pendingRegistrations, allowRegistration, oldestAdminId, appSettings, pushConfig };
+	const audioProcessingConfig = getAudioProcessingRuntimeConfig();
+	return {
+		users,
+		currentUser,
+		csrfToken: locals.csrfToken,
+		pendingRegistrations,
+		allowRegistration,
+		oldestAdminId,
+		appSettings,
+		broadcastInfo,
+		pushConfig,
+		audioProcessingConfig
+	};
 };
 
 export const actions: Actions = {
@@ -182,6 +198,46 @@ export const actions: Actions = {
 			success: true,
 			message: 'Réglages du groupe enregistrés',
 			appSettings: getAppSettings()
+		};
+	},
+
+	saveBroadcastInfo: async ({ request, locals }) => {
+		if (!locals.user?.is_admin) {
+			return fail(403, { error: 'Non autorisé' });
+		}
+
+		const data = await request.formData();
+		const message = data.get('broadcast_info_message')?.toString() ?? '';
+		const result = saveBroadcastInfoMessage(message);
+
+		return {
+			success: true,
+			message: result.message
+				? 'Information utilisateurs diffusée'
+				: 'Information utilisateurs supprimée',
+			broadcastInfo: result
+		};
+	},
+
+	toggleAudioProcessing: async ({ request, locals }) => {
+		if (!locals.user?.is_admin) {
+			return fail(403, { error: 'Non autorisé' });
+		}
+
+		const runtimeConfig = getAudioProcessingRuntimeConfig();
+		if (!runtimeConfig.configured) {
+			return fail(400, { error: 'Le traitement audio n’est pas configuré sur ce serveur' });
+		}
+
+		const data = await request.formData();
+		const enabled = data.get('enabled') === 'true';
+		setAppConfig('audio_processing_enabled', enabled ? 'true' : 'false');
+
+		return {
+			success: true,
+			message: enabled
+				? 'Amélioration audio activée pour les prochaines capsules'
+				: 'Amélioration audio désactivée'
 		};
 	},
 

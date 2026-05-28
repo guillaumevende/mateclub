@@ -2,12 +2,12 @@
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/stores';
 	import { playerStore, initPlayer, debugLogs, logsEnabled, jinglesEnabled } from '$lib/stores/player';
-	import { initHaptics, destroyHaptics } from '$lib/utils/haptics';
+	import { initHaptics } from '$lib/utils/haptics';
 	import FloatingPlayer from '$lib/components/FloatingPlayer.svelte';
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount } from 'svelte';
 	import '@khmyznikov/pwa-install';
 
-	let { children, data }: { children: Snippet, data: { user?: { avatar: string; is_admin: number; pseudo: string; logs_enabled?: number; jingles_enabled?: number; pwa_tutorial_enabled?: number }; appSettings?: { groupName: string; historyMonths: number; maxRecordingSeconds: number; maxGroupNameLength: number } } } = $props();
+	let { children, data }: { children: Snippet, data: { user?: { avatar: string; is_admin: number; pseudo: string; logs_enabled?: number; jingles_enabled?: number; pwa_tutorial_enabled?: number }; appSettings?: { groupName: string; historyMonths: number; maxRecordingSeconds: number; maxGroupNameLength: number; audioProcessingEnabled?: boolean }; broadcastInfo?: { message: string; revision: number; read: boolean } | null } } = $props();
 
 	let debugVisible = $state(false);
 	let logsEnabledValue = $state(false);
@@ -237,6 +237,17 @@
 		width: 100%;
 		background: #1a1a2e;
 		color: white;
+	}
+
+	:global(textarea) {
+		width: 100%;
+		background: #1a1a2e;
+		color: white;
+		border: none;
+		border-radius: 12px;
+		padding: 0.9rem 1rem;
+		font: inherit;
+		resize: vertical;
 	}
 
 	:global(button) {

@@ -1,7 +1,9 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import {
+	countActivePushSubscriptionsForUser,
 	disableAllPushSubscriptionsForUser,
+	disablePushSubscriptionForUser,
 	togglePushNotificationsEnabled,
 	upsertPushSubscription
 } from '$lib/server/db';
@@ -60,13 +62,21 @@ export const POST: RequestHandler = async ({ locals, request }) => {
 	return json({ success: true });
 };
 
-export const DELETE: RequestHandler = async ({ locals }) => {
+export const DELETE: RequestHandler = async ({ locals, request }) => {
 	if (!locals.user) {
 		return json({ error: 'Non authentifié' }, { status: 401 });
 	}
 
-	disableAllPushSubscriptionsForUser(locals.user.id);
-	togglePushNotificationsEnabled(locals.user.id, false);
+	const payload = await request.json().catch(() => null) as { endpoint?: string | null } | null;
+	const endpoint = payload?.endpoint?.trim();
+
+	if (endpoint) {
+		disablePushSubscriptionForUser(locals.user.id, endpoint);
+	} else {
+		disableAllPushSubscriptionsForUser(locals.user.id);
+	}
+
+	togglePushNotificationsEnabled(locals.user.id, countActivePushSubscriptionsForUser(locals.user.id) > 0);
 
 	return json({ success: true });
 };
