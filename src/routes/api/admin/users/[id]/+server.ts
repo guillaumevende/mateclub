@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { redirect, json } from '@sveltejs/kit';
-import { deleteUser, getUserById, toggleSuperPowers, toggleLogsEnabled, toggleJinglesEnabled, updateUserHour } from '$lib/server/db';
+import { deleteUser, getUserById, toggleLogsEnabled, toggleJinglesEnabled, updateUserHour } from '$lib/server/db';
 
 export const DELETE: RequestHandler = async ({ params, locals }) => {
 	if (!locals.user || !locals.user.is_admin) {
@@ -32,9 +32,6 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
 	const { action, value } = data;
 
 	switch (action) {
-		case 'super_powers':
-			toggleSuperPowers(userId, value);
-			break;
 		case 'logs_enabled':
 			toggleLogsEnabled(userId, value);
 			break;

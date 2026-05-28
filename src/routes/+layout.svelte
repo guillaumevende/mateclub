@@ -7,7 +7,7 @@
 	import { onMount } from 'svelte';
 	import '@khmyznikov/pwa-install';
 
-	let { children, data }: { children: Snippet, data: { user?: { avatar: string; is_admin: number; pseudo: string; logs_enabled?: number; jingles_enabled?: number; pwa_tutorial_enabled?: number }; appSettings?: { groupName: string; historyMonths: number; maxRecordingSeconds: number; maxGroupNameLength: number; audioProcessingEnabled?: boolean }; broadcastInfo?: { message: string; revision: number; read: boolean } | null } } = $props();
+	let { children, data }: { children: Snippet, data: { user?: { avatar: string; is_admin: number; pseudo: string; logs_enabled?: number; jingles_enabled?: number; pwa_tutorial_enabled?: number }; appSettings?: { groupName: string; historyMonths: number; maxRecordingSeconds: number; maxGroupNameLength: number; audioProcessingEnabled?: boolean; recordingUnlockMode?: 'never_locked' | 'timed_lock' | 'timed_optional_unlock' }; broadcastInfo?: { message: string; revision: number; read: boolean } | null } } = $props();
 
 	let debugVisible = $state(false);
 	let logsEnabledValue = $state(false);

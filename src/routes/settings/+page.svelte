@@ -22,6 +22,7 @@
 				avatar: string;
 				daily_notification_hour: number;
 				timezone: string;
+				super_powers?: number;
 				pwa_tutorial_enabled?: number;
 				push_notifications_enabled?: number;
 			}
@@ -29,6 +30,9 @@
 			savedImage: string | null
 			version: string
 			pushConfig: PushConfig
+			appSettings?: {
+				recordingUnlockMode: 'never_locked' | 'timed_lock' | 'timed_optional_unlock';
+			}
 		}, 
 	} = $props();
 
@@ -69,6 +73,9 @@
 	let pushSupported = $state(false);
 	let pushPermission = $state<BrowserNotificationPermission>('default');
 	let pushEnabled = $state(false);
+	let superPowersLoading = $state(false);
+	let superPowersMessage = $state<string | null>(null);
+	let superPowersError = $state<string | null>(null);
 	
 	// Convertir daily_notification_hour (minutes ou heures) en format HH:mm pour l'input time
 	function minutesToHHmm(value: number): string {
@@ -709,9 +716,9 @@
 					{#if pushToggleLoading}
 						Mise à jour...
 					{:else if pushEnabled}
-						Désactiver les notifications push
+						Désactiver les notifications push sur cet appareil
 					{:else}
-						Activer les notifications push
+						Activer les notifications push sur cet appareil
 					{/if}
 				</button>
 				{#if pushPermission === 'denied' && !pushEnabled}
@@ -728,6 +735,55 @@
 			</section>
 		{/if}
 	</form>
+
+	{#if data.appSettings?.recordingUnlockMode === 'timed_optional_unlock'}
+		<section class="settings-toggle-card push-settings-card">
+			<h2>Super-pouvoirs</h2>
+			<p class="description">Activez cette option pour lever votre verrouillage temporel personnel et écouter les publications sans attendre votre heure de disponibilité.</p>
+			<form
+				method="POST"
+				class="toggle-form"
+				use:enhance={() => {
+					superPowersLoading = true;
+					superPowersMessage = null;
+					superPowersError = null;
+
+					return async ({ result, update }) => {
+						superPowersLoading = false;
+						await update();
+
+						if (result.type === 'success') {
+							superPowersMessage = data.user?.super_powers === 1
+								? 'Super-pouvoirs désactivés.'
+								: 'Super-pouvoirs activés.';
+							setTimeout(() => window.location.reload(), 300);
+						} else if (result.type === 'failure') {
+							superPowersError = (result.data as any)?.error || 'Impossible de mettre à jour les super-pouvoirs';
+						}
+					};
+				}}
+			>
+				<input type="hidden" name="intent" value="toggleSuperPowers" />
+				<input type="hidden" name="enabled" value={data.user?.super_powers === 1 ? 'false' : 'true'} />
+				<input type="hidden" name="csrf_token" value={(data as any)?.csrfToken ?? ''} />
+				<button type="submit" class="toggle-button" disabled={superPowersLoading}>
+					{#if superPowersLoading}
+						Mise à jour...
+					{:else if data.user?.super_powers === 1}
+						Désactiver les super-pouvoirs
+					{:else}
+						Activer les super-pouvoirs
+					{/if}
+				</button>
+				{#if superPowersMessage}
+					<p class="success-message update-success">{superPowersMessage}</p>
+				{/if}
+				{#if superPowersError}
+					<p class="error-message update-success">{superPowersError}</p>
+				{/if}
+			</form>
+		</section>
+	{/if}
 
 	<button type="submit" form="settings-form">Sauvegarder</button>
 

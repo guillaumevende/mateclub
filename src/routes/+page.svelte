@@ -43,6 +43,7 @@
 		id: number;
 		pseudo: string;
 		avatar: string;
+		super_powers: number;
 		is_admin: number;
 		recording_count?: number;
 	};
@@ -52,6 +53,7 @@
 		historyMonths: number;
 		maxRecordingSeconds: number;
 		maxGroupNameLength: number;
+		recordingUnlockMode: 'never_locked' | 'timed_lock' | 'timed_optional_unlock';
 	};
 
 	type BroadcastInfo = {
@@ -222,6 +224,10 @@
 	});
 
 	let canPlayUnreadSummary = $derived(playableUnreadSummaryStats.count > 0);
+	let userHasImmediateUnlock = $derived(
+		data.appSettings?.recordingUnlockMode === 'never_locked' ||
+		(data.appSettings?.recordingUnlockMode === 'timed_optional_unlock' && data.user?.super_powers === 1)
+	);
 	let broadcastInfoRead = $derived(
 		(data.broadcastInfo?.read ?? true) ||
 		(data.broadcastInfo?.revision != null && locallyReadBroadcastRevision === data.broadcastInfo.revision)
@@ -236,6 +242,15 @@
 		const hasPlayableUnread = playableCount > 0;
 		const hasOnlyLockedUnread = hasResolvedPlayableState && totalCount > 0 && playableCount === 0;
 		const hasMixedUnread = hasResolvedPlayableState && playableCount > 0 && playableCount < totalCount;
+
+		if (userHasImmediateUnlock && totalCount > 0) {
+			return {
+				title: `${totalCount} capsule${totalCount !== 1 ? 's' : ''} non lue${totalCount !== 1 ? 's' : ''}`,
+				duration: formatCompactDurationLabel(totalSeconds),
+				showPlayIcon: true,
+				showLockIcon: false
+			};
+		}
 
 		if (!hasResolvedPlayableState && totalCount > 0) {
 			return {
@@ -894,13 +909,7 @@
 	function shouldShowPlayer(day: DayRecordings, user?: User): boolean {
 		if (!day.available) return false;
 		if (day.recordings.length === 0) return false;
-		
-		const today = getUserToday();
-		// Show player for past days always
-		if (day.date !== today) return true;
-		
-		// For today, only show if user has super powers
-		return user?.super_powers === 1 || user?.is_admin === 1;
+		return true;
 	}
 
 	function formatTimeSeconds(seconds: number): string {
@@ -1189,7 +1198,11 @@
 		</button>
 	</header>
 
-	<TeamList allUsers={data.allUsers} bind:showTeam />
+	<TeamList
+		allUsers={data.allUsers}
+		showUnlockStatus={data.appSettings?.recordingUnlockMode === 'timed_optional_unlock'}
+		bind:showTeam
+	/>
 
 	{#if showBroadcastInfoModal && data.broadcastInfo?.message}
 		<div

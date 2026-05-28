@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.37.2-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.37.3-blue?style=for-the-badge)
 
 </div>
 
@@ -627,9 +627,13 @@ Chaque utilisateur peut configurer une **heure de mise à disposition** dans ses
 | 6h30 | Hier | ✅ Oui |
 | 7h00+ | Aujourd'hui | 🔒 Non (jusqu'à demain 7h) |
 
-### Exception
+### Modes de verrouillage
 
-- Les utilisateurs avec **super pouvoirs** (admin) voient toutes les capsules sans verrouillage
+L’admin peut choisir entre trois modes :
+
+- **Aucun verrouillage** : toutes les publications sont accessibles immédiatement
+- **Verrouillage temporel** : fonctionnement historique pour tout le monde
+- **Verrouillage temporel avec déblocage individuel** : chaque utilisateur peut activer ses propres super-pouvoirs depuis Réglages pour lever sa limite de temps
 
 ### Calendrier
 

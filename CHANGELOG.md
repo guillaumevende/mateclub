@@ -2,6 +2,25 @@
 
 ---
 
+## v0.37.3 (2026-05-28) - Modes de verrouillage des publications
+
+### ✨ Nouvelles fonctionnalités
+
+- **Mode global de verrouillage configurable** : l’admin choisit désormais entre trois comportements pour les publications : jamais verrouillées, verrouillage temporel pour tout le monde, ou verrouillage temporel avec déblocage individuel
+- **Super-pouvoirs individuels conditionnels** : quand le mode de déblocage individuel est activé, chaque utilisateur voit apparaître dans Réglages un nouveau bouton pour lever ou réactiver sa propre limite de temps
+- **Statut visible dans la liste des membres** : dans `La team`, chaque pseudo affiche `⏱️` si le déblocage individuel est activé et `📆` sinon, uniquement quand le mode 3 est actif
+
+### 🐛 Corrections
+
+- **Accueil cohérent sans verrouillage** : le résumé des capsules non lues ne parle plus d’attente horaire quand le verrouillage est désactivé globalement ou levé pour l’utilisateur courant
+- **Nettoyage de l’ancien modèle admin** : le réglage “Mes super pouvoirs” disparaît de l’admin au profit du nouveau sélecteur global de verrouillage
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.3`
+- README.md : documentation du nouveau système à trois modes pour les publications verrouillées
+- package.json / package-lock.json : version portée en `0.37.3`
+
 ## v0.37.2 (2026-05-27) - Restauration exacte du retour haptique verrouillé
 
 ### 🐛 Corrections

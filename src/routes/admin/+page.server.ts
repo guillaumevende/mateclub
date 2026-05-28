@@ -7,7 +7,6 @@ import {
 	createUser, 
 	deleteUser, 
 	updateUserHour, 
-	toggleSuperPowers, 
 	getUserById, 
 	isPseudoAvailable, 
 	toggleLogsEnabled, 
@@ -23,7 +22,8 @@ import {
 	updateUserPassword,
 	markLatestOtherRecordingsAsUnread,
 	getOldestAdminId,
-	getAppSettings
+	getAppSettings,
+	getRecordingUnlockMode
 } from '$lib/server/db';
 import { getPushRuntimeConfig } from '$lib/server/push';
 
@@ -126,16 +126,6 @@ export const actions: Actions = {
 		return { success: true };
 	},
 
-	toggleSuperPowers: async ({ request, locals }) => {
-		const data = await request.formData();
-		const enabled = data.get('enabled') === 'true';
-
-		if (locals.user && locals.user.id) {
-			toggleSuperPowers(locals.user.id, enabled);
-		}
-		return { success: true };
-	},
-
 	toggleLogs: async ({ request, locals }) => {
 		const data = await request.formData();
 		const enabled = data.get('enabled') === 'true';
@@ -197,6 +187,32 @@ export const actions: Actions = {
 		return {
 			success: true,
 			message: 'Réglages du groupe enregistrés',
+			appSettings: getAppSettings()
+		};
+	},
+
+	saveRecordingUnlockMode: async ({ request, locals }) => {
+		if (!locals.user?.is_admin) {
+			return fail(403, { error: 'Non autorisé' });
+		}
+
+		const data = await request.formData();
+		const mode = data.get('recording_unlock_mode')?.toString() ?? '';
+		if (mode !== 'never_locked' && mode !== 'timed_lock' && mode !== 'timed_optional_unlock') {
+			return fail(400, { error: 'Mode de verrouillage invalide' });
+		}
+
+		setAppConfig('recording_unlock_mode', mode);
+
+		return {
+			success: true,
+			message:
+				mode === 'never_locked'
+					? 'Les publications ne seront plus jamais verrouillées'
+					: mode === 'timed_lock'
+						? 'Le verrouillage temporel s’applique maintenant à tout le monde'
+						: 'Le verrouillage temporel avec déblocage individuel est maintenant activé',
+			recordingUnlockMode: getRecordingUnlockMode(),
 			appSettings: getAppSettings()
 		};
 	},

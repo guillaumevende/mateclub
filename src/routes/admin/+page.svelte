@@ -26,6 +26,7 @@
 		maxRecordingSeconds: number;
 		maxGroupNameLength: number;
 		audioProcessingEnabled: boolean;
+		recordingUnlockMode: 'never_locked' | 'timed_lock' | 'timed_optional_unlock';
 	};
 
 	type PushConfig = {
@@ -101,12 +102,14 @@
 	let countdownInterval: ReturnType<typeof setInterval> | null = $state(null);
 	let canConfirmDelete = $state(false);
 
-	let superPowersEnabled = $state(false);
 	let allowRegistrationEnabled = $state(false);
+	let recordingUnlockMode = $state<'never_locked' | 'timed_lock' | 'timed_optional_unlock'>('timed_lock');
+	let recordingUnlockModeMessage = $state<string | null>(null);
+	let recordingUnlockModeError = $state<string | null>(null);
+	let recordingUnlockModeLoading = $state(false);
 
 	// Synchroniser avec data quand il change
 	$effect(() => {
-		superPowersEnabled = data.currentUser?.super_powers === 1;
 		allowRegistrationEnabled = data.allowRegistration === true;
 		groupName = data.appSettings?.groupName ?? '';
 		historyMonths = data.appSettings?.historyMonths ?? 3;
@@ -114,6 +117,7 @@
 		maxRecordingMinutes = Math.floor(duration / 60);
 		maxRecordingSeconds = duration % 60;
 		broadcastInfoMessage = data.broadcastInfo?.message ?? '';
+		recordingUnlockMode = data.appSettings?.recordingUnlockMode ?? 'timed_lock';
 	});
 
 	function openDeleteModal(user: User) {
@@ -389,31 +393,71 @@
 	</section>
 
 	<section>
-		<h2>Mes super pouvoirs</h2>
-		
-		{#if data.currentUser?.super_powers === 1}
-			<p class="super-text">
-				Vous avez des super pouvoirs : vous pouvez écouter les enregistrements du jour 
-				sans attendre votre prochaine livraison. Jouez le jeu et annulez cette possibilité 
-				en cliquant ci-dessous.
-			</p>
-			<form method="POST" action="?/toggleSuperPowers">
-				<input type="hidden" name="csrf_token" value={data.csrfToken} />
-				<input type="hidden" name="enabled" value="false" />
-				<button type="submit" class="super-btn">✅ Désactiver les super pouvoirs</button>
-			</form>
-		{:else}
-			<p class="super-text">
-				Vous n'avez aucun privilège. Activez les super pouvoirs pour écouter 
-				les enregistrements du jour sans attendre votre prochaine livraison. 
-				Vous devriez jouer le jeu et ne l'activer qu'à titre exceptionnel.
-			</p>
-			<form method="POST" action="?/toggleSuperPowers">
-				<input type="hidden" name="csrf_token" value={data.csrfToken} />
-				<input type="hidden" name="enabled" value="true" />
-				<button type="submit" class="super-btn">✨ Activer les super pouvoirs</button>
-			</form>
-		{/if}
+		<h2>Verrouillage des publications</h2>
+		<p class="super-text">
+			Définissez comment les publications sont verrouillées dans l’app.
+		</p>
+		<form
+			method="POST"
+			action="?/saveRecordingUnlockMode"
+			use:enhance={() => {
+				recordingUnlockModeLoading = true;
+				recordingUnlockModeMessage = null;
+				recordingUnlockModeError = null;
+
+				return async ({ result }) => {
+					recordingUnlockModeLoading = false;
+
+					if (result.type === 'success') {
+						recordingUnlockModeMessage = (result.data as any)?.message || 'Mode de verrouillage enregistré';
+						recordingUnlockMode = ((result.data as any)?.recordingUnlockMode ?? recordingUnlockMode) as typeof recordingUnlockMode;
+					} else if (result.type === 'failure') {
+						recordingUnlockModeError = (result.data as any)?.error || 'Impossible d’enregistrer le mode de verrouillage';
+					}
+				};
+			}}
+			class="group-config-form"
+		>
+			<input type="hidden" name="csrf_token" value={data.csrfToken} />
+
+			<div class="config-field">
+				<span class="config-label">Choix du mode :</span>
+				<div class="radio-config-group">
+					<label class="radio-config-option">
+						<input type="radio" name="recording_unlock_mode" value="never_locked" bind:group={recordingUnlockMode} />
+						<div>
+							<strong>Aucun verrouillage</strong>
+							<span>Les publications sont toujours accessibles immédiatement.</span>
+						</div>
+					</label>
+					<label class="radio-config-option">
+						<input type="radio" name="recording_unlock_mode" value="timed_lock" bind:group={recordingUnlockMode} />
+						<div>
+							<strong>Verrouillage temporel pour tout le monde</strong>
+							<span>Le fonctionnement actuel reste appliqué à tous les utilisateurs.</span>
+						</div>
+					</label>
+					<label class="radio-config-option">
+						<input type="radio" name="recording_unlock_mode" value="timed_optional_unlock" bind:group={recordingUnlockMode} />
+						<div>
+							<strong>Verrouillage temporel avec déblocage individuel</strong>
+							<span>Chaque utilisateur peut activer ses super-pouvoirs dans ses réglages pour lever la limite de temps.</span>
+						</div>
+					</label>
+				</div>
+			</div>
+
+			{#if recordingUnlockModeMessage}
+				<p class="success-message">{recordingUnlockModeMessage}</p>
+			{/if}
+			{#if recordingUnlockModeError}
+				<p class="error-message">{recordingUnlockModeError}</p>
+			{/if}
+
+			<button type="submit" class="super-btn section-action-btn" disabled={recordingUnlockModeLoading}>
+				{recordingUnlockModeLoading ? 'Enregistrement...' : 'Enregistrer le mode'}
+			</button>
+		</form>
 	</section>
 
 	<section>
@@ -1264,6 +1308,43 @@
 		gap: 0.35rem;
 		color: #cfcde6;
 		font-size: 0.95rem;
+	}
+
+	.radio-config-group {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.radio-config-option {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		gap: 0.75rem;
+		align-items: start;
+		padding: 0.95rem 1rem;
+		border-radius: 12px;
+		background: rgba(255, 255, 255, 0.04);
+		border: 1px solid rgba(255, 255, 255, 0.08);
+	}
+
+	.radio-config-option input {
+		margin-top: 0.25rem;
+	}
+
+	.radio-config-option div {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.radio-config-option strong {
+		color: #f1eef7;
+	}
+
+	.radio-config-option span {
+		color: #cfcde6;
+		line-height: 1.4;
+		font-size: 0.94rem;
 	}
 
 	/* Modal de confirmation */

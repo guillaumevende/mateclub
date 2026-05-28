@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
-import { getUserById, getUserTimezone, db, getConfiguredHistoryMonths } from '$lib/server/db';
+import { getUserById, getUserTimezone, db, getConfiguredHistoryMonths, getRecordingUnlockMode } from '$lib/server/db';
 
 export const GET: RequestHandler = async ({ locals }) => {
 	if (!locals.user) {
@@ -10,6 +10,8 @@ export const GET: RequestHandler = async ({ locals }) => {
 	const timezone = getUserTimezone(locals.user.id);
 	const user = getUserById(locals.user.id);
 	const thresholdMinutes = user?.daily_notification_hour ?? 420;
+	const unlockMode = getRecordingUnlockMode();
+	const bypassLock = unlockMode === 'never_locked' || (unlockMode === 'timed_optional_unlock' && user?.super_powers === 1);
 	const hours = Math.floor(thresholdMinutes / 60);
 	const mins = thresholdMinutes % 60;
 	const threshold = mins === 0 ? `${hours}h` : `${hours}h${mins.toString().padStart(2, '0')}`;
@@ -92,7 +94,8 @@ export const GET: RequestHandler = async ({ locals }) => {
 			
 			// Enregistrements d'hier → disponibles seulement si on a passé le seuil
 			// Enregistrements d'aujourd'hui → disponibles seulement si l'heure d'enregistrement < seuil
-			const isAvailable = effectiveDate < yesterdayStr || 
+			const isAvailable = bypassLock ||
+				effectiveDate < yesterdayStr || 
 				(effectiveDate === yesterdayStr && currentMinutes >= thresholdMinutes) ||
 				(effectiveDate === today && recordedMinutes < thresholdMinutes);
 			if (isAvailable) {
@@ -116,6 +119,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 			dates: datesInfo,
 			timezone,
 			threshold: user?.daily_notification_hour || 420,
+			recordingUnlockMode: unlockMode,
 			superPowers: user?.super_powers === 1
 		});
 	} catch (error) {

@@ -29,6 +29,7 @@ const DEFAULT_MAX_RECORDING_SECONDS = 180;
 const MAX_GROUP_NAME_LENGTH = 24;
 const DEFAULT_PUSH_CHECK_WINDOW_MINUTES = 120;
 const DEFAULT_AUDIO_PROCESSING_ENABLED = false;
+const DEFAULT_RECORDING_UNLOCK_MODE = 'timed_lock';
 
 // No automatic admin creation - first admin must be created via /setup page
 
@@ -276,12 +277,14 @@ try {
 	stmt.run('max_recording_seconds', DEFAULT_MAX_RECORDING_SECONDS.toString());
 	stmt.run('push_check_window_minutes', DEFAULT_PUSH_CHECK_WINDOW_MINUTES.toString());
 	stmt.run('audio_processing_enabled', DEFAULT_AUDIO_PROCESSING_ENABLED ? 'true' : 'false');
+	stmt.run('recording_unlock_mode', DEFAULT_RECORDING_UNLOCK_MODE);
 	stmt.run('broadcast_info_message', '');
 	stmt.run('broadcast_info_revision', '0');
 } catch (e) {
 	// Table déjà existante
 }
 
+export type RecordingUnlockMode = 'never_locked' | 'timed_lock' | 'timed_optional_unlock';
 export type AppSettings = {
 	allowRegistration: boolean;
 	groupName: string;
@@ -289,6 +292,7 @@ export type AppSettings = {
 	maxRecordingSeconds: number;
 	maxGroupNameLength: number;
 	audioProcessingEnabled: boolean;
+	recordingUnlockMode: RecordingUnlockMode;
 };
 
 export type BroadcastInfo = {
@@ -324,6 +328,14 @@ export function getConfiguredPushCheckWindowMinutes(): number {
 	return parseAppConfigInteger(getAppConfig('push_check_window_minutes'), DEFAULT_PUSH_CHECK_WINDOW_MINUTES, 1, 24 * 60);
 }
 
+export function getRecordingUnlockMode(): RecordingUnlockMode {
+	const value = (getAppConfig('recording_unlock_mode') ?? '').trim();
+	if (value === 'never_locked' || value === 'timed_lock' || value === 'timed_optional_unlock') {
+		return value;
+	}
+	return DEFAULT_RECORDING_UNLOCK_MODE;
+}
+
 export function getAppSettings(): AppSettings {
 	return {
 		allowRegistration: isRegistrationAllowed(),
@@ -331,7 +343,8 @@ export function getAppSettings(): AppSettings {
 		historyMonths: getConfiguredHistoryMonths(),
 		maxRecordingSeconds: getConfiguredMaxRecordingSeconds(),
 		maxGroupNameLength: MAX_GROUP_NAME_LENGTH,
-		audioProcessingEnabled: isAudioProcessingEnabled()
+		audioProcessingEnabled: isAudioProcessingEnabled(),
+		recordingUnlockMode: getRecordingUnlockMode()
 	};
 }
 
@@ -539,7 +552,9 @@ export function getRecordingsByDate(userId: number, date: string): DayRecordings
 }
 
 function isDateAvailable(recordedAt: string, superPowers: boolean, thresholdMinutes: number, timezone: string): boolean {
-	if (superPowers) return true;
+	const unlockMode = getRecordingUnlockMode();
+	if (unlockMode === 'never_locked') return true;
+	if (unlockMode === 'timed_optional_unlock' && superPowers) return true;
 
 	const now = new Date();
 	
@@ -593,6 +608,11 @@ function isDateAvailable(recordedAt: string, superPowers: boolean, thresholdMinu
 	
 	// Enregistrements de demain ou plus → verrouillés
 	return false;
+}
+
+export function canUserBypassRecordingLock(user?: Pick<User, 'super_powers'> | null): boolean {
+	if (!user) return false;
+	return getRecordingUnlockMode() === 'timed_optional_unlock' && user.super_powers === 1;
 }
 
 export function getRecordingsGroupedByDay(userId: number, limit = 7, page = 1, timezone?: string): DayRecordings[] {
