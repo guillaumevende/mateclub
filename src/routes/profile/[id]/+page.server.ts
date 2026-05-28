@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { error, redirect } from '@sveltejs/kit';
-import { getUserById, getUserProfileImages, getUserProfileImagesCount, getUserRecentRecordings } from '$lib/server/db';
+import { getUserById, getUserProfileImages, getUserProfileImagesCount, getUserRecentRecordings, getVisibleRecentRecordingsForViewer } from '$lib/server/db';
 
 export const load: PageServerLoad = async ({ locals, params }) => {
 	if (!locals.user) {
@@ -19,7 +19,9 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 
 	const images = getUserProfileImages(userId, 8, 0);
 	const totalImages = getUserProfileImagesCount(userId);
-	const recordings = getUserRecentRecordings(userId, 10);
+	const recordings = locals.user.id === userId
+		? getUserRecentRecordings(userId, 10)
+		: getVisibleRecentRecordingsForViewer(userId, locals.user.id, 10);
 
 	return {
 		profileUser,

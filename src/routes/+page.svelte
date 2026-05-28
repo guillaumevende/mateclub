@@ -226,7 +226,13 @@
 	let canPlayUnreadSummary = $derived(playableUnreadSummaryStats.count > 0);
 	let userHasImmediateUnlock = $derived(
 		data.appSettings?.recordingUnlockMode === 'never_locked' ||
-		(data.appSettings?.recordingUnlockMode === 'timed_optional_unlock' && data.user?.super_powers === 1)
+		(
+			data.user?.super_powers === 1 &&
+			(
+				data.appSettings?.recordingUnlockMode === 'timed_optional_unlock' ||
+				data.user?.is_admin === 1
+			)
+		)
 	);
 	let broadcastInfoRead = $derived(
 		(data.broadcastInfo?.read ?? true) ||

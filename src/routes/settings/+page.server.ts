@@ -102,7 +102,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 		if (intent === 'toggleSuperPowers') {
 			const enabled = data.get('enabled') === 'true';
 			const appSettings = getAppSettings();
-			if (appSettings.recordingUnlockMode !== 'timed_optional_unlock') {
+			const canTogglePersonalUnlock = appSettings.recordingUnlockMode === 'timed_optional_unlock'
+				|| (appSettings.recordingUnlockMode === 'timed_lock' && locals.user.is_admin === 1);
+			if (!canTogglePersonalUnlock) {
 				return fail(400, {
 					success: false,
 					error: 'Le déblocage individuel n’est pas disponible actuellement.'

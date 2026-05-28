@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
-import { getUserById, getUserTimezone, db, getConfiguredHistoryMonths, getRecordingUnlockMode } from '$lib/server/db';
+import { getUserById, getUserTimezone, db, getConfiguredHistoryMonths, getRecordingUnlockMode, canUserBypassRecordingLock } from '$lib/server/db';
 
 export const GET: RequestHandler = async ({ locals }) => {
 	if (!locals.user) {
@@ -11,7 +11,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 	const user = getUserById(locals.user.id);
 	const thresholdMinutes = user?.daily_notification_hour ?? 420;
 	const unlockMode = getRecordingUnlockMode();
-	const bypassLock = unlockMode === 'never_locked' || (unlockMode === 'timed_optional_unlock' && user?.super_powers === 1);
+	const bypassLock = unlockMode === 'never_locked' || canUserBypassRecordingLock(user);
 	const hours = Math.floor(thresholdMinutes / 60);
 	const mins = thresholdMinutes % 60;
 	const threshold = mins === 0 ? `${hours}h` : `${hours}h${mins.toString().padStart(2, '0')}`;
@@ -120,7 +120,7 @@ export const GET: RequestHandler = async ({ locals }) => {
 			timezone,
 			threshold: user?.daily_notification_hour || 420,
 			recordingUnlockMode: unlockMode,
-			superPowers: user?.super_powers === 1
+			superPowers: canUserBypassRecordingLock(user)
 		});
 	} catch (error) {
 		console.error('Error in /api/recordings/dates:', error);

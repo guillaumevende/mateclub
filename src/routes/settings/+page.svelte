@@ -20,6 +20,7 @@
 				id: number;
 				pseudo: string;
 				avatar: string;
+				is_admin?: number;
 				daily_notification_hour: number;
 				timezone: string;
 				super_powers?: number;
@@ -92,6 +93,16 @@
 	}
 	let selectedHour = $state('');
 	let selectedTimezone = $state('Europe/Paris');
+	let hourInput = $state<HTMLInputElement | null>(null);
+	let canToggleSuperPowers = $derived(
+		data.appSettings?.recordingUnlockMode === 'timed_optional_unlock'
+		|| (data.appSettings?.recordingUnlockMode === 'timed_lock' && data.user?.is_admin === 1)
+	);
+	let superPowersDescription = $derived(
+		data.appSettings?.recordingUnlockMode === 'timed_lock' && data.user?.is_admin === 1
+			? 'En tant qu’administrateur, cette option vous permet de lever votre verrouillage temporel personnel sans l’ouvrir aux autres membres.'
+			: 'Activez cette option pour lever votre verrouillage temporel personnel et écouter les publications sans attendre votre heure de disponibilité.'
+	);
 	
 	// Initialiser selectedHour après le chargement des données
 	$effect(() => {
@@ -549,6 +560,7 @@
 		}}>
 		
 		<input type="hidden" name="avatarImage" value={savedImageFilename || ''} />
+		<input type="hidden" name="hour" value={selectedHour} />
 		<input type="hidden" name="csrf_token" value={(data as any)?.csrfToken ?? ''} />
 		
 		<!-- Bloc 1: Nom d'utilisateur -->
@@ -696,7 +708,7 @@
 			<p class="description">Les enregistrements de la veille seront disponibles à partir de cette heure (dans ton fuseau horaire).</p>
 
 			<div class="hour-input">
-				<input type="time" name="hour" bind:value={selectedHour} />
+				<input type="time" bind:this={hourInput} bind:value={selectedHour} />
 			</div>
 			{#if hourError}
 				<p class="hour-feedback error">{hourError}</p>
@@ -734,12 +746,18 @@
 				{/if}
 			</section>
 		{/if}
+		<button
+			type="submit"
+			onclick={() => hourInput?.blur()}
+		>
+			Sauvegarder
+		</button>
 	</form>
 
-	{#if data.appSettings?.recordingUnlockMode === 'timed_optional_unlock'}
+	{#if canToggleSuperPowers}
 		<section class="settings-toggle-card push-settings-card">
 			<h2>Super-pouvoirs</h2>
-			<p class="description">Activez cette option pour lever votre verrouillage temporel personnel et écouter les publications sans attendre votre heure de disponibilité.</p>
+			<p class="description">{superPowersDescription}</p>
 			<form
 				method="POST"
 				class="toggle-form"
@@ -784,8 +802,6 @@
 			</form>
 		</section>
 	{/if}
-
-	<button type="submit" form="settings-form">Sauvegarder</button>
 
 	<section class="settings-toggle-card">
 		<h2>Tuto PWA</h2>

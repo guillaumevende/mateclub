@@ -540,8 +540,8 @@ export function getRecordingsByDate(userId: number, date: string): DayRecordings
 	if (filteredResults.length === 0) return null;
 
 	// Vérifier chaque enregistrement individuellement
-	const isAvailable = filteredResults.some(r => 
-		isDateAvailable(r.recorded_at, user.super_powers === 1, user.daily_notification_hour, timezone)
+	const isAvailable = filteredResults.some(r =>
+		isDateAvailable(r.recorded_at, canUserBypassRecordingLock(user), user.daily_notification_hour, timezone)
 	);
 
 	return {
@@ -551,10 +551,10 @@ export function getRecordingsByDate(userId: number, date: string): DayRecordings
 	};
 }
 
-function isDateAvailable(recordedAt: string, superPowers: boolean, thresholdMinutes: number, timezone: string): boolean {
+function isDateAvailable(recordedAt: string, canBypassLock: boolean, thresholdMinutes: number, timezone: string): boolean {
 	const unlockMode = getRecordingUnlockMode();
 	if (unlockMode === 'never_locked') return true;
-	if (unlockMode === 'timed_optional_unlock' && superPowers) return true;
+	if (canBypassLock) return true;
 
 	const now = new Date();
 	
@@ -610,9 +610,15 @@ function isDateAvailable(recordedAt: string, superPowers: boolean, thresholdMinu
 	return false;
 }
 
-export function canUserBypassRecordingLock(user?: Pick<User, 'super_powers'> | null): boolean {
+export function canUserBypassRecordingLock(user?: Pick<User, 'super_powers' | 'is_admin'> | null): boolean {
 	if (!user) return false;
-	return getRecordingUnlockMode() === 'timed_optional_unlock' && user.super_powers === 1;
+	if (user.super_powers !== 1) return false;
+
+	const unlockMode = getRecordingUnlockMode();
+	if (unlockMode === 'never_locked') return false;
+	if (unlockMode === 'timed_optional_unlock') return true;
+
+	return user.is_admin === 1;
 }
 
 export function getRecordingsGroupedByDay(userId: number, limit = 7, page = 1, timezone?: string): DayRecordings[] {
@@ -653,8 +659,8 @@ export function getRecordingsGroupedByDay(userId: number, limit = 7, page = 1, t
 	for (const [date, recordings] of Object.entries(grouped)) {
 		// Vérifier chaque enregistrement individuellement
 		// Si AU MOINS un enregistrement est disponible, le groupe est disponible
-		const isAvailable = recordings.some(r => 
-			isDateAvailable(r.recorded_at, user.super_powers === 1, threshold, userTimezone)
+		const isAvailable = recordings.some(r =>
+			isDateAvailable(r.recorded_at, canUserBypassRecordingLock(user), threshold, userTimezone)
 		);
 		
 		days.push({
@@ -724,7 +730,7 @@ export function getRecordingsGroupedByDayWithHasMore(
 	for (const date of selectedDates) {
 		const recordings = grouped[date];
 		const isAvailable = recordings.some(r =>
-			isDateAvailable(r.recorded_at, user.super_powers === 1, threshold, userTimezone)
+			isDateAvailable(r.recorded_at, canUserBypassRecordingLock(user), threshold, userTimezone)
 		);
 
 		days.push({
@@ -792,7 +798,7 @@ export function getAvailableUnreadCount(userId: number): { count: number; totalS
 
 	const unreadRecordings = stmt.all(userId, userId, historyCutoffStr) as Recording[];
 	const availableRecordings = unreadRecordings.filter((recording) =>
-		isDateAvailable(recording.recorded_at, user.super_powers === 1, user.daily_notification_hour, user.timezone || 'Europe/Paris')
+		isDateAvailable(recording.recorded_at, canUserBypassRecordingLock(user), user.daily_notification_hour, user.timezone || 'Europe/Paris')
 	);
 
 	return {
@@ -1521,6 +1527,19 @@ export function getUserRecentRecordings(userId: number, limit = 10, includeNonRe
 	`);
 
 	return stmt.all(userId, historyCutoff.toISOString(), limit) as Recording[];
+}
+
+export function getVisibleRecentRecordingsForViewer(profileUserId: number, viewerId: number, limit = 10): Recording[] {
+	const viewer = getUserById(viewerId);
+	const profileUser = getUserById(profileUserId);
+	if (!viewer || !profileUser) return [];
+
+	const viewerTimezone = viewer.timezone || 'Europe/Paris';
+	const threshold = viewer.daily_notification_hour;
+
+	return getUserRecentRecordings(profileUserId, limit).filter((recording) =>
+		isDateAvailable(recording.recorded_at, canUserBypassRecordingLock(viewer), threshold, viewerTimezone)
+	);
 }
 
 export function getRecordingsForUser(userId: number): Recording[] {

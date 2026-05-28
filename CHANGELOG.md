@@ -2,6 +2,20 @@
 
 ---
 
+## v0.37.4 (2026-05-28) - Verrouillage cohérent sur Android et profils
+
+### 🐛 Corrections
+
+- **Heure de disponibilité fiabilisée sur Android** : la sauvegarde du réglage d’heure soumet désormais explicitement la valeur Svelte courante dans le formulaire, avec un flux de validation plus robuste pour les pickers natifs Android
+- **Profil d’un autre utilisateur à nouveau verrouillé** : la page profil ne laisse plus écouter les capsules récentes d’un autre membre quand elles devraient encore être verrouillées pour le visiteur courant
+- **Déblocage admin personnel restauré** : un admin peut à nouveau s’accorder les super-pouvoirs uniquement pour lui-même dès lors qu’un mode verrouillé est actif, y compris dans le mode de verrouillage temporel classique
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.4`
+- README.md : précision sur le déblocage personnel possible pour l’admin quand un verrouillage reste actif
+- package.json / package-lock.json : version portée en `0.37.4`
+
 ## v0.37.3 (2026-05-28) - Modes de verrouillage des publications
 
 ### ✨ Nouvelles fonctionnalités

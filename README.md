@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.37.3-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.37.4-blue?style=for-the-badge)
 
 </div>
 
@@ -634,6 +634,8 @@ L’admin peut choisir entre trois modes :
 - **Aucun verrouillage** : toutes les publications sont accessibles immédiatement
 - **Verrouillage temporel** : fonctionnement historique pour tout le monde
 - **Verrouillage temporel avec déblocage individuel** : chaque utilisateur peut activer ses propres super-pouvoirs depuis Réglages pour lever sa limite de temps
+
+Quand un mode verrouillé reste actif, l’administrateur conserve aussi la possibilité d’activer ses propres super-pouvoirs pour lui-même, sans ouvrir ce déblocage à tout le groupe.
 
 ### Calendrier
 
