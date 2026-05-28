@@ -1,10 +1,8 @@
 import type { Handle } from '@sveltejs/kit';
 import { getSession, hasAdmin, refreshSession, generateCSRFToken, validateCSRFToken, periodicCleanup } from '$lib/server/db';
-import { initializeAudioProcessingWorker } from '$lib/server/audioProcessing';
 import { initializePushScheduler } from '$lib/server/push';
 
 initializePushScheduler();
-initializeAudioProcessingWorker();
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const sessionId = event.cookies.get('session');

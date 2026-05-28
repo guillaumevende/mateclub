@@ -14,10 +14,9 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 
 	const limit = parseInt(url.searchParams.get('limit') || '8', 10);
 	const offset = parseInt(url.searchParams.get('offset') || '0', 10);
-	const includeNonReady = locals.user.id === userId;
 
-	const images = getUserProfileImages(userId, limit, offset, includeNonReady);
-	const total = getUserProfileImagesCount(userId, includeNonReady);
+	const images = getUserProfileImages(userId, limit, offset);
+	const total = getUserProfileImagesCount(userId);
 
 	return json({
 		images,

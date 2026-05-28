@@ -1,14 +1,6 @@
 import type { RequestHandler } from './$types';
 import { redirect, json } from '@sveltejs/kit';
-import {
-	getRecordingById,
-	getRecordingFilePath,
-	getRecordingPlaybackFilename,
-	markAsListened,
-	deleteRecording,
-	updateRecordingImage,
-	updateRecordingUrl
-} from '$lib/server/db';
+import { getRecordingById, getRecordingFilePath, markAsListened, deleteRecording, updateRecordingImage, updateRecordingUrl } from '$lib/server/db';
 import { existsSync, createReadStream, statSync, openSync, readSync, closeSync } from 'fs';
 import { detectAudioMimeType, isValidImageBuffer } from '$lib/server/fileValidation';
 import { Readable } from 'stream';
@@ -52,23 +44,9 @@ export const GET: RequestHandler = async ({ request, params, locals }) => {
 		return json({ error: 'Fichier non trouvé' }, { status: 404 });
 	}
 
-	if (recording.processing_status !== 'ready') {
-		if (recording.user_id !== locals.user.id && !locals.user.is_admin) {
-			return json({ error: 'Fichier non trouvé' }, { status: 404 });
-		}
-
-		const statusLabel = recording.processing_status === 'failed' ? 'échoué' : 'en cours';
-		return json({ error: `Ce message audio est encore en traitement serveur (${statusLabel})` }, { status: 409 });
-	}
-
 	markAsListened(recordingId, locals.user.id);
 
-	const playbackFilename = getRecordingPlaybackFilename(recording);
-	if (!playbackFilename) {
-		return json({ error: 'Fichier non disponible' }, { status: 409 });
-	}
-
-	const filepath = getRecordingFilePath(playbackFilename);
+	const filepath = getRecordingFilePath(recording.filename);
 	
 	if (!existsSync(filepath)) {
 		return json({ error: 'Fichier non trouvé' }, { status: 404 });
@@ -84,11 +62,11 @@ export const GET: RequestHandler = async ({ request, params, locals }) => {
 	}
 
 	const detectedMimeType = detectAudioMimeType(headerBuffer);
-	const fallbackMimeType = playbackFilename.endsWith('.webm')
+	const fallbackMimeType = recording.filename.endsWith('.webm')
 		? 'audio/webm'
-		: playbackFilename.endsWith('.ogg')
+		: recording.filename.endsWith('.ogg')
 			? 'audio/ogg'
-			: playbackFilename.endsWith('.mp3')
+			: recording.filename.endsWith('.mp3')
 				? 'audio/mpeg'
 				: 'audio/mp4';
 	const contentType = detectedMimeType || fallbackMimeType;
