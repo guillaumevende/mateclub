@@ -2,6 +2,20 @@
 
 ---
 
+## v0.37.6 (2026-05-29) - Stabilisation de la barre basse iOS
+
+### 🐛 Corrections
+
+- **Barre de navigation iOS moins sujette aux décalages** : la compensation de viewport utilisée pour remonter la navigation au-dessus du clavier ne s’active plus que lorsqu’un vrai champ éditable est focus et qu’un clavier logiciel est probablement ouvert
+- **Retour de multitâche mieux géré** : les changements de viewport iOS réinitialisent correctement la compensation basse quand l’app reprend le focus sans clavier actif
+- **Compositing allégé sur la barre basse** : suppression des optimisations CSS susceptibles de figer la barre de navigation à une mauvaise position après certaines transitions iOS
+- **Hauteur de page modernisée** : le layout principal utilise aussi `100dvh` pour mieux suivre les variations de viewport mobile récentes
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.6`
+- package.json / package-lock.json : version portée en `0.37.6`
+
 ## v0.37.5 (2026-05-29) - Nommage cohérent des originaux audio
 
 ### 🐛 Corrections

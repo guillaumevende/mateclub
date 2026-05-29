@@ -12,6 +12,26 @@
 	let debugVisible = $state(false);
 	let logsEnabledValue = $state(false);
 
+	function isEditableElement(element: unknown): element is HTMLElement {
+		if (!(element instanceof HTMLElement)) return false;
+
+		if (element.tagName === 'TEXTAREA') return true;
+		if (element.tagName === 'INPUT') {
+			const inputType = element.getAttribute('type')?.toLowerCase() ?? 'text';
+			return !['button', 'submit', 'reset', 'checkbox', 'radio', 'range', 'color', 'file'].includes(inputType);
+		}
+
+		return element.isContentEditable;
+	}
+
+	function shouldLiftNavigationForKeyboard(viewportHeight: number, viewportOffsetTop: number) {
+		const activeElement = document.activeElement;
+		if (!isEditableElement(activeElement)) return false;
+
+		const estimatedKeyboardHeight = window.innerHeight - (viewportHeight + viewportOffsetTop);
+		return estimatedKeyboardHeight > 120;
+	}
+
 	function updateViewportBottomOffset() {
 		if (typeof window === 'undefined') return;
 
@@ -19,8 +39,9 @@
 		const viewportHeight = visualViewport?.height ?? window.innerHeight;
 		const viewportOffsetTop = visualViewport?.offsetTop ?? 0;
 		const rawBottomOffset = Math.max(0, window.innerHeight - (viewportHeight + viewportOffsetTop));
+		const bottomOffset = shouldLiftNavigationForKeyboard(viewportHeight, viewportOffsetTop) ? rawBottomOffset : 0;
 
-		document.documentElement.style.setProperty('--viewport-bottom-offset', `${rawBottomOffset}px`);
+		document.documentElement.style.setProperty('--viewport-bottom-offset', `${bottomOffset}px`);
 	}
 
 	function refreshViewportBottomOffset() {
@@ -85,17 +106,21 @@
 		window.addEventListener('resize', handleViewportChange);
 		window.addEventListener('orientationchange', handleViewportChange);
 		window.addEventListener('focus', handleViewportChange);
+		window.addEventListener('blur', handleViewportChange);
 		window.addEventListener('pageshow', handleViewportChange);
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 		window.visualViewport?.addEventListener('resize', handleViewportChange);
+		window.visualViewport?.addEventListener('scroll', handleViewportChange);
 
 		return () => {
 			window.removeEventListener('resize', handleViewportChange);
 			window.removeEventListener('orientationchange', handleViewportChange);
 			window.removeEventListener('focus', handleViewportChange);
+			window.removeEventListener('blur', handleViewportChange);
 			window.removeEventListener('pageshow', handleViewportChange);
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
 			window.visualViewport?.removeEventListener('resize', handleViewportChange);
+			window.visualViewport?.removeEventListener('scroll', handleViewportChange);
 		};
 	});
 
@@ -281,8 +306,6 @@
 		justify-content: flex-end;
 		border-top: 1px solid #2a2a4e;
 		z-index: 1100;
-		transform: translateZ(0);
-		will-change: bottom;
 	}
 
 	nav::after {
@@ -375,6 +398,7 @@
 		max-width: 600px;
 		margin: 0 auto;
 		min-height: 100vh;
+		min-height: 100dvh;
 		background: #1a1a2e;
 	}
 
