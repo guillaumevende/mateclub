@@ -1066,6 +1066,40 @@ export type SaveRecordingOptions = {
 	recordedAt?: string | null;
 };
 
+function parseRecordingDate(recordedAt: string | null | undefined): Date {
+	if (!recordedAt) return new Date();
+
+	const normalized = recordedAt.includes('T')
+		? recordedAt
+		: `${recordedAt.replace(' ', 'T')}Z`;
+	const parsed = new Date(normalized);
+	return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+function buildRecordingAuthorPrefix(pseudo: string): string {
+	const normalized = pseudo
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.toLowerCase()
+		.replace(/[^a-z0-9]/g, '');
+
+	return (normalized.slice(0, 3) || 'usr').padEnd(3, 'x');
+}
+
+function buildRecordingFilename(userId: number, audioExtension: string, recordedAt: string | null | undefined): string {
+	const user = getUserById(userId);
+	const authorPrefix = buildRecordingAuthorPrefix(user?.pseudo || 'usr');
+	const recordedDate = parseRecordingDate(recordedAt);
+	const year = recordedDate.getUTCFullYear();
+	const month = String(recordedDate.getUTCMonth() + 1).padStart(2, '0');
+	const day = String(recordedDate.getUTCDate()).padStart(2, '0');
+	const hours = String(recordedDate.getUTCHours()).padStart(2, '0');
+	const minutes = String(recordedDate.getUTCMinutes()).padStart(2, '0');
+	const randomSuffix = crypto.randomUUID().replace(/-/g, '').slice(0, 6);
+
+	return `${year}${month}${day}${hours}${minutes}_${authorPrefix}_${randomSuffix}.${audioExtension}`;
+}
+
 export function saveRecording(
 	userId: number,
 	audioData: Buffer,
@@ -1088,7 +1122,7 @@ export function saveRecording(
 
 	debug.db.log('saveRecording - audioData:', audioData.length, 'bytes, imageData:', imageData?.length || 'none');
 
-	const filename = `${Date.now()}-${crypto.randomUUID()}.${audioExtension}`;
+	const filename = buildRecordingFilename(userId, audioExtension, recordedAt);
 	const effectiveProcessedFilename =
 		processedFilename ?? (processingStatus === 'ready' ? filename : null);
 	const filepath = join(uploadsDir, filename);

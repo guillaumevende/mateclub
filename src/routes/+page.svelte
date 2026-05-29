@@ -92,7 +92,7 @@
 	function getInitialHomeState() {
 		const initialPage = data.page ?? 1;
 		const initialTodayDate = getUserToday();
-		const initialDays = data.days ?? [];
+		const initialDays: DayRecordings[] = data.days ?? [];
 
 		return {
 			initialPage,
@@ -464,16 +464,16 @@
 				const today = getUserToday();
 				
 				if (page === 1) {
-					allDays = data.days.filter(d => d.date !== today);
+					allDays = data.days.filter((d: DayRecordings) => d.date !== today);
 				} else {
-					const existingDates = new Set(allDays.map(d => d.date));
-					const newDays = data.days.filter(d => d.date !== today && !existingDates.has(d.date));
+					const existingDates = new Set(allDays.map((d: DayRecordings) => d.date));
+					const newDays = data.days.filter((d: DayRecordings) => d.date !== today && !existingDates.has(d.date));
 					if (newDays.length > 0) {
 						allDays = [...allDays, ...newDays];
 					}
 				}
 				
-				todayDay = data.days.find(d => d.date === today) || null;
+				todayDay = data.days.find((d: DayRecordings) => d.date === today) || null;
 				currentPage = page;
 				showCalendar = page >= 2;
 				

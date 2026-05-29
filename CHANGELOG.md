@@ -2,6 +2,20 @@
 
 ---
 
+## v0.37.5 (2026-05-29) - Nommage cohérent des originaux audio
+
+### 🐛 Corrections
+
+- **Nommage unifié des nouveaux audios** : les nouvelles capsules utilisent à nouveau la nomenclature `YYYYMMDDHHmm_prefixe_suffixe.ext`, basée sur l’horodatage d’enregistrement et les trois premiers caractères nettoyés du pseudo auteur
+- **Originaux archivés sous le même nom** : les copies conservées dans `uploads/originals/` gardent exactement le même nom de fichier que la capsule publiée correspondante
+- **Aucun impact rétroactif** : les anciens fichiers déjà stockés ne sont pas renommés
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.5`
+- README.md : précision sur le nommage des nouveaux originaux audio archivés
+- package.json / package-lock.json : version portée en `0.37.5`
+
 ## v0.37.4 (2026-05-28) - Verrouillage cohérent sur Android et profils
 
 ### 🐛 Corrections
