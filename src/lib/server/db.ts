@@ -41,6 +41,7 @@ const DEFAULT_RECORDING_UNLOCK_MODE = 'timed_lock';
 		avatar TEXT DEFAULT '☕',
 		is_admin INTEGER DEFAULT 0,
 		super_powers INTEGER DEFAULT 0,
+		auto_mark_own_recordings_as_listened INTEGER DEFAULT 1,
 		daily_notification_hour INTEGER DEFAULT 420,
 		timezone TEXT DEFAULT 'Europe/Paris',
 		created_at DATETIME DEFAULT (datetime('now')),
@@ -139,6 +140,12 @@ try {
 
 try {
 	db.exec('ALTER TABLE users ADD COLUMN super_powers INTEGER DEFAULT 0');
+} catch (e) {
+	// Colonne déjà existante
+}
+
+try {
+	db.exec('ALTER TABLE users ADD COLUMN auto_mark_own_recordings_as_listened INTEGER DEFAULT 1');
 } catch (e) {
 	// Colonne déjà existante
 }
@@ -361,6 +368,7 @@ export type User = {
 	avatar: string;
 	is_admin: number;
 	super_powers: number;
+	auto_mark_own_recordings_as_listened: number;
 	daily_notification_hour: number;
 	timezone: string;
 	created_at: string;
@@ -825,7 +833,7 @@ export function hasAdmin(): boolean {
 }
 
 export function getUserById(id: number): User | undefined {
-	const stmt = db.prepare('SELECT id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, last_login, logs_enabled, jingles_enabled, pwa_tutorial_enabled, push_notifications_enabled FROM users WHERE id = ?');
+	const stmt = db.prepare('SELECT id, pseudo, avatar, is_admin, super_powers, auto_mark_own_recordings_as_listened, daily_notification_hour, timezone, created_at, last_login, logs_enabled, jingles_enabled, pwa_tutorial_enabled, push_notifications_enabled FROM users WHERE id = ?');
 	return stmt.get(id) as User | undefined;
 }
 
@@ -852,7 +860,7 @@ export function getAllUsers(): UserWithCount[] {
 	
 	const stmt = db.prepare(`
 		SELECT 
-			u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled, u.push_notifications_enabled,
+			u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.auto_mark_own_recordings_as_listened, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled, u.push_notifications_enabled,
 			COALESCE((
 				SELECT COUNT(*) 
 				FROM recordings r 
@@ -977,6 +985,11 @@ export function toggleSuperPowers(userId: number, enabled: boolean): void {
 	stmt.run(enabled ? 1 : 0, userId);
 }
 
+export function toggleAutoMarkOwnRecordingsAsListened(userId: number, enabled: boolean): void {
+	const stmt = db.prepare('UPDATE users SET auto_mark_own_recordings_as_listened = ? WHERE id = ?');
+	stmt.run(enabled ? 1 : 0, userId);
+}
+
 export function toggleLogsEnabled(userId: number, enabled: boolean): void {
 	const stmt = db.prepare('UPDATE users SET logs_enabled = ? WHERE id = ?');
 	stmt.run(enabled ? 1 : 0, userId);
@@ -1017,7 +1030,7 @@ export function updateLastLogin(userId: number): void {
 
 export function getSession(sessionId: string): User | undefined {
 	const stmt = db.prepare(`
-		SELECT u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled, u.push_notifications_enabled
+		SELECT u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.auto_mark_own_recordings_as_listened, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled, u.push_notifications_enabled
 		FROM sessions s 
 		JOIN users u ON s.user_id = u.id 
 		WHERE s.id = ? AND s.expires_at > datetime('now')
@@ -1171,7 +1184,17 @@ export function saveRecording(
 	);
 	debug.db.log('Enregistrement créé - id:', result.lastInsertRowid);
 
-	return getRecordingById(result.lastInsertRowid as number)!;
+	const createdRecordingId = result.lastInsertRowid as number;
+	const user = getUserById(userId);
+	if (user?.auto_mark_own_recordings_as_listened !== 0) {
+		const listenStmt = db.prepare(`
+			INSERT OR IGNORE INTO listening_history (user_id, recording_id)
+			VALUES (?, ?)
+		`);
+		listenStmt.run(userId, createdRecordingId);
+	}
+
+	return getRecordingById(createdRecordingId)!;
 }
 
 export function updateRecordingImage(recordingId: number, imageData: Buffer): Recording | undefined {
@@ -1820,6 +1843,7 @@ export function getUsersWithPushNotificationsEnabled(): User[] {
 			avatar,
 			is_admin,
 			super_powers,
+			auto_mark_own_recordings_as_listened,
 			daily_notification_hour,
 			timezone,
 			created_at,
@@ -2047,7 +2071,7 @@ export function approveRegistration(id: number, isAdmin: boolean = false): User 
 	const insertUserStmt = db.prepare(`
 		INSERT INTO users (pseudo, password_hash, avatar, timezone, is_admin, super_powers)
 		VALUES (?, ?, ?, ?, ?, 0)
-		RETURNING id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, logs_enabled, jingles_enabled, push_notifications_enabled
+		RETURNING id, pseudo, avatar, is_admin, super_powers, auto_mark_own_recordings_as_listened, daily_notification_hour, timezone, created_at, logs_enabled, jingles_enabled, push_notifications_enabled
 	`);
 	const user = insertUserStmt.get(
 		registration.pseudo, 

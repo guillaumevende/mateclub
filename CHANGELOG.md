@@ -2,6 +2,21 @@
 
 ---
 
+## v0.37.7 (2026-05-29) - Réglage individuel de lecture automatique des propres capsules
+
+### ✨ Nouvelles fonctionnalités
+
+- **Réglage individuel pour ses propres capsules** : chaque utilisateur peut désormais choisir dans Réglages si ses nouvelles publications doivent être marquées automatiquement comme lues pour lui
+
+### 🐛 Corrections
+
+- **Marquage auto-lu conditionnel à la publication** : les nouvelles capsules ne sont ajoutées à l’historique d’écoute de leur auteur qu’en fonction de ce réglage personnel, sans effet rétroactif sur l’historique existant
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.7`
+- package.json / package-lock.json : version portée en `0.37.7`
+
 ## v0.37.6 (2026-05-29) - Stabilisation de la barre basse iOS
 
 ### 🐛 Corrections

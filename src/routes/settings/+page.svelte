@@ -24,6 +24,7 @@
 				daily_notification_hour: number;
 				timezone: string;
 				super_powers?: number;
+				auto_mark_own_recordings_as_listened?: number;
 				pwa_tutorial_enabled?: number;
 				push_notifications_enabled?: number;
 			}
@@ -77,6 +78,9 @@
 	let superPowersLoading = $state(false);
 	let superPowersMessage = $state<string | null>(null);
 	let superPowersError = $state<string | null>(null);
+	let autoMarkOwnLoading = $state(false);
+	let autoMarkOwnMessage = $state<string | null>(null);
+	let autoMarkOwnError = $state<string | null>(null);
 	
 	// Convertir daily_notification_hour (minutes ou heures) en format HH:mm pour l'input time
 	function minutesToHHmm(value: number): string {
@@ -802,6 +806,54 @@
 			</form>
 		</section>
 	{/if}
+
+	<section class="settings-toggle-card">
+		<h2>Mes propres capsules</h2>
+		<p class="description">Choisissez si vos nouvelles publications sont automatiquement marquées comme lues pour vous.</p>
+
+		<form
+			method="POST"
+			class="toggle-form"
+			use:enhance={() => {
+				autoMarkOwnLoading = true;
+				autoMarkOwnMessage = null;
+				autoMarkOwnError = null;
+
+				return async ({ result, update }) => {
+					autoMarkOwnLoading = false;
+					await update();
+
+					if (result.type === 'success') {
+						autoMarkOwnMessage = data.user?.auto_mark_own_recordings_as_listened === 1
+							? 'Le marquage automatique de vos capsules a été désactivé.'
+							: 'Vos nouvelles capsules seront à nouveau marquées comme lues automatiquement.';
+						setTimeout(() => window.location.reload(), 300);
+					} else if (result.type === 'failure') {
+						autoMarkOwnError = (result.data as any)?.error || 'Impossible de mettre à jour ce réglage';
+					}
+				};
+			}}
+		>
+			<input type="hidden" name="intent" value="toggleAutoMarkOwnRecordingsAsListened" />
+			<input type="hidden" name="enabled" value={data.user?.auto_mark_own_recordings_as_listened === 1 ? 'false' : 'true'} />
+			<input type="hidden" name="csrf_token" value={(data as any)?.csrfToken ?? ''} />
+			<button type="submit" class="toggle-button" disabled={autoMarkOwnLoading}>
+				{#if autoMarkOwnLoading}
+					Mise à jour...
+				{:else if data.user?.auto_mark_own_recordings_as_listened === 1}
+					Ne plus marquer automatiquement mes capsules comme lues
+				{:else}
+					Marquer automatiquement mes capsules comme lues
+				{/if}
+			</button>
+			{#if autoMarkOwnMessage}
+				<p class="success-message update-success">{autoMarkOwnMessage}</p>
+			{/if}
+			{#if autoMarkOwnError}
+				<p class="error-message update-success">{autoMarkOwnError}</p>
+			{/if}
+		</form>
+	</section>
 
 	<section class="settings-toggle-card">
 		<h2>Tuto PWA</h2>
