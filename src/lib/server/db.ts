@@ -1074,7 +1074,7 @@ export function getUpcomingBirthdaysForUser(userId: number, withinDays = 30): Up
 				daysUntil: nextBirthday.daysUntil
 			} satisfies UpcomingBirthday;
 		})
-		.filter((birthday): birthday is UpcomingBirthday => Boolean(birthday) && birthday.daysUntil <= withinDays)
+		.filter((birthday): birthday is UpcomingBirthday => birthday !== null && birthday.daysUntil <= withinDays)
 		.sort((a, b) => a.daysUntil - b.daysUntil || a.month - b.month || a.day - b.day || a.pseudo.localeCompare(b.pseudo, 'fr'));
 }
 

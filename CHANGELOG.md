@@ -2,6 +2,18 @@
 
 ---
 
+## v0.37.9 (2026-06-05) - Réglages anniversaire alignés et barre iOS stabilisée
+
+### 🐛 Corrections
+
+- **Anniversaire mieux aligné sur mobile** : les trois champs jour/mois/année restent désormais visuellement alignés malgré le libellé plus long de l’année, avec une adaptation en deux colonnes sur les écrans les plus étroits
+- **Barre basse iOS plus stable après multitâche** : le décalage de navigation au-dessus du clavier se base maintenant sur une hauteur de viewport de référence, ce qui réduit les remontées erronées de la barre et les grands espaces vides après certaines reprises d’application
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.9`
+- package.json / package-lock.json : version portée en `0.37.9`
+
 ## v0.37.8 (2026-06-05) - Anniversaires et visibilité audio par utilisateur
 
 ### ✨ Nouvelles fonctionnalités

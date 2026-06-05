@@ -992,6 +992,7 @@
 		display: grid;
 		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: 0.75rem;
+		align-items: end;
 	}
 
 	.birthday-fields label,
@@ -1008,6 +1009,12 @@
 		font-size: 0.92rem;
 	}
 
+	.birthday-fields label span {
+		min-height: 2.6em;
+		display: flex;
+		align-items: flex-end;
+	}
+
 	.availability-days-field {
 		flex-direction: row;
 		align-items: center;
@@ -1016,6 +1023,20 @@
 
 	.availability-days-field input {
 		max-width: 140px;
+	}
+
+	@media (max-width: 520px) {
+		.birthday-fields {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		.birthday-fields label:last-child {
+			grid-column: 1 / -1;
+		}
+
+		.birthday-fields label span {
+			min-height: auto;
+		}
 	}
 
 	.field-hint {

@@ -11,6 +11,7 @@
 
 	let debugVisible = $state(false);
 	let logsEnabledValue = $state(false);
+	let baselineViewportHeight = 0;
 
 	function isEditableElement(element: unknown): element is HTMLElement {
 		if (!(element instanceof HTMLElement)) return false;
@@ -28,8 +29,18 @@
 		const activeElement = document.activeElement;
 		if (!isEditableElement(activeElement)) return false;
 
-		const estimatedKeyboardHeight = window.innerHeight - (viewportHeight + viewportOffsetTop);
+		const layoutViewportHeight = baselineViewportHeight || window.visualViewport?.height || window.innerHeight;
+		const estimatedKeyboardHeight = layoutViewportHeight - (viewportHeight + viewportOffsetTop);
 		return estimatedKeyboardHeight > 120;
+	}
+
+	function updateBaselineViewportHeight(force = false) {
+		if (typeof window === 'undefined') return;
+
+		const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+		if (force || !shouldLiftNavigationForKeyboard(viewportHeight, window.visualViewport?.offsetTop ?? 0)) {
+			baselineViewportHeight = viewportHeight;
+		}
 	}
 
 	function updateViewportBottomOffset() {
@@ -38,7 +49,10 @@
 		const visualViewport = window.visualViewport;
 		const viewportHeight = visualViewport?.height ?? window.innerHeight;
 		const viewportOffsetTop = visualViewport?.offsetTop ?? 0;
-		const rawBottomOffset = Math.max(0, window.innerHeight - (viewportHeight + viewportOffsetTop));
+		if (!baselineViewportHeight) {
+			baselineViewportHeight = viewportHeight;
+		}
+		const rawBottomOffset = Math.max(0, baselineViewportHeight - (viewportHeight + viewportOffsetTop));
 		const bottomOffset = shouldLiftNavigationForKeyboard(viewportHeight, viewportOffsetTop) ? rawBottomOffset : 0;
 
 		document.documentElement.style.setProperty('--viewport-bottom-offset', `${bottomOffset}px`);
@@ -54,6 +68,7 @@
 	onMount(() => {
 		initPlayer();
 		initHaptics();
+		updateBaselineViewportHeight(true);
 		refreshViewportBottomOffset();
 		
 		// Initialize logsEnabled from user data
@@ -95,11 +110,13 @@
 
 		const handleVisibilityChange = () => {
 			if (!document.hidden) {
+				updateBaselineViewportHeight(true);
 				refreshViewportBottomOffset();
 			}
 		};
 
 		const handleViewportChange = () => {
+			updateBaselineViewportHeight();
 			refreshViewportBottomOffset();
 		};
 
