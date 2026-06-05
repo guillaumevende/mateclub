@@ -9,6 +9,10 @@
 		avatar: string;
 		super_powers?: number;
 		recording_count?: number;
+		birthdayInfo?: {
+			label: string;
+			ageOnBirthday: number | null;
+		} | null;
 	}
 
 	interface Props {
@@ -52,13 +56,22 @@
 					{@const count = user.recording_count ?? 0}
 					<li>
 						<UserProfileAvatarLink userId={user.id} avatar={user.avatar} size="small" label={`Voir le profil de ${user.pseudo}`} />
-						<span class="team-pseudo">
-							{user.pseudo}
-							{#if showUnlockStatus}
-								<span class="team-lock-emoji" aria-hidden="true">{user.super_powers === 1 ? '⏱️' : '📆'}</span>
+						<div class="team-meta">
+							<div class="team-main-line">
+								<span class="team-pseudo">
+									{user.pseudo}
+									{#if showUnlockStatus}
+										<span class="team-lock-emoji" aria-hidden="true">{user.super_powers === 1 ? '⏱️' : '📆'}</span>
+									{/if}
+								</span>
+								<span class="team-count">({count} capsule{count !== 1 ? 's' : ''})</span>
+							</div>
+							{#if user.birthdayInfo}
+								<span class="team-birthday">
+									🎂 {user.birthdayInfo.label}{user.birthdayInfo.ageOnBirthday !== null ? ` (${user.birthdayInfo.ageOnBirthday} ans)` : ''}
+								</span>
 							{/if}
-						</span>
-						<span class="team-count">({count} capsule{count !== 1 ? 's' : ''})</span>
+						</div>
 					</li>
 				{/each}
 			</ul>
@@ -125,17 +138,37 @@
 		border-radius: 8px;
 	}
 
-	.team-pseudo {
+	.team-meta {
 		flex: 1;
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		min-width: 0;
+	}
+
+	.team-main-line {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+	}
+
+	.team-pseudo {
 		font-weight: 500;
 	}
 
 	.team-count {
 		font-size: 0.85rem;
 		color: #888;
+		white-space: nowrap;
 	}
 
 	.team-lock-emoji {
 		margin-left: 0.35rem;
+	}
+
+	.team-birthday {
+		font-size: 0.88rem;
+		color: #d5d7ef;
 	}
 </style>

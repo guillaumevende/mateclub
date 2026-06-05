@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { redirect, fail } from '@sveltejs/kit';
 import { hashSync } from 'bcrypt';
-import { updateUserAvatar, updateUserHour, updateUserTimezone, getUserById, updateUserPassword, updateUserPseudo, isPseudoAvailable, deleteUserSessions, togglePwaTutorialEnabled, markAllExistingOtherRecordingsAsListened, toggleSuperPowers, toggleAutoMarkOwnRecordingsAsListened, getAppSettings } from '$lib/server/db';
+import { updateUserAvatar, updateUserHour, updateUserTimezone, getUserById, updateUserPassword, updateUserPseudo, isPseudoAvailable, deleteUserSessions, togglePwaTutorialEnabled, markAllExistingOtherRecordingsAsListened, toggleSuperPowers, toggleAutoMarkOwnRecordingsAsListened, getAppSettings, updateUserBirthday, updateUserAudioAvailabilityDays } from '$lib/server/db';
 import { readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { version } from '../../../package.json';
@@ -143,6 +143,12 @@ export const load: PageServerLoad = async ({ locals }) => {
 		const password = data.get('password')?.toString();
 		const confirmPassword = data.get('confirmPassword')?.toString();
 		const pseudo = data.get('pseudo')?.toString();
+		const appSettings = getAppSettings();
+		const birthdayDayRaw = data.get('birthdayDay')?.toString().trim() ?? '';
+		const birthdayMonthRaw = data.get('birthdayMonth')?.toString().trim() ?? '';
+		const birthdayYearRaw = data.get('birthdayYear')?.toString().trim() ?? '';
+		const availabilityDaysRaw = data.get('audioAvailabilityDays')?.toString().trim() ?? '';
+		const maxAvailabilityDays = appSettings.historyDays;
 		
 		// Validation et mise à jour du pseudo
 		if (pseudo && pseudo.length > 0) {
@@ -172,6 +178,49 @@ export const load: PageServerLoad = async ({ locals }) => {
 				});
 			}
 			updateUserPseudo(locals.user.id, pseudo);
+		}
+
+		let birthdayDay: number | null = null;
+		let birthdayMonth: number | null = null;
+		let birthdayYear: number | null = null;
+		if (birthdayDayRaw || birthdayMonthRaw || birthdayYearRaw) {
+			if (!birthdayDayRaw || !birthdayMonthRaw) {
+				return fail(400, {
+					success: false,
+					error: 'Veuillez renseigner au minimum le jour et le mois de votre anniversaire'
+				});
+			}
+
+			birthdayDay = Number.parseInt(birthdayDayRaw, 10);
+			birthdayMonth = Number.parseInt(birthdayMonthRaw, 10);
+			birthdayYear = birthdayYearRaw ? Number.parseInt(birthdayYearRaw, 10) : null;
+
+			if (!Number.isInteger(birthdayDay) || birthdayDay < 1 || birthdayDay > 31) {
+				return fail(400, { success: false, error: 'Le jour d’anniversaire doit être compris entre 1 et 31' });
+			}
+
+			if (!Number.isInteger(birthdayMonth) || birthdayMonth < 1 || birthdayMonth > 12) {
+				return fail(400, { success: false, error: 'Le mois d’anniversaire doit être compris entre 1 et 12' });
+			}
+
+			if (birthdayYear !== null && (!Number.isInteger(birthdayYear) || birthdayYear < 1900 || birthdayYear > new Date().getFullYear())) {
+				return fail(400, { success: false, error: 'L’année d’anniversaire est invalide' });
+			}
+		}
+
+		if (!availabilityDaysRaw || !/^\d+$/.test(availabilityDaysRaw)) {
+			return fail(400, {
+				success: false,
+				error: 'Veuillez renseigner une durée de mise à disposition valide'
+			});
+		}
+
+		const audioAvailabilityDays = Number.parseInt(availabilityDaysRaw, 10);
+		if (audioAvailabilityDays < 7 || audioAvailabilityDays > maxAvailabilityDays) {
+			return fail(400, {
+				success: false,
+				error: `La durée de mise à disposition doit être comprise entre 7 et ${maxAvailabilityDays} jours`
+			});
 		}
 		
 		// Mise à jour du mot de passe si fourni
@@ -208,6 +257,9 @@ export const load: PageServerLoad = async ({ locals }) => {
 			updateUserAvatar(locals.user.id, avatarImage);
 		}
 		
+		updateUserBirthday(locals.user.id, birthdayDay, birthdayMonth, birthdayYear);
+		updateUserAudioAvailabilityDays(locals.user.id, audioAvailabilityDays);
+
 		// Mise à jour de l'heure de disponibilité (en minutes depuis minuit)
 		if (minutesFromMidnight >= 0 && minutesFromMidnight <= 1439) {
 			updateUserHour(locals.user.id, minutesFromMidnight);

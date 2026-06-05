@@ -10,7 +10,14 @@ import {
 	updateUserPseudo,
 	toggleAutoMarkOwnRecordingsAsListened,
 	getUserTimezone,
-	deleteUser
+	deleteUser,
+	updateUserBirthday,
+	updateUserAudioAvailabilityDays,
+	getTeamBirthdayInfo,
+	getUserCurrentAge,
+	getConfiguredHistoryDays,
+	saveRecording,
+	getUserRecentRecordings
 } from './db';
 
 describe('Validation mot de passe', () => {
@@ -137,10 +144,39 @@ describe('Fonctions utilisateur', () => {
 		expect(user?.auto_mark_own_recordings_as_listened).toBe(1);
 	});
 
+	it('devrait initialiser la durée de mise à disposition sur la durée globale de l’app', () => {
+		const user = getUserById(testUserId);
+		expect(user?.audio_availability_days).toBe(getConfiguredHistoryDays());
+	});
+
 	it('devrait pouvoir désactiver le marquage auto-lu des propres capsules', () => {
 		toggleAutoMarkOwnRecordingsAsListened(testUserId, false);
 		const user = getUserById(testUserId);
 		expect(user?.auto_mark_own_recordings_as_listened).toBe(0);
+	});
+
+	it('devrait enregistrer un anniversaire avec année optionnelle', () => {
+		updateUserBirthday(testUserId, 12, 7, 1994);
+		const user = getUserById(testUserId);
+		expect(user?.birthday_day).toBe(12);
+		expect(user?.birthday_month).toBe(7);
+		expect(user?.birthday_year).toBe(1994);
+		expect(getTeamBirthdayInfo(user!, 'Europe/Paris')?.label).toBe('12/07');
+		expect(getUserCurrentAge(user!, 'Europe/Paris')).not.toBeNull();
+	});
+
+	it('devrait filtrer les enregistrements plus anciens que la durée perso de mise à disposition', () => {
+		updateUserAudioAvailabilityDays(testUserId, 7);
+
+		const recentDate = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+		const oldDate = new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString();
+
+		saveRecording(testUserId, Buffer.from('recent-audio'), 5, { recordedAt: recentDate });
+		saveRecording(testUserId, Buffer.from('old-audio'), 5, { recordedAt: oldDate });
+
+		const recordings = getUserRecentRecordings(testUserId, 20);
+		expect(recordings.some((recording) => recording.recorded_at === recentDate)).toBe(true);
+		expect(recordings.some((recording) => recording.recorded_at === oldDate)).toBe(false);
 	});
 });
 

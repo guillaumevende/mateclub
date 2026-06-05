@@ -42,7 +42,11 @@ const DEFAULT_RECORDING_UNLOCK_MODE = 'timed_lock';
 		is_admin INTEGER DEFAULT 0,
 		super_powers INTEGER DEFAULT 0,
 		auto_mark_own_recordings_as_listened INTEGER DEFAULT 1,
+		audio_availability_days INTEGER DEFAULT 90,
 		daily_notification_hour INTEGER DEFAULT 420,
+		birthday_day INTEGER,
+		birthday_month INTEGER,
+		birthday_year INTEGER,
 		timezone TEXT DEFAULT 'Europe/Paris',
 		created_at DATETIME DEFAULT (datetime('now')),
 		last_login DATETIME
@@ -151,6 +155,30 @@ try {
 }
 
 try {
+	db.exec('ALTER TABLE users ADD COLUMN audio_availability_days INTEGER DEFAULT 90');
+} catch (e) {
+	// Colonne déjà existante
+}
+
+try {
+	db.exec('ALTER TABLE users ADD COLUMN birthday_day INTEGER');
+} catch (e) {
+	// Colonne déjà existante
+}
+
+try {
+	db.exec('ALTER TABLE users ADD COLUMN birthday_month INTEGER');
+} catch (e) {
+	// Colonne déjà existante
+}
+
+try {
+	db.exec('ALTER TABLE users ADD COLUMN birthday_year INTEGER');
+} catch (e) {
+	// Colonne déjà existante
+}
+
+try {
 	db.exec('ALTER TABLE recordings ADD COLUMN image_filename TEXT');
 } catch (e) {
 	// Colonne déjà existante
@@ -210,6 +238,16 @@ try {
 	db.exec("UPDATE recordings SET processing_mode = 'none' WHERE processing_mode IS NULL OR processing_mode = ''");
 	db.exec("UPDATE recordings SET processed_at = recorded_at WHERE processed_at IS NULL AND processing_status = 'ready'");
 	db.exec("CREATE INDEX IF NOT EXISTS idx_recordings_processing_status ON recordings(processing_status, recorded_at)");
+} catch (e) {
+	// Migration best effort
+}
+
+try {
+	db.prepare(`
+		UPDATE users
+		SET audio_availability_days = ?
+		WHERE audio_availability_days IS NULL OR audio_availability_days < 1
+	`).run(getConfiguredHistoryDays());
 } catch (e) {
 	// Migration best effort
 }
@@ -296,6 +334,7 @@ export type AppSettings = {
 	allowRegistration: boolean;
 	groupName: string;
 	historyMonths: number;
+	historyDays: number;
 	maxRecordingSeconds: number;
 	maxGroupNameLength: number;
 	audioProcessingEnabled: boolean;
@@ -327,6 +366,10 @@ export function getConfiguredHistoryMonths(): number {
 	return parseAppConfigInteger(getAppConfig('history_months'), DEFAULT_HISTORY_MONTHS, 1, 24);
 }
 
+export function getConfiguredHistoryDays(): number {
+	return getConfiguredHistoryMonths() * 30;
+}
+
 export function getConfiguredMaxRecordingSeconds(): number {
 	return parseAppConfigInteger(getAppConfig('max_recording_seconds'), DEFAULT_MAX_RECORDING_SECONDS, 15, 60 * 60);
 }
@@ -348,6 +391,7 @@ export function getAppSettings(): AppSettings {
 		allowRegistration: isRegistrationAllowed(),
 		groupName: (getAppConfig('group_name') ?? '').trim().slice(0, MAX_GROUP_NAME_LENGTH),
 		historyMonths: getConfiguredHistoryMonths(),
+		historyDays: getConfiguredHistoryDays(),
 		maxRecordingSeconds: getConfiguredMaxRecordingSeconds(),
 		maxGroupNameLength: MAX_GROUP_NAME_LENGTH,
 		audioProcessingEnabled: isAudioProcessingEnabled(),
@@ -369,7 +413,11 @@ export type User = {
 	is_admin: number;
 	super_powers: number;
 	auto_mark_own_recordings_as_listened: number;
+	audio_availability_days: number;
 	daily_notification_hour: number;
+	birthday_day: number | null;
+	birthday_month: number | null;
+	birthday_year: number | null;
 	timezone: string;
 	created_at: string;
 	last_login: string | null;
@@ -446,6 +494,36 @@ export type DayRecordings = {
 	available: boolean;
 };
 
+export type UpcomingBirthday = {
+	userId: number;
+	pseudo: string;
+	day: number;
+	month: number;
+	label: string;
+	ageOnBirthday: number | null;
+	daysUntil: number;
+};
+
+export type TeamBirthdayInfo = {
+	label: string;
+	ageOnBirthday: number | null;
+};
+
+const FRENCH_MONTH_NAMES = [
+	'janvier',
+	'février',
+	'mars',
+	'avril',
+	'mai',
+	'juin',
+	'juillet',
+	'août',
+	'septembre',
+	'octobre',
+	'novembre',
+	'décembre'
+] as const;
+
 function getDateInTimezone(dateStr: string, timezone: string): string {
 	const date = new Date(dateStr);
 	const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -517,6 +595,91 @@ function getCurrentTimeInTimezone(timezone: string): { hour: number; minute: num
 	return { hour, minute };
 }
 
+function getCurrentDatePartsInTimezone(timezone: string): { year: number; month: number; day: number } {
+	const formatter = new Intl.DateTimeFormat('en-CA', {
+		timeZone: timezone,
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit'
+	});
+	const parts = formatter.formatToParts(new Date());
+	return {
+		year: parseInt(parts.find((part) => part.type === 'year')?.value || '0', 10),
+		month: parseInt(parts.find((part) => part.type === 'month')?.value || '0', 10),
+		day: parseInt(parts.find((part) => part.type === 'day')?.value || '0', 10)
+	};
+}
+
+function buildUtcDate(year: number, month: number, day: number): Date | null {
+	const candidate = new Date(Date.UTC(year, month - 1, day));
+	if (
+		candidate.getUTCFullYear() !== year ||
+		candidate.getUTCMonth() !== month - 1 ||
+		candidate.getUTCDate() !== day
+	) {
+		return null;
+	}
+	return candidate;
+}
+
+function isValidBirthday(day: number, month: number, year?: number | null): boolean {
+	if (!Number.isInteger(day) || !Number.isInteger(month)) return false;
+	if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+	const referenceYear = year ?? 2000;
+	return buildUtcDate(referenceYear, month, day) !== null;
+}
+
+function formatBirthdayDayMonth(day: number, month: number): string {
+	return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}`;
+}
+
+function formatBirthdayFrench(day: number, month: number): string {
+	return `${String(day).padStart(2, '0')} ${FRENCH_MONTH_NAMES[month - 1]}`;
+}
+
+function getNextBirthdayOccurrence(day: number, month: number, timezone: string): { nextDate: Date; daysUntil: number } | null {
+	if (!isValidBirthday(day, month)) return null;
+	const today = getCurrentDatePartsInTimezone(timezone);
+	const todayUtc = new Date(Date.UTC(today.year, today.month - 1, today.day));
+
+	for (let year = today.year; year <= today.year + 8; year += 1) {
+		const candidate = buildUtcDate(year, month, day);
+		if (!candidate) continue;
+		const diffDays = Math.round((candidate.getTime() - todayUtc.getTime()) / 86400000);
+		if (diffDays >= 0) {
+			return { nextDate: candidate, daysUntil: diffDays };
+		}
+	}
+
+	return null;
+}
+
+function getCurrentAge(day: number, month: number, year: number | null, timezone: string): number | null {
+	if (!year || !isValidBirthday(day, month, year)) return null;
+	const today = getCurrentDatePartsInTimezone(timezone);
+	let age = today.year - year;
+	if (today.month < month || (today.month === month && today.day < day)) {
+		age -= 1;
+	}
+	return age >= 0 ? age : null;
+}
+
+function getAgeOnNextBirthday(day: number, month: number, year: number | null, timezone: string): number | null {
+	if (!year || !isValidBirthday(day, month, year)) return null;
+	const nextBirthday = getNextBirthdayOccurrence(day, month, timezone);
+	if (!nextBirthday) return null;
+	return nextBirthday.nextDate.getUTCFullYear() - year;
+}
+
+function getEffectiveAudioAvailabilityDays(user?: Pick<User, 'audio_availability_days'> | null): number {
+	const configuredDays = getConfiguredHistoryDays();
+	const rawDays = user?.audio_availability_days;
+	if (!Number.isInteger(rawDays) || (rawDays as number) < 1) {
+		return configuredDays;
+	}
+	return Math.min(configuredDays, Math.max(7, rawDays as number));
+}
+
 export function getUserTimezone(userId: number): string {
 	const user = getUserById(userId);
 	return user?.timezone || 'Europe/Paris';
@@ -538,6 +701,7 @@ export function getRecordingsByDate(userId: number, date: string): DayRecordings
 		JOIN users u ON r.user_id = u.id 
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
 		WHERE r.recorded_at >= ? AND r.processing_status = 'ready'
+		AND ${getAudioAvailabilitySqlClause('u')}
 		ORDER BY r.recorded_at ASC
 	`);
 	const results = stmt.all(userId, historyCutoff.toISOString()) as Recording[];
@@ -629,6 +793,10 @@ export function canUserBypassRecordingLock(user?: Pick<User, 'super_powers' | 'i
 	return user.is_admin === 1;
 }
 
+function getAudioAvailabilitySqlClause(userAlias: string, recordingAlias = 'r'): string {
+	return `datetime(${recordingAlias}.recorded_at) >= datetime('now', '-' || MIN(COALESCE(${userAlias}.audio_availability_days, ${getConfiguredHistoryDays()}), ${getConfiguredHistoryDays()}) || ' days')`;
+}
+
 export function getRecordingsGroupedByDay(userId: number, limit = 7, page = 1, timezone?: string): DayRecordings[] {
 	const user = getUserById(userId);
 	if (!user) return [];
@@ -649,6 +817,7 @@ export function getRecordingsGroupedByDay(userId: number, limit = 7, page = 1, t
 		JOIN users u ON r.user_id = u.id 
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
 		WHERE r.recorded_at >= ? AND r.processing_status = 'ready'
+		AND ${getAudioAvailabilitySqlClause('u')}
 		ORDER BY r.recorded_at DESC
 		LIMIT ? OFFSET ?
 	`);
@@ -715,6 +884,7 @@ export function getRecordingsGroupedByDayWithHasMore(
 		JOIN users u ON r.user_id = u.id
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
 		WHERE r.recorded_at >= ? AND r.processing_status = 'ready'
+		AND ${getAudioAvailabilitySqlClause('u')}
 		ORDER BY r.recorded_at DESC
 		LIMIT ? OFFSET ?
 	`);
@@ -767,8 +937,10 @@ export function getUnreadCount(userId: number): { count: number; totalSeconds: n
 			COUNT(*) as count,
 			COALESCE(SUM(r.duration_seconds), 0) as totalSeconds
 		FROM recordings r
+		JOIN users u ON u.id = r.user_id
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
 		WHERE l.id IS NULL AND r.user_id != ? AND r.recorded_at >= ? AND r.processing_status = 'ready'
+		AND ${getAudioAvailabilitySqlClause('u')}
 	`);
 	const result = stmt.get(userId, userId, historyCutoffStr) as { count: number; totalSeconds: number };
 	return result;
@@ -801,6 +973,7 @@ export function getAvailableUnreadCount(userId: number): { count: number; totalS
 		JOIN users u ON r.user_id = u.id
 		LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
 		WHERE l.id IS NULL AND r.user_id != ? AND r.recorded_at >= ? AND r.processing_status = 'ready'
+		AND ${getAudioAvailabilitySqlClause('u')}
 		ORDER BY datetime(r.recorded_at) ASC, r.id ASC
 	`);
 
@@ -817,8 +990,8 @@ export function getAvailableUnreadCount(userId: number): { count: number; totalS
 
 export function createUser(pseudo: string, password: string, isAdmin = false, avatar = '☕'): User {
 	const hashpwd = hashSync(password, 10);
-	const stmt = db.prepare('INSERT INTO users (pseudo, password_hash, is_admin, avatar) VALUES (?, ?, ?, ?)');
-	const result = stmt.run(pseudo, hashpwd, isAdmin ? 1 : 0, avatar);
+	const stmt = db.prepare('INSERT INTO users (pseudo, password_hash, is_admin, avatar, audio_availability_days) VALUES (?, ?, ?, ?, ?)');
+	const result = stmt.run(pseudo, hashpwd, isAdmin ? 1 : 0, avatar, getConfiguredHistoryDays());
 	return getUserById(result.lastInsertRowid as number)!;
 }
 
@@ -833,7 +1006,7 @@ export function hasAdmin(): boolean {
 }
 
 export function getUserById(id: number): User | undefined {
-	const stmt = db.prepare('SELECT id, pseudo, avatar, is_admin, super_powers, auto_mark_own_recordings_as_listened, daily_notification_hour, timezone, created_at, last_login, logs_enabled, jingles_enabled, pwa_tutorial_enabled, push_notifications_enabled FROM users WHERE id = ?');
+	const stmt = db.prepare('SELECT id, pseudo, avatar, is_admin, super_powers, auto_mark_own_recordings_as_listened, audio_availability_days, daily_notification_hour, birthday_day, birthday_month, birthday_year, timezone, created_at, last_login, logs_enabled, jingles_enabled, pwa_tutorial_enabled, push_notifications_enabled FROM users WHERE id = ?');
 	return stmt.get(id) as User | undefined;
 }
 
@@ -860,17 +1033,63 @@ export function getAllUsers(): UserWithCount[] {
 	
 	const stmt = db.prepare(`
 		SELECT 
-			u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.auto_mark_own_recordings_as_listened, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled, u.push_notifications_enabled,
+			u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.auto_mark_own_recordings_as_listened, u.audio_availability_days, u.daily_notification_hour, u.birthday_day, u.birthday_month, u.birthday_year, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled, u.push_notifications_enabled,
 			COALESCE((
 				SELECT COUNT(*) 
 				FROM recordings r 
 				WHERE r.user_id = u.id 
 				AND r.recorded_at >= ?
+				AND datetime(r.recorded_at) >= datetime('now', '-' || MIN(COALESCE(u.audio_availability_days, ?), ?) || ' days')
 			), 0) as recording_count
 		FROM users u
 		ORDER BY recording_count DESC, u.pseudo ASC
 	`);
-	return stmt.all(historyCutoff.toISOString()) as UserWithCount[];
+	return stmt.all(historyCutoff.toISOString(), getConfiguredHistoryDays(), getConfiguredHistoryDays()) as UserWithCount[];
+}
+
+export function getUpcomingBirthdaysForUser(userId: number, withinDays = 30): UpcomingBirthday[] {
+	const user = getUserById(userId);
+	if (!user) return [];
+
+	const timezone = user.timezone || 'Europe/Paris';
+
+	return getAllUsers()
+		.filter((member) => member.birthday_day && member.birthday_month)
+		.map((member) => {
+			const nextBirthday = getNextBirthdayOccurrence(member.birthday_day!, member.birthday_month!, timezone);
+			if (!nextBirthday) return null;
+
+			return {
+				userId: member.id,
+				pseudo: member.pseudo,
+				day: member.birthday_day!,
+				month: member.birthday_month!,
+				label: formatBirthdayFrench(member.birthday_day!, member.birthday_month!),
+				ageOnBirthday: getAgeOnNextBirthday(
+					member.birthday_day!,
+					member.birthday_month!,
+					member.birthday_year,
+					timezone
+				),
+				daysUntil: nextBirthday.daysUntil
+			} satisfies UpcomingBirthday;
+		})
+		.filter((birthday): birthday is UpcomingBirthday => Boolean(birthday) && birthday.daysUntil <= withinDays)
+		.sort((a, b) => a.daysUntil - b.daysUntil || a.month - b.month || a.day - b.day || a.pseudo.localeCompare(b.pseudo, 'fr'));
+}
+
+export function getTeamBirthdayInfo(user: Pick<User, 'birthday_day' | 'birthday_month' | 'birthday_year'>, timezone = 'Europe/Paris'): TeamBirthdayInfo | null {
+	if (!user.birthday_day || !user.birthday_month) return null;
+
+	return {
+		label: formatBirthdayDayMonth(user.birthday_day, user.birthday_month),
+		ageOnBirthday: getAgeOnNextBirthday(user.birthday_day, user.birthday_month, user.birthday_year, timezone)
+	};
+}
+
+export function getUserCurrentAge(user: Pick<User, 'birthday_day' | 'birthday_month' | 'birthday_year'>, timezone = 'Europe/Paris'): number | null {
+	if (!user.birthday_day || !user.birthday_month || !user.birthday_year) return null;
+	return getCurrentAge(user.birthday_day, user.birthday_month, user.birthday_year, timezone);
 }
 
 export function deleteUser(id: number): void {
@@ -945,6 +1164,30 @@ export function updateUserTimezone(userId: number, timezone: string): void {
 	}
 	const stmt = db.prepare('UPDATE users SET timezone = ? WHERE id = ?');
 	stmt.run(timezone, userId);
+}
+
+export function updateUserBirthday(userId: number, day: number | null, month: number | null, year: number | null): void {
+	if (day === null || month === null) {
+		const stmt = db.prepare('UPDATE users SET birthday_day = NULL, birthday_month = NULL, birthday_year = NULL WHERE id = ?');
+		stmt.run(userId);
+		return;
+	}
+
+	if (!isValidBirthday(day, month, year)) {
+		return;
+	}
+
+	const stmt = db.prepare('UPDATE users SET birthday_day = ?, birthday_month = ?, birthday_year = ? WHERE id = ?');
+	stmt.run(day, month, year ?? null, userId);
+}
+
+export function updateUserAudioAvailabilityDays(userId: number, days: number): void {
+	if (!Number.isInteger(days) || days < 7) {
+		return;
+	}
+	const normalizedDays = Math.min(getConfiguredHistoryDays(), Math.max(7, Math.trunc(days)));
+	const stmt = db.prepare('UPDATE users SET audio_availability_days = ? WHERE id = ?');
+	stmt.run(normalizedDays, userId);
 }
 
 export function updateUserPassword(userId: number, passwordHash: string): void {
@@ -1030,7 +1273,7 @@ export function updateLastLogin(userId: number): void {
 
 export function getSession(sessionId: string): User | undefined {
 	const stmt = db.prepare(`
-		SELECT u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.auto_mark_own_recordings_as_listened, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled, u.push_notifications_enabled
+		SELECT u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.auto_mark_own_recordings_as_listened, u.audio_availability_days, u.daily_notification_hour, u.birthday_day, u.birthday_month, u.birthday_year, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled, u.push_notifications_enabled
 		FROM sessions s 
 		JOIN users u ON s.user_id = u.id 
 		WHERE s.id = ? AND s.expires_at > datetime('now')
@@ -1477,7 +1720,10 @@ export function getShortRecordings(filters: ShortRecordingFilters = {}): Recordi
 }
 
 export function getUserRecordings(userId: number, limit = 5, offset = 0): Recording[] {
+	const user = getUserById(userId);
+	if (!user) return [];
 	const historyCutoff = getHistoryCutoffDate();
+	const availabilityDays = getEffectiveAudioAvailabilityDays(user);
 	
 	const stmt = db.prepare(`
 		SELECT
@@ -1498,29 +1744,35 @@ export function getUserRecordings(userId: number, limit = 5, offset = 0): Record
 			u.avatar
 		FROM recordings r
 		JOIN users u ON r.user_id = u.id
-		WHERE r.user_id = ? AND r.recorded_at >= ?
+		WHERE r.user_id = ? AND r.recorded_at >= ? AND datetime(r.recorded_at) >= datetime('now', '-' || ? || ' days')
 		ORDER BY r.recorded_at DESC
 		LIMIT ? OFFSET ?
 	`);
 	
-	return stmt.all(userId, historyCutoff.toISOString(), limit, offset) as Recording[];
+	return stmt.all(userId, historyCutoff.toISOString(), availabilityDays, limit, offset) as Recording[];
 }
 
 export function getUserRecordingsCount(userId: number): number {
+	const user = getUserById(userId);
+	if (!user) return 0;
 	const historyCutoff = getHistoryCutoffDate();
+	const availabilityDays = getEffectiveAudioAvailabilityDays(user);
 	
 	const stmt = db.prepare(`
 		SELECT COUNT(*) as count
 		FROM recordings
-		WHERE user_id = ? AND recorded_at >= ?
+		WHERE user_id = ? AND recorded_at >= ? AND datetime(recorded_at) >= datetime('now', '-' || ? || ' days')
 	`);
 	
-	const result = stmt.get(userId, historyCutoff.toISOString()) as { count: number };
+	const result = stmt.get(userId, historyCutoff.toISOString(), availabilityDays) as { count: number };
 	return result.count;
 }
 
 export function getUserProfileImages(userId: number, limit = 8, offset = 0, includeNonReady = false): ProfileImage[] {
+	const user = getUserById(userId);
+	if (!user) return [];
 	const historyCutoff = getHistoryCutoffDate();
+	const availabilityDays = getEffectiveAudioAvailabilityDays(user);
 	const stmt = db.prepare(`
 		SELECT
 			r.id,
@@ -1534,29 +1786,37 @@ export function getUserProfileImages(userId: number, limit = 8, offset = 0, incl
 		FROM recordings r
 		JOIN users u ON u.id = r.user_id
 		WHERE r.user_id = ? AND r.image_filename IS NOT NULL AND r.recorded_at >= ?
+		AND datetime(r.recorded_at) >= datetime('now', '-' || ? || ' days')
 		${includeNonReady ? '' : "AND r.processing_status = 'ready'"}
 		ORDER BY datetime(r.recorded_at) DESC, r.id DESC
 		LIMIT ? OFFSET ?
 	`);
 
-	return stmt.all(userId, historyCutoff.toISOString(), limit, offset) as ProfileImage[];
+	return stmt.all(userId, historyCutoff.toISOString(), availabilityDays, limit, offset) as ProfileImage[];
 }
 
 export function getUserProfileImagesCount(userId: number, includeNonReady = false): number {
+	const user = getUserById(userId);
+	if (!user) return 0;
 	const historyCutoff = getHistoryCutoffDate();
+	const availabilityDays = getEffectiveAudioAvailabilityDays(user);
 	const stmt = db.prepare(`
 		SELECT COUNT(*) as count
 		FROM recordings
 		WHERE user_id = ? AND image_filename IS NOT NULL AND recorded_at >= ?
+		AND datetime(recorded_at) >= datetime('now', '-' || ? || ' days')
 		${includeNonReady ? '' : "AND processing_status = 'ready'"}
 	`);
 
-	const result = stmt.get(userId, historyCutoff.toISOString()) as { count: number };
+	const result = stmt.get(userId, historyCutoff.toISOString(), availabilityDays) as { count: number };
 	return result.count;
 }
 
 export function getUserRecentRecordings(userId: number, limit = 10, includeNonReady = false): Recording[] {
+	const user = getUserById(userId);
+	if (!user) return [];
 	const historyCutoff = getHistoryCutoffDate();
+	const availabilityDays = getEffectiveAudioAvailabilityDays(user);
 	const stmt = db.prepare(`
 		SELECT
 			r.id,
@@ -1578,12 +1838,13 @@ export function getUserRecentRecordings(userId: number, limit = 10, includeNonRe
 		FROM recordings r
 		JOIN users u ON u.id = r.user_id
 		WHERE r.user_id = ? AND r.recorded_at >= ?
+		AND datetime(r.recorded_at) >= datetime('now', '-' || ? || ' days')
 		${includeNonReady ? '' : "AND r.processing_status = 'ready'"}
 		ORDER BY datetime(r.recorded_at) DESC, r.id DESC
 		LIMIT ?
 	`);
 
-	return stmt.all(userId, historyCutoff.toISOString(), limit) as Recording[];
+	return stmt.all(userId, historyCutoff.toISOString(), availabilityDays, limit) as Recording[];
 }
 
 export function getVisibleRecentRecordingsForViewer(profileUserId: number, viewerId: number, limit = 10): Recording[] {
@@ -1594,9 +1855,33 @@ export function getVisibleRecentRecordingsForViewer(profileUserId: number, viewe
 	const viewerTimezone = viewer.timezone || 'Europe/Paris';
 	const threshold = viewer.daily_notification_hour;
 
-	return getUserRecentRecordings(profileUserId, limit).filter((recording) =>
+	return getUserRecentRecordings(profileUserId, Math.max(limit * 4, 24)).filter((recording) =>
 		isDateAvailable(recording.recorded_at, canUserBypassRecordingLock(viewer), threshold, viewerTimezone)
-	);
+	).slice(0, limit);
+}
+
+export function getVisibleProfileImagesForViewer(profileUserId: number, viewerId: number, limit = 8, offset = 0): ProfileImage[] {
+	const viewer = getUserById(viewerId);
+	if (!viewer) return [];
+
+	const viewerTimezone = viewer.timezone || 'Europe/Paris';
+	const threshold = viewer.daily_notification_hour;
+
+	return getUserProfileImages(profileUserId, 500, 0).filter((image) =>
+		isDateAvailable(image.recorded_at, canUserBypassRecordingLock(viewer), threshold, viewerTimezone)
+	).slice(offset, offset + limit);
+}
+
+export function getVisibleProfileImagesCountForViewer(profileUserId: number, viewerId: number): number {
+	const viewer = getUserById(viewerId);
+	if (!viewer) return 0;
+
+	const viewerTimezone = viewer.timezone || 'Europe/Paris';
+	const threshold = viewer.daily_notification_hour;
+
+	return getUserProfileImages(profileUserId, 500, 0).filter((image) =>
+		isDateAvailable(image.recorded_at, canUserBypassRecordingLock(viewer), threshold, viewerTimezone)
+	).length;
 }
 
 export function getRecordingsForUser(userId: number): Recording[] {
@@ -1624,6 +1909,7 @@ export function getRecordingsForUser(userId: number): Recording[] {
 			FROM recordings r 
 			JOIN users u ON r.user_id = u.id 
 			WHERE date(r.recorded_at) = ? AND r.processing_status = 'ready'
+			AND ${getAudioAvailabilitySqlClause('u')}
 			ORDER BY r.recorded_at DESC
 		`);
 		return stmt.all(today) as Recording[];
@@ -1633,6 +1919,7 @@ export function getRecordingsForUser(userId: number): Recording[] {
 			FROM recordings r 
 			JOIN users u ON r.user_id = u.id 
 			WHERE date(r.recorded_at) = ? AND r.processing_status = 'ready'
+			AND ${getAudioAvailabilitySqlClause('u')}
 			ORDER BY r.recorded_at DESC
 		`);
 		return stmt.all(yesterdayStr) as Recording[];
@@ -1844,7 +2131,11 @@ export function getUsersWithPushNotificationsEnabled(): User[] {
 			is_admin,
 			super_powers,
 			auto_mark_own_recordings_as_listened,
+			audio_availability_days,
 			daily_notification_hour,
+			birthday_day,
+			birthday_month,
+			birthday_year,
 			timezone,
 			created_at,
 			last_login,
@@ -2069,16 +2360,17 @@ export function approveRegistration(id: number, isAdmin: boolean = false): User 
 	
 	// Crée l'utilisateur avec le même hash de mot de passe
 	const insertUserStmt = db.prepare(`
-		INSERT INTO users (pseudo, password_hash, avatar, timezone, is_admin, super_powers)
-		VALUES (?, ?, ?, ?, ?, 0)
-		RETURNING id, pseudo, avatar, is_admin, super_powers, auto_mark_own_recordings_as_listened, daily_notification_hour, timezone, created_at, logs_enabled, jingles_enabled, push_notifications_enabled
+		INSERT INTO users (pseudo, password_hash, avatar, timezone, is_admin, super_powers, audio_availability_days)
+		VALUES (?, ?, ?, ?, ?, 0, ?)
+		RETURNING id, pseudo, avatar, is_admin, super_powers, auto_mark_own_recordings_as_listened, audio_availability_days, daily_notification_hour, birthday_day, birthday_month, birthday_year, timezone, created_at, logs_enabled, jingles_enabled, push_notifications_enabled
 	`);
 	const user = insertUserStmt.get(
 		registration.pseudo, 
 		registration.password_hash, 
 		registration.avatar, 
 		registration.timezone,
-		isAdmin ? 1 : 0
+		isAdmin ? 1 : 0,
+		getConfiguredHistoryDays()
 	) as User;
 	
 	// Met à jour le statut de la demande

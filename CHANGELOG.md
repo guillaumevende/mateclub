@@ -2,6 +2,27 @@
 
 ---
 
+## v0.37.8 (2026-06-05) - Anniversaires et visibilité audio par utilisateur
+
+### ✨ Nouvelles fonctionnalités
+
+- **Anniversaires des membres** : chaque utilisateur peut désormais renseigner un jour et un mois d’anniversaire dans Réglages, avec année optionnelle pour afficher l’âge
+- **Anniversaires à venir sur l’accueil** : les anniversaires des 30 prochains jours apparaissent sous la date du jour, triés du plus proche au plus lointain
+- **Anniversaire visible dans la team** : la liste des membres affiche la date d’anniversaire et l’âge au prochain anniversaire quand l’année est renseignée
+- **Âge sur le profil** : la page profil affiche désormais l’âge sous le pseudo quand l’année de naissance est connue
+- **Durée de mise à disposition des audios par utilisateur** : chaque membre peut définir pendant combien de jours ses propres capsules restent visibles, entre 7 jours et la durée maximale configurée pour l’installation
+
+### 🐛 Corrections
+
+- **Visibilité des capsules cohérente partout** : la durée de mise à disposition personnelle s’applique à l’accueil, au calendrier, aux profils et aux compteurs dérivés sans supprimer aucun fichier
+- **Compte des capsules par membre ajusté** : la liste des membres reflète mieux les capsules réellement visibles dans la fenêtre de disponibilité définie par chaque utilisateur
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.8`
+- README.md : ajout des anniversaires et de la visibilité personnalisée des capsules dans les fonctionnalités
+- package.json / package-lock.json : version portée en `0.37.8`
+
 ## v0.37.7 (2026-05-29) - Réglage individuel de lecture automatique des propres capsules
 
 ### ✨ Nouvelles fonctionnalités

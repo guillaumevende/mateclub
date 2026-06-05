@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.37.7-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.37.8-blue?style=for-the-badge)
 
 </div>
 
@@ -118,6 +118,8 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 - **Tuto PWA désactivable** - Chaque utilisateur peut masquer les popups d’installation PWA depuis ses réglages
 - **Mise à jour rapide** - Un membre peut marquer en une fois toutes les publications existantes des autres utilisateurs comme lues
 - **Information groupée** - L’admin peut diffuser une information persistante visible par tous les membres dans une bulle dédiée
+- **Anniversaires** - Chaque membre peut renseigner son anniversaire, avec année optionnelle pour afficher l’âge dans la team et sur son profil
+- **Visibilité personnalisée des capsules** - Chaque membre choisit combien de jours ses enregistrements restent visibles, dans la limite fixée par l’installation
 - **Profils utilisateurs** - Chaque avatar ouvre une page profil avec galerie des images publiées et dernières capsules audio
 - **Pull-to-refresh** - Rechargement de la page d'accueil (désactivé sur modales)
 - **Scroll lock** - Empêche le scroll arrière-plan quand une modale est ouverte
