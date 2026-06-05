@@ -43,6 +43,7 @@
 		id: number;
 		pseudo: string;
 		avatar: string;
+		super_powers: number;
 		is_admin: number;
 		recording_count?: number;
 	};
@@ -52,6 +53,7 @@
 		historyMonths: number;
 		maxRecordingSeconds: number;
 		maxGroupNameLength: number;
+		recordingUnlockMode: 'never_locked' | 'timed_lock' | 'timed_optional_unlock';
 	};
 
 	type BroadcastInfo = {
@@ -90,7 +92,7 @@
 	function getInitialHomeState() {
 		const initialPage = data.page ?? 1;
 		const initialTodayDate = getUserToday();
-		const initialDays = data.days ?? [];
+		const initialDays: DayRecordings[] = data.days ?? [];
 
 		return {
 			initialPage,
@@ -222,6 +224,16 @@
 	});
 
 	let canPlayUnreadSummary = $derived(playableUnreadSummaryStats.count > 0);
+	let userHasImmediateUnlock = $derived(
+		data.appSettings?.recordingUnlockMode === 'never_locked' ||
+		(
+			data.user?.super_powers === 1 &&
+			(
+				data.appSettings?.recordingUnlockMode === 'timed_optional_unlock' ||
+				data.user?.is_admin === 1
+			)
+		)
+	);
 	let broadcastInfoRead = $derived(
 		(data.broadcastInfo?.read ?? true) ||
 		(data.broadcastInfo?.revision != null && locallyReadBroadcastRevision === data.broadcastInfo.revision)
@@ -236,6 +248,15 @@
 		const hasPlayableUnread = playableCount > 0;
 		const hasOnlyLockedUnread = hasResolvedPlayableState && totalCount > 0 && playableCount === 0;
 		const hasMixedUnread = hasResolvedPlayableState && playableCount > 0 && playableCount < totalCount;
+
+		if (userHasImmediateUnlock && totalCount > 0) {
+			return {
+				title: `${totalCount} capsule${totalCount !== 1 ? 's' : ''} non lue${totalCount !== 1 ? 's' : ''}`,
+				duration: formatCompactDurationLabel(totalSeconds),
+				showPlayIcon: true,
+				showLockIcon: false
+			};
+		}
 
 		if (!hasResolvedPlayableState && totalCount > 0) {
 			return {
@@ -443,16 +464,16 @@
 				const today = getUserToday();
 				
 				if (page === 1) {
-					allDays = data.days.filter(d => d.date !== today);
+					allDays = data.days.filter((d: DayRecordings) => d.date !== today);
 				} else {
-					const existingDates = new Set(allDays.map(d => d.date));
-					const newDays = data.days.filter(d => d.date !== today && !existingDates.has(d.date));
+					const existingDates = new Set(allDays.map((d: DayRecordings) => d.date));
+					const newDays = data.days.filter((d: DayRecordings) => d.date !== today && !existingDates.has(d.date));
 					if (newDays.length > 0) {
 						allDays = [...allDays, ...newDays];
 					}
 				}
 				
-				todayDay = data.days.find(d => d.date === today) || null;
+				todayDay = data.days.find((d: DayRecordings) => d.date === today) || null;
 				currentPage = page;
 				showCalendar = page >= 2;
 				
@@ -894,13 +915,7 @@
 	function shouldShowPlayer(day: DayRecordings, user?: User): boolean {
 		if (!day.available) return false;
 		if (day.recordings.length === 0) return false;
-		
-		const today = getUserToday();
-		// Show player for past days always
-		if (day.date !== today) return true;
-		
-		// For today, only show if user has super powers
-		return user?.super_powers === 1 || user?.is_admin === 1;
+		return true;
 	}
 
 	function formatTimeSeconds(seconds: number): string {
@@ -1189,7 +1204,11 @@
 		</button>
 	</header>
 
-	<TeamList allUsers={data.allUsers} bind:showTeam />
+	<TeamList
+		allUsers={data.allUsers}
+		showUnlockStatus={data.appSettings?.recordingUnlockMode === 'timed_optional_unlock'}
+		bind:showTeam
+	/>
 
 	{#if showBroadcastInfoModal && data.broadcastInfo?.message}
 		<div

@@ -1,7 +1,7 @@
 import type { PageServerLoad, Actions } from './$types';
 import { redirect, fail } from '@sveltejs/kit';
 import { hashSync } from 'bcrypt';
-import { updateUserAvatar, updateUserHour, updateUserTimezone, getUserById, updateUserPassword, updateUserPseudo, isPseudoAvailable, deleteUserSessions, togglePwaTutorialEnabled, markAllExistingOtherRecordingsAsListened } from '$lib/server/db';
+import { updateUserAvatar, updateUserHour, updateUserTimezone, getUserById, updateUserPassword, updateUserPseudo, isPseudoAvailable, deleteUserSessions, togglePwaTutorialEnabled, markAllExistingOtherRecordingsAsListened, toggleSuperPowers, toggleAutoMarkOwnRecordingsAsListened, getAppSettings } from '$lib/server/db';
 import { readdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { version } from '../../../package.json';
@@ -67,7 +67,8 @@ export const load: PageServerLoad = async ({ locals }) => {
 		savedImage,
 		csrfToken: locals.csrfToken ?? '',
 		version,
-		pushConfig: getPushRuntimeConfig()
+		pushConfig: getPushRuntimeConfig(),
+		appSettings: getAppSettings()
 	};
 };
 
@@ -96,6 +97,27 @@ export const load: PageServerLoad = async ({ locals }) => {
 					? 'Aucune publication à marquer comme lue'
 					: `${result.selectedCount} publication${plural} marquée${plural} comme lue${plural}`
 			};
+		}
+
+		if (intent === 'toggleSuperPowers') {
+			const enabled = data.get('enabled') === 'true';
+			const appSettings = getAppSettings();
+			const canTogglePersonalUnlock = appSettings.recordingUnlockMode === 'timed_optional_unlock'
+				|| (appSettings.recordingUnlockMode === 'timed_lock' && locals.user.is_admin === 1);
+			if (!canTogglePersonalUnlock) {
+				return fail(400, {
+					success: false,
+					error: 'Le déblocage individuel n’est pas disponible actuellement.'
+				});
+			}
+			toggleSuperPowers(locals.user.id, enabled);
+			return { success: true, superPowersUpdated: true };
+		}
+
+		if (intent === 'toggleAutoMarkOwnRecordingsAsListened') {
+			const enabled = data.get('enabled') === 'true';
+			toggleAutoMarkOwnRecordingsAsListened(locals.user.id, enabled);
+			return { success: true, autoMarkOwnRecordingsUpdated: true };
 		}
 
 		const avatar = data.get('avatar')?.toString() || '☕';

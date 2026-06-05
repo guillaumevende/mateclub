@@ -29,6 +29,7 @@ const DEFAULT_MAX_RECORDING_SECONDS = 180;
 const MAX_GROUP_NAME_LENGTH = 24;
 const DEFAULT_PUSH_CHECK_WINDOW_MINUTES = 120;
 const DEFAULT_AUDIO_PROCESSING_ENABLED = false;
+const DEFAULT_RECORDING_UNLOCK_MODE = 'timed_lock';
 
 // No automatic admin creation - first admin must be created via /setup page
 
@@ -40,6 +41,7 @@ const DEFAULT_AUDIO_PROCESSING_ENABLED = false;
 		avatar TEXT DEFAULT '☕',
 		is_admin INTEGER DEFAULT 0,
 		super_powers INTEGER DEFAULT 0,
+		auto_mark_own_recordings_as_listened INTEGER DEFAULT 1,
 		daily_notification_hour INTEGER DEFAULT 420,
 		timezone TEXT DEFAULT 'Europe/Paris',
 		created_at DATETIME DEFAULT (datetime('now')),
@@ -138,6 +140,12 @@ try {
 
 try {
 	db.exec('ALTER TABLE users ADD COLUMN super_powers INTEGER DEFAULT 0');
+} catch (e) {
+	// Colonne déjà existante
+}
+
+try {
+	db.exec('ALTER TABLE users ADD COLUMN auto_mark_own_recordings_as_listened INTEGER DEFAULT 1');
 } catch (e) {
 	// Colonne déjà existante
 }
@@ -276,12 +284,14 @@ try {
 	stmt.run('max_recording_seconds', DEFAULT_MAX_RECORDING_SECONDS.toString());
 	stmt.run('push_check_window_minutes', DEFAULT_PUSH_CHECK_WINDOW_MINUTES.toString());
 	stmt.run('audio_processing_enabled', DEFAULT_AUDIO_PROCESSING_ENABLED ? 'true' : 'false');
+	stmt.run('recording_unlock_mode', DEFAULT_RECORDING_UNLOCK_MODE);
 	stmt.run('broadcast_info_message', '');
 	stmt.run('broadcast_info_revision', '0');
 } catch (e) {
 	// Table déjà existante
 }
 
+export type RecordingUnlockMode = 'never_locked' | 'timed_lock' | 'timed_optional_unlock';
 export type AppSettings = {
 	allowRegistration: boolean;
 	groupName: string;
@@ -289,6 +299,7 @@ export type AppSettings = {
 	maxRecordingSeconds: number;
 	maxGroupNameLength: number;
 	audioProcessingEnabled: boolean;
+	recordingUnlockMode: RecordingUnlockMode;
 };
 
 export type BroadcastInfo = {
@@ -324,6 +335,14 @@ export function getConfiguredPushCheckWindowMinutes(): number {
 	return parseAppConfigInteger(getAppConfig('push_check_window_minutes'), DEFAULT_PUSH_CHECK_WINDOW_MINUTES, 1, 24 * 60);
 }
 
+export function getRecordingUnlockMode(): RecordingUnlockMode {
+	const value = (getAppConfig('recording_unlock_mode') ?? '').trim();
+	if (value === 'never_locked' || value === 'timed_lock' || value === 'timed_optional_unlock') {
+		return value;
+	}
+	return DEFAULT_RECORDING_UNLOCK_MODE;
+}
+
 export function getAppSettings(): AppSettings {
 	return {
 		allowRegistration: isRegistrationAllowed(),
@@ -331,7 +350,8 @@ export function getAppSettings(): AppSettings {
 		historyMonths: getConfiguredHistoryMonths(),
 		maxRecordingSeconds: getConfiguredMaxRecordingSeconds(),
 		maxGroupNameLength: MAX_GROUP_NAME_LENGTH,
-		audioProcessingEnabled: isAudioProcessingEnabled()
+		audioProcessingEnabled: isAudioProcessingEnabled(),
+		recordingUnlockMode: getRecordingUnlockMode()
 	};
 }
 
@@ -348,6 +368,7 @@ export type User = {
 	avatar: string;
 	is_admin: number;
 	super_powers: number;
+	auto_mark_own_recordings_as_listened: number;
 	daily_notification_hour: number;
 	timezone: string;
 	created_at: string;
@@ -527,8 +548,8 @@ export function getRecordingsByDate(userId: number, date: string): DayRecordings
 	if (filteredResults.length === 0) return null;
 
 	// Vérifier chaque enregistrement individuellement
-	const isAvailable = filteredResults.some(r => 
-		isDateAvailable(r.recorded_at, user.super_powers === 1, user.daily_notification_hour, timezone)
+	const isAvailable = filteredResults.some(r =>
+		isDateAvailable(r.recorded_at, canUserBypassRecordingLock(user), user.daily_notification_hour, timezone)
 	);
 
 	return {
@@ -538,8 +559,10 @@ export function getRecordingsByDate(userId: number, date: string): DayRecordings
 	};
 }
 
-function isDateAvailable(recordedAt: string, superPowers: boolean, thresholdMinutes: number, timezone: string): boolean {
-	if (superPowers) return true;
+function isDateAvailable(recordedAt: string, canBypassLock: boolean, thresholdMinutes: number, timezone: string): boolean {
+	const unlockMode = getRecordingUnlockMode();
+	if (unlockMode === 'never_locked') return true;
+	if (canBypassLock) return true;
 
 	const now = new Date();
 	
@@ -595,6 +618,17 @@ function isDateAvailable(recordedAt: string, superPowers: boolean, thresholdMinu
 	return false;
 }
 
+export function canUserBypassRecordingLock(user?: Pick<User, 'super_powers' | 'is_admin'> | null): boolean {
+	if (!user) return false;
+	if (user.super_powers !== 1) return false;
+
+	const unlockMode = getRecordingUnlockMode();
+	if (unlockMode === 'never_locked') return false;
+	if (unlockMode === 'timed_optional_unlock') return true;
+
+	return user.is_admin === 1;
+}
+
 export function getRecordingsGroupedByDay(userId: number, limit = 7, page = 1, timezone?: string): DayRecordings[] {
 	const user = getUserById(userId);
 	if (!user) return [];
@@ -633,8 +667,8 @@ export function getRecordingsGroupedByDay(userId: number, limit = 7, page = 1, t
 	for (const [date, recordings] of Object.entries(grouped)) {
 		// Vérifier chaque enregistrement individuellement
 		// Si AU MOINS un enregistrement est disponible, le groupe est disponible
-		const isAvailable = recordings.some(r => 
-			isDateAvailable(r.recorded_at, user.super_powers === 1, threshold, userTimezone)
+		const isAvailable = recordings.some(r =>
+			isDateAvailable(r.recorded_at, canUserBypassRecordingLock(user), threshold, userTimezone)
 		);
 		
 		days.push({
@@ -704,7 +738,7 @@ export function getRecordingsGroupedByDayWithHasMore(
 	for (const date of selectedDates) {
 		const recordings = grouped[date];
 		const isAvailable = recordings.some(r =>
-			isDateAvailable(r.recorded_at, user.super_powers === 1, threshold, userTimezone)
+			isDateAvailable(r.recorded_at, canUserBypassRecordingLock(user), threshold, userTimezone)
 		);
 
 		days.push({
@@ -772,7 +806,7 @@ export function getAvailableUnreadCount(userId: number): { count: number; totalS
 
 	const unreadRecordings = stmt.all(userId, userId, historyCutoffStr) as Recording[];
 	const availableRecordings = unreadRecordings.filter((recording) =>
-		isDateAvailable(recording.recorded_at, user.super_powers === 1, user.daily_notification_hour, user.timezone || 'Europe/Paris')
+		isDateAvailable(recording.recorded_at, canUserBypassRecordingLock(user), user.daily_notification_hour, user.timezone || 'Europe/Paris')
 	);
 
 	return {
@@ -799,7 +833,7 @@ export function hasAdmin(): boolean {
 }
 
 export function getUserById(id: number): User | undefined {
-	const stmt = db.prepare('SELECT id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, last_login, logs_enabled, jingles_enabled, pwa_tutorial_enabled, push_notifications_enabled FROM users WHERE id = ?');
+	const stmt = db.prepare('SELECT id, pseudo, avatar, is_admin, super_powers, auto_mark_own_recordings_as_listened, daily_notification_hour, timezone, created_at, last_login, logs_enabled, jingles_enabled, pwa_tutorial_enabled, push_notifications_enabled FROM users WHERE id = ?');
 	return stmt.get(id) as User | undefined;
 }
 
@@ -826,7 +860,7 @@ export function getAllUsers(): UserWithCount[] {
 	
 	const stmt = db.prepare(`
 		SELECT 
-			u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled, u.push_notifications_enabled,
+			u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.auto_mark_own_recordings_as_listened, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled, u.push_notifications_enabled,
 			COALESCE((
 				SELECT COUNT(*) 
 				FROM recordings r 
@@ -951,6 +985,11 @@ export function toggleSuperPowers(userId: number, enabled: boolean): void {
 	stmt.run(enabled ? 1 : 0, userId);
 }
 
+export function toggleAutoMarkOwnRecordingsAsListened(userId: number, enabled: boolean): void {
+	const stmt = db.prepare('UPDATE users SET auto_mark_own_recordings_as_listened = ? WHERE id = ?');
+	stmt.run(enabled ? 1 : 0, userId);
+}
+
 export function toggleLogsEnabled(userId: number, enabled: boolean): void {
 	const stmt = db.prepare('UPDATE users SET logs_enabled = ? WHERE id = ?');
 	stmt.run(enabled ? 1 : 0, userId);
@@ -991,7 +1030,7 @@ export function updateLastLogin(userId: number): void {
 
 export function getSession(sessionId: string): User | undefined {
 	const stmt = db.prepare(`
-		SELECT u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled, u.push_notifications_enabled
+		SELECT u.id, u.pseudo, u.avatar, u.is_admin, u.super_powers, u.auto_mark_own_recordings_as_listened, u.daily_notification_hour, u.timezone, u.created_at, u.last_login, u.logs_enabled, u.jingles_enabled, u.pwa_tutorial_enabled, u.push_notifications_enabled
 		FROM sessions s 
 		JOIN users u ON s.user_id = u.id 
 		WHERE s.id = ? AND s.expires_at > datetime('now')
@@ -1040,6 +1079,40 @@ export type SaveRecordingOptions = {
 	recordedAt?: string | null;
 };
 
+function parseRecordingDate(recordedAt: string | null | undefined): Date {
+	if (!recordedAt) return new Date();
+
+	const normalized = recordedAt.includes('T')
+		? recordedAt
+		: `${recordedAt.replace(' ', 'T')}Z`;
+	const parsed = new Date(normalized);
+	return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+function buildRecordingAuthorPrefix(pseudo: string): string {
+	const normalized = pseudo
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '')
+		.toLowerCase()
+		.replace(/[^a-z0-9]/g, '');
+
+	return (normalized.slice(0, 3) || 'usr').padEnd(3, 'x');
+}
+
+function buildRecordingFilename(userId: number, audioExtension: string, recordedAt: string | null | undefined): string {
+	const user = getUserById(userId);
+	const authorPrefix = buildRecordingAuthorPrefix(user?.pseudo || 'usr');
+	const recordedDate = parseRecordingDate(recordedAt);
+	const year = recordedDate.getUTCFullYear();
+	const month = String(recordedDate.getUTCMonth() + 1).padStart(2, '0');
+	const day = String(recordedDate.getUTCDate()).padStart(2, '0');
+	const hours = String(recordedDate.getUTCHours()).padStart(2, '0');
+	const minutes = String(recordedDate.getUTCMinutes()).padStart(2, '0');
+	const randomSuffix = crypto.randomUUID().replace(/-/g, '').slice(0, 6);
+
+	return `${year}${month}${day}${hours}${minutes}_${authorPrefix}_${randomSuffix}.${audioExtension}`;
+}
+
 export function saveRecording(
 	userId: number,
 	audioData: Buffer,
@@ -1062,7 +1135,7 @@ export function saveRecording(
 
 	debug.db.log('saveRecording - audioData:', audioData.length, 'bytes, imageData:', imageData?.length || 'none');
 
-	const filename = `${Date.now()}-${crypto.randomUUID()}.${audioExtension}`;
+	const filename = buildRecordingFilename(userId, audioExtension, recordedAt);
 	const effectiveProcessedFilename =
 		processedFilename ?? (processingStatus === 'ready' ? filename : null);
 	const filepath = join(uploadsDir, filename);
@@ -1111,7 +1184,17 @@ export function saveRecording(
 	);
 	debug.db.log('Enregistrement créé - id:', result.lastInsertRowid);
 
-	return getRecordingById(result.lastInsertRowid as number)!;
+	const createdRecordingId = result.lastInsertRowid as number;
+	const user = getUserById(userId);
+	if (user?.auto_mark_own_recordings_as_listened !== 0) {
+		const listenStmt = db.prepare(`
+			INSERT OR IGNORE INTO listening_history (user_id, recording_id)
+			VALUES (?, ?)
+		`);
+		listenStmt.run(userId, createdRecordingId);
+	}
+
+	return getRecordingById(createdRecordingId)!;
 }
 
 export function updateRecordingImage(recordingId: number, imageData: Buffer): Recording | undefined {
@@ -1503,6 +1586,19 @@ export function getUserRecentRecordings(userId: number, limit = 10, includeNonRe
 	return stmt.all(userId, historyCutoff.toISOString(), limit) as Recording[];
 }
 
+export function getVisibleRecentRecordingsForViewer(profileUserId: number, viewerId: number, limit = 10): Recording[] {
+	const viewer = getUserById(viewerId);
+	const profileUser = getUserById(profileUserId);
+	if (!viewer || !profileUser) return [];
+
+	const viewerTimezone = viewer.timezone || 'Europe/Paris';
+	const threshold = viewer.daily_notification_hour;
+
+	return getUserRecentRecordings(profileUserId, limit).filter((recording) =>
+		isDateAvailable(recording.recorded_at, canUserBypassRecordingLock(viewer), threshold, viewerTimezone)
+	);
+}
+
 export function getRecordingsForUser(userId: number): Recording[] {
 	const user = getUserById(userId);
 	if (!user) return [];
@@ -1747,6 +1843,7 @@ export function getUsersWithPushNotificationsEnabled(): User[] {
 			avatar,
 			is_admin,
 			super_powers,
+			auto_mark_own_recordings_as_listened,
 			daily_notification_hour,
 			timezone,
 			created_at,
@@ -1974,7 +2071,7 @@ export function approveRegistration(id: number, isAdmin: boolean = false): User 
 	const insertUserStmt = db.prepare(`
 		INSERT INTO users (pseudo, password_hash, avatar, timezone, is_admin, super_powers)
 		VALUES (?, ?, ?, ?, ?, 0)
-		RETURNING id, pseudo, avatar, is_admin, super_powers, daily_notification_hour, timezone, created_at, logs_enabled, jingles_enabled, push_notifications_enabled
+		RETURNING id, pseudo, avatar, is_admin, super_powers, auto_mark_own_recordings_as_listened, daily_notification_hour, timezone, created_at, logs_enabled, jingles_enabled, push_notifications_enabled
 	`);
 	const user = insertUserStmt.get(
 		registration.pseudo, 

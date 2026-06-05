@@ -20,8 +20,11 @@
 				id: number;
 				pseudo: string;
 				avatar: string;
+				is_admin?: number;
 				daily_notification_hour: number;
 				timezone: string;
+				super_powers?: number;
+				auto_mark_own_recordings_as_listened?: number;
 				pwa_tutorial_enabled?: number;
 				push_notifications_enabled?: number;
 			}
@@ -29,6 +32,9 @@
 			savedImage: string | null
 			version: string
 			pushConfig: PushConfig
+			appSettings?: {
+				recordingUnlockMode: 'never_locked' | 'timed_lock' | 'timed_optional_unlock';
+			}
 		}, 
 	} = $props();
 
@@ -69,6 +75,12 @@
 	let pushSupported = $state(false);
 	let pushPermission = $state<BrowserNotificationPermission>('default');
 	let pushEnabled = $state(false);
+	let superPowersLoading = $state(false);
+	let superPowersMessage = $state<string | null>(null);
+	let superPowersError = $state<string | null>(null);
+	let autoMarkOwnLoading = $state(false);
+	let autoMarkOwnMessage = $state<string | null>(null);
+	let autoMarkOwnError = $state<string | null>(null);
 	
 	// Convertir daily_notification_hour (minutes ou heures) en format HH:mm pour l'input time
 	function minutesToHHmm(value: number): string {
@@ -85,6 +97,16 @@
 	}
 	let selectedHour = $state('');
 	let selectedTimezone = $state('Europe/Paris');
+	let hourInput = $state<HTMLInputElement | null>(null);
+	let canToggleSuperPowers = $derived(
+		data.appSettings?.recordingUnlockMode === 'timed_optional_unlock'
+		|| (data.appSettings?.recordingUnlockMode === 'timed_lock' && data.user?.is_admin === 1)
+	);
+	let superPowersDescription = $derived(
+		data.appSettings?.recordingUnlockMode === 'timed_lock' && data.user?.is_admin === 1
+			? 'En tant qu’administrateur, cette option vous permet de lever votre verrouillage temporel personnel sans l’ouvrir aux autres membres.'
+			: 'Activez cette option pour lever votre verrouillage temporel personnel et écouter les publications sans attendre votre heure de disponibilité.'
+	);
 	
 	// Initialiser selectedHour après le chargement des données
 	$effect(() => {
@@ -542,6 +564,7 @@
 		}}>
 		
 		<input type="hidden" name="avatarImage" value={savedImageFilename || ''} />
+		<input type="hidden" name="hour" value={selectedHour} />
 		<input type="hidden" name="csrf_token" value={(data as any)?.csrfToken ?? ''} />
 		
 		<!-- Bloc 1: Nom d'utilisateur -->
@@ -689,7 +712,7 @@
 			<p class="description">Les enregistrements de la veille seront disponibles à partir de cette heure (dans ton fuseau horaire).</p>
 
 			<div class="hour-input">
-				<input type="time" name="hour" bind:value={selectedHour} />
+				<input type="time" bind:this={hourInput} bind:value={selectedHour} />
 			</div>
 			{#if hourError}
 				<p class="hour-feedback error">{hourError}</p>
@@ -709,9 +732,9 @@
 					{#if pushToggleLoading}
 						Mise à jour...
 					{:else if pushEnabled}
-						Désactiver les notifications push
+						Désactiver les notifications push sur cet appareil
 					{:else}
-						Activer les notifications push
+						Activer les notifications push sur cet appareil
 					{/if}
 				</button>
 				{#if pushPermission === 'denied' && !pushEnabled}
@@ -727,9 +750,110 @@
 				{/if}
 			</section>
 		{/if}
+		<button
+			type="submit"
+			onclick={() => hourInput?.blur()}
+		>
+			Sauvegarder
+		</button>
 	</form>
 
-	<button type="submit" form="settings-form">Sauvegarder</button>
+	{#if canToggleSuperPowers}
+		<section class="settings-toggle-card push-settings-card">
+			<h2>Super-pouvoirs</h2>
+			<p class="description">{superPowersDescription}</p>
+			<form
+				method="POST"
+				class="toggle-form"
+				use:enhance={() => {
+					superPowersLoading = true;
+					superPowersMessage = null;
+					superPowersError = null;
+
+					return async ({ result, update }) => {
+						superPowersLoading = false;
+						await update();
+
+						if (result.type === 'success') {
+							superPowersMessage = data.user?.super_powers === 1
+								? 'Super-pouvoirs désactivés.'
+								: 'Super-pouvoirs activés.';
+							setTimeout(() => window.location.reload(), 300);
+						} else if (result.type === 'failure') {
+							superPowersError = (result.data as any)?.error || 'Impossible de mettre à jour les super-pouvoirs';
+						}
+					};
+				}}
+			>
+				<input type="hidden" name="intent" value="toggleSuperPowers" />
+				<input type="hidden" name="enabled" value={data.user?.super_powers === 1 ? 'false' : 'true'} />
+				<input type="hidden" name="csrf_token" value={(data as any)?.csrfToken ?? ''} />
+				<button type="submit" class="toggle-button" disabled={superPowersLoading}>
+					{#if superPowersLoading}
+						Mise à jour...
+					{:else if data.user?.super_powers === 1}
+						Désactiver les super-pouvoirs
+					{:else}
+						Activer les super-pouvoirs
+					{/if}
+				</button>
+				{#if superPowersMessage}
+					<p class="success-message update-success">{superPowersMessage}</p>
+				{/if}
+				{#if superPowersError}
+					<p class="error-message update-success">{superPowersError}</p>
+				{/if}
+			</form>
+		</section>
+	{/if}
+
+	<section class="settings-toggle-card">
+		<h2>Mes propres capsules</h2>
+		<p class="description">Choisissez si vos nouvelles publications sont automatiquement marquées comme lues pour vous.</p>
+
+		<form
+			method="POST"
+			class="toggle-form"
+			use:enhance={() => {
+				autoMarkOwnLoading = true;
+				autoMarkOwnMessage = null;
+				autoMarkOwnError = null;
+
+				return async ({ result, update }) => {
+					autoMarkOwnLoading = false;
+					await update();
+
+					if (result.type === 'success') {
+						autoMarkOwnMessage = data.user?.auto_mark_own_recordings_as_listened === 1
+							? 'Le marquage automatique de vos capsules a été désactivé.'
+							: 'Vos nouvelles capsules seront à nouveau marquées comme lues automatiquement.';
+						setTimeout(() => window.location.reload(), 300);
+					} else if (result.type === 'failure') {
+						autoMarkOwnError = (result.data as any)?.error || 'Impossible de mettre à jour ce réglage';
+					}
+				};
+			}}
+		>
+			<input type="hidden" name="intent" value="toggleAutoMarkOwnRecordingsAsListened" />
+			<input type="hidden" name="enabled" value={data.user?.auto_mark_own_recordings_as_listened === 1 ? 'false' : 'true'} />
+			<input type="hidden" name="csrf_token" value={(data as any)?.csrfToken ?? ''} />
+			<button type="submit" class="toggle-button" disabled={autoMarkOwnLoading}>
+				{#if autoMarkOwnLoading}
+					Mise à jour...
+				{:else if data.user?.auto_mark_own_recordings_as_listened === 1}
+					Ne plus marquer automatiquement mes capsules comme lues
+				{:else}
+					Marquer automatiquement mes capsules comme lues
+				{/if}
+			</button>
+			{#if autoMarkOwnMessage}
+				<p class="success-message update-success">{autoMarkOwnMessage}</p>
+			{/if}
+			{#if autoMarkOwnError}
+				<p class="error-message update-success">{autoMarkOwnError}</p>
+			{/if}
+		</form>
+	</section>
 
 	<section class="settings-toggle-card">
 		<h2>Tuto PWA</h2>

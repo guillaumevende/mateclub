@@ -2,6 +2,82 @@
 
 ---
 
+## v0.37.7 (2026-05-29) - Réglage individuel de lecture automatique des propres capsules
+
+### ✨ Nouvelles fonctionnalités
+
+- **Réglage individuel pour ses propres capsules** : chaque utilisateur peut désormais choisir dans Réglages si ses nouvelles publications doivent être marquées automatiquement comme lues pour lui
+
+### 🐛 Corrections
+
+- **Marquage auto-lu conditionnel à la publication** : les nouvelles capsules ne sont ajoutées à l’historique d’écoute de leur auteur qu’en fonction de ce réglage personnel, sans effet rétroactif sur l’historique existant
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.7`
+- package.json / package-lock.json : version portée en `0.37.7`
+
+## v0.37.6 (2026-05-29) - Stabilisation de la barre basse iOS
+
+### 🐛 Corrections
+
+- **Barre de navigation iOS moins sujette aux décalages** : la compensation de viewport utilisée pour remonter la navigation au-dessus du clavier ne s’active plus que lorsqu’un vrai champ éditable est focus et qu’un clavier logiciel est probablement ouvert
+- **Retour de multitâche mieux géré** : les changements de viewport iOS réinitialisent correctement la compensation basse quand l’app reprend le focus sans clavier actif
+- **Compositing allégé sur la barre basse** : suppression des optimisations CSS susceptibles de figer la barre de navigation à une mauvaise position après certaines transitions iOS
+- **Hauteur de page modernisée** : le layout principal utilise aussi `100dvh` pour mieux suivre les variations de viewport mobile récentes
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.6`
+- package.json / package-lock.json : version portée en `0.37.6`
+
+## v0.37.5 (2026-05-29) - Nommage cohérent des originaux audio
+
+### 🐛 Corrections
+
+- **Nommage unifié des nouveaux audios** : les nouvelles capsules utilisent à nouveau la nomenclature `YYYYMMDDHHmm_prefixe_suffixe.ext`, basée sur l’horodatage d’enregistrement et les trois premiers caractères nettoyés du pseudo auteur
+- **Originaux archivés sous le même nom** : les copies conservées dans `uploads/originals/` gardent exactement le même nom de fichier que la capsule publiée correspondante
+- **Aucun impact rétroactif** : les anciens fichiers déjà stockés ne sont pas renommés
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.5`
+- README.md : précision sur le nommage des nouveaux originaux audio archivés
+- package.json / package-lock.json : version portée en `0.37.5`
+
+## v0.37.4 (2026-05-28) - Verrouillage cohérent sur Android et profils
+
+### 🐛 Corrections
+
+- **Heure de disponibilité fiabilisée sur Android** : la sauvegarde du réglage d’heure soumet désormais explicitement la valeur Svelte courante dans le formulaire, avec un flux de validation plus robuste pour les pickers natifs Android
+- **Profil d’un autre utilisateur à nouveau verrouillé** : la page profil ne laisse plus écouter les capsules récentes d’un autre membre quand elles devraient encore être verrouillées pour le visiteur courant
+- **Déblocage admin personnel restauré** : un admin peut à nouveau s’accorder les super-pouvoirs uniquement pour lui-même dès lors qu’un mode verrouillé est actif, y compris dans le mode de verrouillage temporel classique
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.4`
+- README.md : précision sur le déblocage personnel possible pour l’admin quand un verrouillage reste actif
+- package.json / package-lock.json : version portée en `0.37.4`
+
+## v0.37.3 (2026-05-28) - Modes de verrouillage des publications
+
+### ✨ Nouvelles fonctionnalités
+
+- **Mode global de verrouillage configurable** : l’admin choisit désormais entre trois comportements pour les publications : jamais verrouillées, verrouillage temporel pour tout le monde, ou verrouillage temporel avec déblocage individuel
+- **Super-pouvoirs individuels conditionnels** : quand le mode de déblocage individuel est activé, chaque utilisateur voit apparaître dans Réglages un nouveau bouton pour lever ou réactiver sa propre limite de temps
+- **Statut visible dans la liste des membres** : dans `La team`, chaque pseudo affiche `⏱️` si le déblocage individuel est activé et `📆` sinon, uniquement quand le mode 3 est actif
+
+### 🐛 Corrections
+
+- **Accueil cohérent sans verrouillage** : le résumé des capsules non lues ne parle plus d’attente horaire quand le verrouillage est désactivé globalement ou levé pour l’utilisateur courant
+- **Nettoyage de l’ancien modèle admin** : le réglage “Mes super pouvoirs” disparaît de l’admin au profit du nouveau sélecteur global de verrouillage
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.3`
+- README.md : documentation du nouveau système à trois modes pour les publications verrouillées
+- package.json / package-lock.json : version portée en `0.37.3`
+
 ## v0.37.2 (2026-05-27) - Restauration exacte du retour haptique verrouillé
 
 ### 🐛 Corrections

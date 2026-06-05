@@ -8,6 +8,7 @@ import {
 	updateUserHour,
 	updateUserTimezone,
 	updateUserPseudo,
+	toggleAutoMarkOwnRecordingsAsListened,
 	getUserTimezone,
 	deleteUser
 } from './db';
@@ -129,6 +130,17 @@ describe('Fonctions utilisateur', () => {
 		updateUserPseudo(testUserId, newPseudo);
 		const user = getUserById(testUserId);
 		expect(user?.pseudo).toBe(newPseudo);
+	});
+
+	it('devrait activer le marquage auto-lu des propres capsules par défaut', () => {
+		const user = getUserById(testUserId);
+		expect(user?.auto_mark_own_recordings_as_listened).toBe(1);
+	});
+
+	it('devrait pouvoir désactiver le marquage auto-lu des propres capsules', () => {
+		toggleAutoMarkOwnRecordingsAsListened(testUserId, false);
+		const user = getUserById(testUserId);
+		expect(user?.auto_mark_own_recordings_as_listened).toBe(0);
 	});
 });
 

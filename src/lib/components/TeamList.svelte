@@ -7,15 +7,17 @@
 		id: number;
 		pseudo: string;
 		avatar: string;
+		super_powers?: number;
 		recording_count?: number;
 	}
 
 	interface Props {
 		allUsers: User[];
 		showTeam?: boolean;
+		showUnlockStatus?: boolean;
 	}
 
-	let { allUsers, showTeam = $bindable(false) }: Props = $props();
+	let { allUsers, showTeam = $bindable(false), showUnlockStatus = false }: Props = $props();
 </script>
 
 {#if showTeam}
@@ -50,7 +52,12 @@
 					{@const count = user.recording_count ?? 0}
 					<li>
 						<UserProfileAvatarLink userId={user.id} avatar={user.avatar} size="small" label={`Voir le profil de ${user.pseudo}`} />
-						<span class="team-pseudo">{user.pseudo}</span>
+						<span class="team-pseudo">
+							{user.pseudo}
+							{#if showUnlockStatus}
+								<span class="team-lock-emoji" aria-hidden="true">{user.super_powers === 1 ? '⏱️' : '📆'}</span>
+							{/if}
+						</span>
 						<span class="team-count">({count} capsule{count !== 1 ? 's' : ''})</span>
 					</li>
 				{/each}
@@ -126,5 +133,9 @@
 	.team-count {
 		font-size: 0.85rem;
 		color: #888;
+	}
+
+	.team-lock-emoji {
+		margin-left: 0.35rem;
 	}
 </style>
