@@ -20,7 +20,7 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	}));
 	const unreadStats = getUnreadCount(locals.user.id);
 	const appSettings = getAppSettings();
-	const upcomingBirthdays = getUpcomingBirthdaysForUser(locals.user.id, 30);
+	const upcomingBirthdays = getUpcomingBirthdaysForUser(locals.user.id, 8);
 
 	const thresholdMinutes = user?.daily_notification_hour ?? 420;
 	const hours = Math.floor(thresholdMinutes / 60);

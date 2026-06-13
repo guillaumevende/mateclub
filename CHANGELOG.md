@@ -2,6 +2,17 @@
 
 ---
 
+## v0.37.10 (2026-06-13) - Anniversaires plus ciblés sur l’accueil
+
+### 🐛 Corrections
+
+- **Anniversaires à venir sur l’accueil** : la home affiche désormais uniquement les anniversaires prévus dans les 8 prochains jours au lieu des 30 prochains jours
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.10`
+- package.json / package-lock.json : version portée en `0.37.10`
+
 ## v0.37.9 (2026-06-05) - Réglages anniversaire alignés et barre iOS stabilisée
 
 ### 🐛 Corrections
