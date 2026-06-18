@@ -46,6 +46,18 @@
 		super_powers: number;
 		is_admin: number;
 		recording_count?: number;
+		birthdayInfo?: {
+			label: string;
+			ageOnBirthday: number | null;
+		} | null;
+	};
+
+	type UpcomingBirthday = {
+		userId: number;
+		pseudo: string;
+		label: string;
+		ageOnBirthday: number | null;
+		daysUntil: number;
 	};
 
 	type AppSettings = {
@@ -87,7 +99,7 @@
 		count: number;
 	};
 
-	let { data }: { data: PageData & { user?: User; allUsers: UserList[]; threshold: string; unreadStats?: { count: number; totalSeconds: number }; hasMore?: boolean; pendingRegistrationsCount?: number; groupName?: string; appSettings?: AppSettings; broadcastInfo?: BroadcastInfo | null } } = $props();
+	let { data }: { data: PageData & { user?: User; allUsers: UserList[]; upcomingBirthdays?: UpcomingBirthday[]; threshold: string; unreadStats?: { count: number; totalSeconds: number }; hasMore?: boolean; pendingRegistrationsCount?: number; groupName?: string; appSettings?: AppSettings; broadcastInfo?: BroadcastInfo | null } } = $props();
 
 	function getInitialHomeState() {
 		const initialPage = data.page ?? 1;
@@ -1165,6 +1177,15 @@
 		{/if}
 		<img src="/icon-512x512.png" alt="Maté Club" class="logo" />
 		<p class="date">{getTodayDate()}</p>
+		{#if data.upcomingBirthdays && data.upcomingBirthdays.length > 0}
+			<div class="upcoming-birthdays" aria-label="Anniversaires à venir">
+				{#each data.upcomingBirthdays as birthday}
+					<p class="upcoming-birthday-line">
+						🎂 Le {birthday.label}, {birthday.pseudo}{birthday.ageOnBirthday !== null ? ` (${birthday.ageOnBirthday} ans)` : ''}
+					</p>
+				{/each}
+			</div>
+		{/if}
 		<p class="welcome">
 			{#if (data.groupName || data.appSettings?.groupName)}
 				Bienvenue chez {data.groupName || data.appSettings?.groupName}, {data.user?.pseudo} !
@@ -1770,6 +1791,19 @@
 
 	.welcome {
 		color: #888;
+	}
+
+	.upcoming-birthdays {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+		margin-bottom: 0.5rem;
+	}
+
+	.upcoming-birthday-line {
+		color: #f5d6dc;
+		font-size: 0.98rem;
+		line-height: 1.35;
 	}
 
 	.unread-summary-pill {

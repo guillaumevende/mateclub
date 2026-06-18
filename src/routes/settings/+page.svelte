@@ -21,6 +21,10 @@
 				pseudo: string;
 				avatar: string;
 				is_admin?: number;
+				birthday_day?: number | null;
+				birthday_month?: number | null;
+				birthday_year?: number | null;
+				audio_availability_days?: number;
 				daily_notification_hour: number;
 				timezone: string;
 				super_powers?: number;
@@ -33,6 +37,7 @@
 			version: string
 			pushConfig: PushConfig
 			appSettings?: {
+				historyDays: number;
 				recordingUnlockMode: 'never_locked' | 'timed_lock' | 'timed_optional_unlock';
 			}
 		}, 
@@ -97,6 +102,10 @@
 	}
 	let selectedHour = $state('');
 	let selectedTimezone = $state('Europe/Paris');
+	let birthdayDay = $state('');
+	let birthdayMonth = $state('');
+	let birthdayYear = $state('');
+	let audioAvailabilityDays = $state(90);
 	let hourInput = $state<HTMLInputElement | null>(null);
 	let canToggleSuperPowers = $derived(
 		data.appSettings?.recordingUnlockMode === 'timed_optional_unlock'
@@ -112,6 +121,13 @@
 	$effect(() => {
 		selectedHour = minutesToHHmm(data.user?.daily_notification_hour ?? 420);
 		selectedTimezone = data.user?.timezone || 'Europe/Paris';
+		birthdayDay = data.user?.birthday_day ? String(data.user.birthday_day) : '';
+		birthdayMonth = data.user?.birthday_month ? String(data.user.birthday_month) : '';
+		birthdayYear = data.user?.birthday_year ? String(data.user.birthday_year) : '';
+		audioAvailabilityDays = Math.min(
+			data.user?.audio_availability_days ?? data.appSettings?.historyDays ?? 90,
+			data.appSettings?.historyDays ?? 90
+		);
 	});
 
 	// Synchroniser avec data quand la page recharge (mais pas si l'utilisateur a déjà modifié le pseudo)
@@ -708,6 +724,26 @@
 		</section>
 
 		<section>
+			<h2>Anniversaire</h2>
+			<p class="description">Facultatif. Renseigne le jour et le mois ; l’année est optionnelle si tu veux afficher ton âge.</p>
+
+			<div class="birthday-fields">
+				<label>
+					<span>Jour</span>
+					<input type="number" name="birthdayDay" min="1" max="31" bind:value={birthdayDay} placeholder="JJ" />
+				</label>
+				<label>
+					<span>Mois</span>
+					<input type="number" name="birthdayMonth" min="1" max="12" bind:value={birthdayMonth} placeholder="MM" />
+				</label>
+				<label>
+					<span>Année (optionnelle)</span>
+					<input type="number" name="birthdayYear" min="1900" max={new Date().getFullYear()} bind:value={birthdayYear} placeholder="AAAA" />
+				</label>
+			</div>
+		</section>
+
+		<section>
 			<h2>Heure de disponibilité</h2>
 			<p class="description">Les enregistrements de la veille seront disponibles à partir de cette heure (dans ton fuseau horaire).</p>
 
@@ -717,6 +753,25 @@
 			{#if hourError}
 				<p class="hour-feedback error">{hourError}</p>
 			{/if}
+		</section>
+
+		<section>
+			<h2>Durée de mise à disposition des audios</h2>
+			<p class="description">Combien de temps voulez-vous laisser disponibles vos enregistrements (7 jours minimum) ?</p>
+
+			<div class="availability-days-field">
+				<input
+					type="number"
+					name="audioAvailabilityDays"
+					min="7"
+					max={data.appSettings?.historyDays ?? 90}
+					step="1"
+					bind:value={audioAvailabilityDays}
+					required
+				/>
+				<span class="field-suffix">jours</span>
+			</div>
+			<p class="field-hint">Maximum pour cette installation : {data.appSettings?.historyDays ?? 90} jours.</p>
 		</section>
 
 		{#if data.pushConfig.configured}
@@ -931,6 +986,61 @@
 		font-size: 0.875rem;
 		margin-top: 0.5rem;
 		color: #ff6b6b;
+	}
+
+	.birthday-fields {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 0.75rem;
+		align-items: end;
+	}
+
+	.birthday-fields label,
+	.availability-days-field {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+	}
+
+	.birthday-fields label span,
+	.field-hint,
+	.field-suffix {
+		color: #aeb1d2;
+		font-size: 0.92rem;
+	}
+
+	.birthday-fields label span {
+		min-height: 2.6em;
+		display: flex;
+		align-items: flex-end;
+	}
+
+	.availability-days-field {
+		flex-direction: row;
+		align-items: center;
+		gap: 0.6rem;
+	}
+
+	.availability-days-field input {
+		max-width: 140px;
+	}
+
+	@media (max-width: 520px) {
+		.birthday-fields {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+
+		.birthday-fields label:last-child {
+			grid-column: 1 / -1;
+		}
+
+		.birthday-fields label span {
+			min-height: auto;
+		}
+	}
+
+	.field-hint {
+		margin-top: 0.45rem;
 	}
 
 	/* Section Avatar */

@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { error, redirect } from '@sveltejs/kit';
-import { getUserById, getUserProfileImages, getUserProfileImagesCount, getUserRecentRecordings, getVisibleRecentRecordingsForViewer } from '$lib/server/db';
+import { getUserById, getUserProfileImages, getUserProfileImagesCount, getUserRecentRecordings, getVisibleProfileImagesCountForViewer, getVisibleProfileImagesForViewer, getVisibleRecentRecordingsForViewer, getUserCurrentAge } from '$lib/server/db';
 
 export const load: PageServerLoad = async ({ locals, params }) => {
 	if (!locals.user) {
@@ -17,14 +17,21 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 		throw error(404, 'Profil introuvable');
 	}
 
-	const images = getUserProfileImages(userId, 8, 0);
-	const totalImages = getUserProfileImagesCount(userId);
-	const recordings = locals.user.id === userId
+	const isOwnProfile = locals.user.id === userId;
+	const images = isOwnProfile
+		? getUserProfileImages(userId, 8, 0)
+		: getVisibleProfileImagesForViewer(userId, locals.user.id, 8, 0);
+	const totalImages = isOwnProfile
+		? getUserProfileImagesCount(userId)
+		: getVisibleProfileImagesCountForViewer(userId, locals.user.id);
+	const recordings = isOwnProfile
 		? getUserRecentRecordings(userId, 10)
 		: getVisibleRecentRecordingsForViewer(userId, locals.user.id, 10);
+	const profileAge = getUserCurrentAge(profileUser, locals.user.timezone || 'Europe/Paris');
 
 	return {
 		profileUser,
+		profileAge,
 		currentUserId: locals.user.id,
 		images,
 		totalImages,

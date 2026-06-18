@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { getRecordingsGroupedByDayWithHasMore, getUserById, getAllUsers, getUserTimezone, getUnreadCount, getPendingRegistrationsCount, getAppSettings } from '$lib/server/db';
+import { getAppSettings, getPendingRegistrationsCount, getRecordingsGroupedByDayWithHasMore, getTeamBirthdayInfo, getUnreadCount, getUpcomingBirthdaysForUser, getUserById, getUserTimezone, getAllUsers } from '$lib/server/db';
 
 export const load: PageServerLoad = async ({ locals, url }) => {
 	if (!locals.user) {
@@ -14,8 +14,13 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 	const { days, hasMore } = getRecordingsGroupedByDayWithHasMore(locals.user.id, limit, page, timezone);
 	const user = getUserById(locals.user.id);
 	const allUsers = getAllUsers();
+	const allUsersWithBirthdayInfo = allUsers.map((member) => ({
+		...member,
+		birthdayInfo: getTeamBirthdayInfo(member, timezone)
+	}));
 	const unreadStats = getUnreadCount(locals.user.id);
 	const appSettings = getAppSettings();
+	const upcomingBirthdays = getUpcomingBirthdaysForUser(locals.user.id, 8);
 
 	const thresholdMinutes = user?.daily_notification_hour ?? 420;
 	const hours = Math.floor(thresholdMinutes / 60);
@@ -30,7 +35,8 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 		hasMore,
 		threshold,
 		user,
-		allUsers,
+		allUsers: allUsersWithBirthdayInfo,
+		upcomingBirthdays,
 		page,
 		unreadStats,
 		pendingRegistrationsCount,

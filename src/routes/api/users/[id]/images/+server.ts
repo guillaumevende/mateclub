@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
-import { getUserProfileImages, getUserProfileImagesCount, getUserById } from '$lib/server/db';
+import { getUserProfileImages, getUserProfileImagesCount, getUserById, getVisibleProfileImagesCountForViewer, getVisibleProfileImagesForViewer } from '$lib/server/db';
 
 export const GET: RequestHandler = async ({ locals, params, url }) => {
 	if (!locals.user) {
@@ -15,8 +15,13 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 	const limit = parseInt(url.searchParams.get('limit') || '8', 10);
 	const offset = parseInt(url.searchParams.get('offset') || '0', 10);
 
-	const images = getUserProfileImages(userId, limit, offset);
-	const total = getUserProfileImagesCount(userId);
+	const isOwnProfile = locals.user.id === userId;
+	const images = isOwnProfile
+		? getUserProfileImages(userId, limit, offset)
+		: getVisibleProfileImagesForViewer(userId, locals.user.id, limit, offset);
+	const total = isOwnProfile
+		? getUserProfileImagesCount(userId)
+		: getVisibleProfileImagesCountForViewer(userId, locals.user.id);
 
 	return json({
 		images,

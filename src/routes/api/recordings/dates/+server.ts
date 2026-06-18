@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { json } from '@sveltejs/kit';
-import { getUserById, getUserTimezone, db, getConfiguredHistoryMonths, getRecordingUnlockMode, canUserBypassRecordingLock } from '$lib/server/db';
+import { getUserById, getUserTimezone, db, getConfiguredHistoryMonths, getRecordingUnlockMode, canUserBypassRecordingLock, getConfiguredHistoryDays } from '$lib/server/db';
 
 export const GET: RequestHandler = async ({ locals }) => {
 	if (!locals.user) {
@@ -27,9 +27,11 @@ export const GET: RequestHandler = async ({ locals }) => {
 				r.recorded_at,
 				r.user_id,
 				l.id as listened_id
-			FROM recordings r 
+			FROM recordings r
+			JOIN users u ON u.id = r.user_id
 			LEFT JOIN listening_history l ON l.recording_id = r.id AND l.user_id = ?
 			WHERE r.recorded_at >= ?
+			AND datetime(r.recorded_at) >= datetime('now', '-' || MIN(COALESCE(u.audio_availability_days, ${getConfiguredHistoryDays()}), ${getConfiguredHistoryDays()}) || ' days')
 			ORDER BY r.recorded_at ASC
 		`);
 

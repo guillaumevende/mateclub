@@ -51,6 +51,7 @@
 	let { data } = $props<{
 		data: {
 			profileUser: { id: number; pseudo: string; avatar: string };
+			profileAge?: number | null;
 			currentUserId: number;
 			images: ProfileImage[];
 			totalImages: number;
@@ -397,6 +398,9 @@
 			label={`Profil de ${data.profileUser.pseudo}`}
 		/>
 		<h1>{data.profileUser.pseudo}</h1>
+		{#if data.profileAge !== null && data.profileAge !== undefined}
+			<p class="profile-age">{data.profileAge} ans</p>
+		{/if}
 		<p class="profile-subtitle">
 			{galleryImages.length} image{galleryImages.length !== 1 ? 's' : ''} · {recordings.length} capsule{recordings.length !== 1 ? 's' : ''} récente{recordings.length !== 1 ? 's' : ''}
 		</p>
@@ -632,6 +636,12 @@
 	h1,
 	h2 {
 		color: #e94560;
+	}
+
+	.profile-age {
+		color: #f5d6dc;
+		font-size: 1rem;
+		font-weight: 600;
 	}
 
 	.profile-subtitle,
