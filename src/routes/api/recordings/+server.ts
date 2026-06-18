@@ -1,6 +1,13 @@
 import type { RequestHandler } from './$types';
 import { redirect, json } from '@sveltejs/kit';
-import { saveRecording, getRecentRecordingByHash, getConfiguredMaxRecordingSeconds, isAudioProcessingEnabled } from '$lib/server/db';
+import {
+	saveRecording,
+	getRecentRecordingByHash,
+	getRecordingByClientDraftId,
+	getRecordingByHashAndRecordedAt,
+	getConfiguredMaxRecordingSeconds,
+	isAudioProcessingEnabled
+} from '$lib/server/db';
 import { getAudioProcessingRuntimeConfig, pokeAudioProcessingWorker } from '$lib/server/audioProcessing';
 import { detectAudioMimeType, isValidAudioBuffer, isValidImageBuffer } from '$lib/server/fileValidation';
 import { prepareAudioForStorage } from '$lib/server/audioCompatibility';
@@ -27,6 +34,22 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	const image = formData.get('image') as File | null;
 	const url = formData.get('url')?.toString();
 	const recordedAtRaw = formData.get('recorded_at')?.toString();
+	const clientDraftId = formData.get('client_draft_id')?.toString() || null;
+
+	if (clientDraftId && !/^[A-Za-z0-9_-]{8,128}$/.test(clientDraftId)) {
+		return json({ error: 'Identifiant de brouillon invalide' }, { status: 400 });
+	}
+
+	if (clientDraftId) {
+		const existingRecording = getRecordingByClientDraftId(locals.user.id, clientDraftId);
+		if (existingRecording) {
+			return json({
+				id: existingRecording.id,
+				duplicate: true,
+				message: 'Enregistrement déjà existant'
+			});
+		}
+	}
 
 	if (!audio || audio.size === 0) {
 		console.error('[RECORDINGS] Audio vide ou absent, user:', locals.user.id);
@@ -87,8 +110,18 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		return json({ error: 'Impossible de convertir cet audio pour les navigateurs Apple' }, { status: 400 });
 	}
 
+	const recordedAt = recordedAtRaw ? new Date(recordedAtRaw) : null;
+	const normalizedRecordedAt = recordedAt
+		? recordedAt.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '')
+		: null;
+	if (recordedAtRaw && (!recordedAt || Number.isNaN(recordedAt.getTime()))) {
+		return json({ error: 'Horodatage d’enregistrement invalide' }, { status: 400 });
+	}
+
 	const audioHash = crypto.createHash('sha256').update(audioBuffer).digest('hex');
-	const recentRecording = getRecentRecordingByHash(locals.user.id, audioHash, DUPLICATE_THRESHOLD_SECONDS);
+	const recentRecording = normalizedRecordedAt
+		? getRecordingByHashAndRecordedAt(locals.user.id, audioHash, normalizedRecordedAt)
+		: getRecentRecordingByHash(locals.user.id, audioHash, DUPLICATE_THRESHOLD_SECONDS);
 	
 	if (recentRecording) {
 		return json({
@@ -99,13 +132,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	}
 
 	const buffer = preparedAudio.buffer;
-	const recordedAt = recordedAtRaw ? new Date(recordedAtRaw) : null;
-	const normalizedRecordedAt = recordedAt
-		? recordedAt.toISOString().replace('T', ' ').replace(/\.\d{3}Z$/, '')
-		: null;
-	if (recordedAtRaw && (!recordedAt || Number.isNaN(recordedAt.getTime()))) {
-		return json({ error: 'Horodatage d’enregistrement invalide' }, { status: 400 });
-	}
 
 	let imageBuffer: Buffer | undefined;
 	if (image && image.size > 0) {
@@ -161,6 +187,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				imageData: imageBuffer,
 				url: url || null,
 				audioHash,
+				clientDraftId,
 				processedFilename: useAudioProcessing ? null : undefined,
 				processingStatus: useAudioProcessing ? 'processing' : 'ready',
 				processingMode: useAudioProcessing ? 'deepfilter' : 'none',
@@ -172,6 +199,16 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			pokeAudioProcessingWorker();
 		}
 	} catch (err) {
+		if (clientDraftId) {
+			const existingRecording = getRecordingByClientDraftId(locals.user.id, clientDraftId);
+			if (existingRecording) {
+				return json({
+					id: existingRecording.id,
+					duplicate: true,
+					message: 'Enregistrement déjà existant'
+				});
+			}
+		}
 		console.error('[RECORDINGS] Error saving recording:', err);
 		return json({ error: 'Erreur interne' }, { status: 500 });
 	}

@@ -17,6 +17,8 @@ import {
 	getUserCurrentAge,
 	getConfiguredHistoryDays,
 	saveRecording,
+	getRecordingByClientDraftId,
+	getRecordingByHashAndRecordedAt,
 	getUserRecentRecordings
 } from './db';
 
@@ -177,6 +179,36 @@ describe('Fonctions utilisateur', () => {
 		const recordings = getUserRecentRecordings(testUserId, 20);
 		expect(recordings.some((recording) => recording.recorded_at === recentDate)).toBe(true);
 		expect(recordings.some((recording) => recording.recorded_at === oldDate)).toBe(false);
+	});
+
+	it('devrait refuser deux enregistrements issus du même brouillon client', () => {
+		const clientDraftId = `draft-${Date.now()}-${testUserId}`;
+		const first = saveRecording(testUserId, Buffer.from('idempotent-audio'), 5, {
+			clientDraftId,
+			audioHash: `hash-${clientDraftId}`
+		});
+
+		expect(() =>
+			saveRecording(testUserId, Buffer.from('idempotent-audio'), 5, {
+				clientDraftId,
+				audioHash: `hash-${clientDraftId}`
+			})
+		).toThrow();
+		expect(getRecordingByClientDraftId(testUserId, clientDraftId)?.id).toBe(first.id);
+	});
+
+	it('devrait retrouver un ancien brouillon avec son empreinte et son heure d’enregistrement', () => {
+		const recordedAt = new Date(Date.now() - 60 * 60 * 1000)
+			.toISOString()
+			.replace('T', ' ')
+			.replace(/\.\d{3}Z$/, '');
+		const audioHash = `old-draft-hash-${Date.now()}-${testUserId}`;
+		const recording = saveRecording(testUserId, Buffer.from('old-draft-audio'), 5, {
+			audioHash,
+			recordedAt
+		});
+
+		expect(getRecordingByHashAndRecordedAt(testUserId, audioHash, recordedAt)?.id).toBe(recording.id);
 	});
 });
 

@@ -2,6 +2,25 @@
 
 ---
 
+## v0.37.11 (2026-06-18) - Envois de capsules idempotents
+
+### 🐛 Corrections
+
+- **Suppression des publications en double** : chaque brouillon possède désormais un identifiant transmis au serveur et unique par utilisateur
+- **Relances réseau fiabilisées** : une capsule déjà reçue est reconnue même si la réponse précédente a été perdue ou si l’envoi est relancé plus de 30 secondes après l’enregistrement
+- **Envois simultanés protégés** : une contrainte SQLite atomique empêche deux requêtes concurrentes de créer deux publications
+- **Compatibilité avec les anciens brouillons** : l’empreinte audio associée à l’heure exacte d’enregistrement permet aussi de reconnaître une relance provenant d’un ancien client
+- **Nettoyage des conflits** : les fichiers temporaires créés par une insertion concurrente refusée sont automatiquement supprimés
+
+### 🧪 Tests
+
+- Ajout de tests sur l’unicité des brouillons et la reconnaissance d’un envoi ancien par empreinte et horodatage
+
+### 📚 Documentation
+
+- README.md : documentation des envois idempotents et badge mis à jour en `0.37.11`
+- package.json / package-lock.json : version portée en `0.37.11`
+
 ## v0.37.10 (2026-06-13) - Anniversaires plus ciblés sur l’accueil
 
 ### 🐛 Corrections

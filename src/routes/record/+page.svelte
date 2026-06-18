@@ -1254,6 +1254,7 @@
 		formData.append('audio', draft.audioBlob, getAudioFilename(draft.audioMimeType));
 		formData.append('duration', draft.durationSeconds.toString());
 		formData.append('recorded_at', draft.createdAt);
+		formData.append('client_draft_id', draft.id);
 
 		if (draft.imageBlob) {
 			formData.append('image', draft.imageBlob, getImageFilename(draft.imageBlob));

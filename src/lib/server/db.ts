@@ -65,6 +65,7 @@ const DEFAULT_RECORDING_UNLOCK_MODE = 'timed_lock';
 		processing_error TEXT,
 		processing_started_at DATETIME,
 		processed_at DATETIME,
+		client_draft_id TEXT,
 		recorded_at DATETIME DEFAULT (datetime('now')),
 		FOREIGN KEY (user_id) REFERENCES users(id)
 	);
@@ -191,6 +192,12 @@ try {
 }
 
 try {
+	db.exec('ALTER TABLE recordings ADD COLUMN client_draft_id TEXT');
+} catch {
+	// Colonne déjà existante
+}
+
+try {
 	db.exec("ALTER TABLE recordings ADD COLUMN processed_filename TEXT");
 } catch (e) {
 	// Colonne déjà existante
@@ -229,6 +236,16 @@ try {
 try {
 	db.exec('CREATE INDEX IF NOT EXISTS idx_audio_hash ON recordings(user_id, audio_hash)');
 } catch (e) {
+	// Index déjà existant
+}
+
+try {
+	db.exec(`
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_recordings_client_draft
+		ON recordings(user_id, client_draft_id)
+		WHERE client_draft_id IS NOT NULL
+	`);
+} catch {
 	// Index déjà existant
 }
 
@@ -440,6 +457,7 @@ export type Recording = {
 	pseudo: string;
 	avatar: string;
 	audio_hash?: string | null;
+	client_draft_id?: string | null;
 	processing_status: RecordingProcessingStatus;
 	processing_mode: RecordingProcessingMode;
 	processing_error?: string | null;
@@ -1313,6 +1331,7 @@ export type SaveRecordingOptions = {
 	imageData?: Buffer;
 	url?: string | null;
 	audioHash?: string;
+	clientDraftId?: string | null;
 	processedFilename?: string | null;
 	processingStatus?: RecordingProcessingStatus;
 	processingMode?: RecordingProcessingMode;
@@ -1367,6 +1386,7 @@ export function saveRecording(
 		imageData,
 		url,
 		audioHash,
+		clientDraftId = null,
 		processedFilename = null,
 		processingStatus = 'ready',
 		processingMode = 'none',
@@ -1407,24 +1427,36 @@ export function saveRecording(
 			processing_error,
 			processing_started_at,
 			processed_at,
+			client_draft_id,
 			recorded_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`);
-	const result = stmt.run(
-		userId,
-		filename,
-		effectiveProcessedFilename,
-		imageFilename,
-		url || null,
-		durationSeconds,
-		audioHash || null,
-		processingStatus,
-		processingMode,
-		processingError,
-		processingStartedAt,
-		processedAt,
-		recordedAt
-	);
+	let result: Database.RunResult;
+	try {
+		result = stmt.run(
+			userId,
+			filename,
+			effectiveProcessedFilename,
+			imageFilename,
+			url || null,
+			durationSeconds,
+			audioHash || null,
+			processingStatus,
+			processingMode,
+			processingError,
+			processingStartedAt,
+			processedAt,
+			clientDraftId,
+			recordedAt
+		);
+	} catch (error) {
+		if (existsSync(filepath)) unlinkSync(filepath);
+		if (imageFilename) {
+			const imagePath = join(uploadsDir, imageFilename);
+			if (existsSync(imagePath)) unlinkSync(imagePath);
+		}
+		throw error;
+	}
 	debug.db.log('Enregistrement créé - id:', result.lastInsertRowid);
 
 	const createdRecordingId = result.lastInsertRowid as number;
@@ -1605,6 +1637,35 @@ export function getRecentRecordingByHash(userId: number, audioHash: string, seco
 		LIMIT 1
 	`);
 	return stmt.get(userId, audioHash, secondsThreshold) as Recording | undefined;
+}
+
+export function getRecordingByClientDraftId(userId: number, clientDraftId: string): Recording | undefined {
+	const stmt = db.prepare(`
+		SELECT r.*, u.pseudo, u.avatar
+		FROM recordings r
+		JOIN users u ON r.user_id = u.id
+		WHERE r.user_id = ? AND r.client_draft_id = ?
+		LIMIT 1
+	`);
+	return stmt.get(userId, clientDraftId) as Recording | undefined;
+}
+
+export function getRecordingByHashAndRecordedAt(
+	userId: number,
+	audioHash: string,
+	recordedAt: string
+): Recording | undefined {
+	const stmt = db.prepare(`
+		SELECT r.*, u.pseudo, u.avatar
+		FROM recordings r
+		JOIN users u ON r.user_id = u.id
+		WHERE r.user_id = ?
+		AND r.audio_hash = ?
+		AND datetime(r.recorded_at) = datetime(?)
+		ORDER BY r.id ASC
+		LIMIT 1
+	`);
+	return stmt.get(userId, audioHash, recordedAt) as Recording | undefined;
 }
 
 export function deleteRecording(recordingId: number): void {

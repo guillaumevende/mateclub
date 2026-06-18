@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.37.10-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.37.11-blue?style=for-the-badge)
 
 </div>
 
@@ -83,6 +83,7 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 - **Brouillons locaux** - Chaque capsule terminée est conservée localement pour pouvoir en enregistrer plusieurs avant l’envoi
 - **Rail de brouillons** - Les capsules prêtes à envoyer sont pilotées depuis un rail horizontal compact avec une capsule active détaillée
 - **Envoi groupé** - Une ou plusieurs capsules peuvent être envoyées d’un coup avec photo et URL propres à chacune
+- **Envois idempotents** - Une reprise après coupure ou une requête simultanée ne peut plus publier deux fois le même brouillon
 - **Progression d’upload** - Une barre indique l’avancement de l’envoi en cours, capsule par capsule
 - **Alertes de fin d’enregistrement** - Un son et un retour haptique préviennent à 15, 10 et 5 secondes de la fin
 - **Visualiseur rééquilibré** - Waveform d'enregistrement plus doux, plus bas et mieux réparti sur la voix
