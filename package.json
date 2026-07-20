@@ -19,15 +19,15 @@
   "dependencies": {
     "@khmyznikov/pwa-install": "^0.6.3",
     "@sveltejs/adapter-node": "^5.5.4",
-    "@sveltejs/kit": "^2.55.0",
+    "@sveltejs/kit": "^2.70.1",
     "@sveltejs/vite-plugin-svelte": "^7.0.0",
     "bcrypt": "^6.0.0",
     "better-sqlite3": "^12.6.2",
     "browser-image-compression": "^2.0.2",
     "sharp": "^0.34.5",
-    "svelte": "^5.53.9",
+    "svelte": "^5.56.7",
     "typescript": "^5.9.3",
-    "vite": "^8.0.1",
+    "vite": "^8.1.5",
     "web-haptics": "^0.0.6",
     "web-push": "^3.6.7"
   },
