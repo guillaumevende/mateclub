@@ -14,6 +14,7 @@
 	} from '$lib/client/recordingDraftQueue';
 	import { scrollLock } from '$lib/actions/scrollLock';
 	import { triggerHaptic } from '$lib/utils/haptics';
+	import { getClientDiagnosticsContext, sendClientDiagnosticError } from '$lib/client/diagnostics';
 	import { debug } from '$lib/debug';
 	import '$lib/shared.css';
 	
@@ -1266,31 +1267,58 @@
 
 		return await new Promise<{ duplicate?: boolean; error?: string }>((resolve, reject) => {
 			const xhr = new globalThis.XMLHttpRequest();
+			const uploadStartedAt = Date.now();
+			let lastUploadProgress = 0;
+			let lastUploadLoaded = 0;
+			let lastUploadTotal = 0;
+
+			const buildUploadError = (message: string) => Object.assign(new Error(message), {
+				uploadDiagnostics: {
+					elapsedMs: Date.now() - uploadStartedAt,
+					status: xhr.status,
+					readyState: xhr.readyState,
+					responseType: xhr.responseType,
+					lastUploadProgress,
+					lastUploadLoaded,
+					lastUploadTotal,
+					network: getClientDiagnosticsContext()
+				}
+			});
+
 			xhr.open('POST', '/api/recordings');
 			xhr.responseType = 'json';
 			xhr.timeout = 60000;
 
 			xhr.upload.onprogress = (event) => {
 				if (!event.lengthComputable || !progress) return;
-				progress(Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100))));
+				lastUploadLoaded = event.loaded;
+				lastUploadTotal = event.total;
+				lastUploadProgress = Math.max(0, Math.min(100, Math.round((event.loaded / event.total) * 100)));
+				progress(lastUploadProgress);
 			};
 
 			xhr.onload = () => {
-				const data = xhr.response && typeof xhr.response === 'object'
-					? xhr.response
-					: JSON.parse(xhr.responseText || '{}');
+				let data: { duplicate?: boolean; error?: string };
+				try {
+					data = xhr.response && typeof xhr.response === 'object'
+						? xhr.response
+						: JSON.parse(xhr.responseText || '{}');
+				} catch {
+					reject(buildUploadError(`Réponse serveur illisible (${xhr.status})`));
+					return;
+				}
 
 				if (xhr.status >= 200 && xhr.status < 300) {
 					resolve(data);
 					return;
 				}
 
-				reject(new Error(data?.error || 'Erreur lors de l\'envoi'));
+				reject(buildUploadError(data?.error || `Erreur lors de l'envoi (${xhr.status})`));
 			};
 
-			xhr.onerror = () => reject(new Error('Erreur réseau lors de l\'envoi'));
-			xhr.ontimeout = () => reject(new Error('Le serveur met trop de temps à répondre. Veuillez réessayer.'));
-			xhr.onabort = () => reject(new Error('Envoi interrompu.'));
+			xhr.onerror = () => reject(buildUploadError('Erreur réseau lors de l\'envoi'));
+			xhr.ontimeout = () => reject(buildUploadError('Le serveur met trop de temps à répondre. Veuillez réessayer.'));
+			xhr.onabort = () => reject(buildUploadError('Envoi interrompu.'));
 			xhr.send(formData);
 		});
 	}
@@ -1318,14 +1346,20 @@
 			return true;
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Erreur lors de l\'envoi';
+			const uploadDiagnostics = err instanceof Error && 'uploadDiagnostics' in err
+				? (err as Error & { uploadDiagnostics?: Record<string, unknown> }).uploadDiagnostics
+				: undefined;
 			updateDraft(id, (item) => ({ ...item, isUploading: false, uploadProgress: 0, error: message }));
-			sendErrorToServer('SEND_RECORDING_ERROR', {
+			await sendClientDiagnosticError(`SEND_RECORDING_ERROR: ${message}`, {
 				message,
 				audioSize: draft.audioBlob.size,
 				audioType: draft.audioMimeType,
 				duration: draft.durationSeconds,
-				url: window.location.href
-			});
+				imageSize: draft.imageBlob?.size,
+				hasUrl: Boolean(draft.recordingUrl.trim()),
+				clientDraftId: draft.id,
+				uploadDiagnostics
+			}, err instanceof Error ? err.stack || '' : '');
 			return false;
 		}
 	}
@@ -1378,22 +1412,6 @@
 		draftQueue = [];
 		await clearRecordingDraftQueue();
 		queueNotice = 'Les brouillons locaux ont été supprimés.';
-	}
-
-	async function sendErrorToServer(type: string, context: any) {
-		try {
-			await fetch('/api/debug', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					message: `${type}: ${context.message || 'Unknown error'}`,
-					stack: context.stack || '',
-					context
-				})
-			});
-		} catch {
-			// Silencieux - on ne veut pas d'erreur sur l'erreur
-		}
 	}
 
 	async function playRecording(recording: UserRecording) {

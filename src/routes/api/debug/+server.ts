@@ -3,8 +3,31 @@ import { json } from '@sveltejs/kit';
 
 const MAX_MESSAGE_LENGTH = 500;
 const MAX_STACK_LENGTH = 1000;
-const MAX_LOGS_PER_MINUTE = 10;
+const MAX_LOGS_PER_MINUTE = 30;
 const LOG_HISTORY: { timestamp: number }[] = [];
+
+function sliceString(value: unknown, maxLength: number) {
+    return typeof value === 'string' ? value.slice(0, maxLength) : undefined;
+}
+
+function sanitizeValue(value: unknown): unknown {
+    if (value === null || value === undefined) return value;
+    if (typeof value === 'string') return value.slice(0, 500);
+    if (typeof value === 'number' || typeof value === 'boolean') return value;
+    if (Array.isArray(value)) return value.slice(0, 20).map(sanitizeValue);
+    if (typeof value === 'object') {
+        return sanitizeContext(value as Record<string, unknown>);
+    }
+    return String(value).slice(0, 500);
+}
+
+function sanitizeContext(context: Record<string, unknown>): Record<string, unknown> {
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(context).slice(0, 60)) {
+        sanitized[key] = sanitizeValue(value);
+    }
+    return sanitized;
+}
 
 function rateLimitCheck(): boolean {
     const now = Date.now();
@@ -34,7 +57,9 @@ export const POST: RequestHandler = async ({ request, locals }) => {
         
         const message = String(body.message || '').slice(0, MAX_MESSAGE_LENGTH);
         const stack = String(body.stack || '').slice(0, MAX_STACK_LENGTH);
-        const context = body.context || {};
+        const context = body.context && typeof body.context === 'object'
+            ? sanitizeContext(body.context)
+            : {};
         const userId = locals.user?.id || 'anonymous';
         
         // Log structuré pour faciliter le parsing
@@ -45,12 +70,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
             message,
             stack: stack.length > 0 ? stack : undefined,
             context: {
-                url: context.url?.slice(0, 200),
-                audioSize: context.audioSize,
-                audioType: context.audioType?.slice(0, 50),
-                duration: context.duration,
-                userAgent: context.userAgent?.slice(0, 200),
-                timestamp: context.timestamp,
+                ...context,
+                url: sliceString(context.url, 300),
+                userAgent: sliceString(context.userAgent, 300),
+                audioType: sliceString(context.audioType, 80),
             }
         };
         

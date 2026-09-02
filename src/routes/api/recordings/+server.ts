@@ -21,11 +21,26 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		throw redirect(303, '/login');
 	}
 
+	const requestId = crypto.randomUUID().slice(0, 8);
+	const startedAt = Date.now();
+	console.log('[RECORDINGS] Upload start', {
+		requestId,
+		userId: locals.user.id,
+		contentLength: request.headers.get('content-length'),
+		contentType: request.headers.get('content-type')?.slice(0, 80),
+		userAgent: request.headers.get('user-agent')?.slice(0, 160)
+	});
+
 	let formData;
 	try {
 		formData = await request.formData();
 	} catch (err) {
-		console.error('[RECORDINGS] Error parsing formData:', err);
+		console.error('[RECORDINGS] Error parsing formData:', {
+			requestId,
+			userId: locals.user.id,
+			elapsedMs: Date.now() - startedAt,
+			error: err
+		});
 		return json({ error: 'Erreur interne' }, { status: 400 });
 	}
 
@@ -43,6 +58,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	if (clientDraftId) {
 		const existingRecording = getRecordingByClientDraftId(locals.user.id, clientDraftId);
 		if (existingRecording) {
+			console.log('[RECORDINGS] Upload duplicate client draft', {
+				requestId,
+				userId: locals.user.id,
+				clientDraftId,
+				recordingId: existingRecording.id,
+				elapsedMs: Date.now() - startedAt
+			});
 			return json({
 				id: existingRecording.id,
 				duplicate: true,
@@ -124,6 +146,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		: getRecentRecordingByHash(locals.user.id, audioHash, DUPLICATE_THRESHOLD_SECONDS);
 	
 	if (recentRecording) {
+		console.log('[RECORDINGS] Upload duplicate hash', {
+			requestId,
+			userId: locals.user.id,
+			recordingId: recentRecording.id,
+			elapsedMs: Date.now() - startedAt
+		});
 		return json({
 			id: recentRecording.id,
 			duplicate: true,
@@ -198,10 +226,27 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		if (useAudioProcessing) {
 			pokeAudioProcessingWorker();
 		}
+		console.log('[RECORDINGS] Upload saved', {
+			requestId,
+			userId: locals.user.id,
+			recordingId: recording.id,
+			audioSize: audio.size,
+			preparedAudioSize: buffer.length,
+			durationSeconds,
+			processingStatus: recording.processing_status,
+			elapsedMs: Date.now() - startedAt
+		});
 	} catch (err) {
 		if (clientDraftId) {
 			const existingRecording = getRecordingByClientDraftId(locals.user.id, clientDraftId);
 			if (existingRecording) {
+				console.log('[RECORDINGS] Upload duplicate after conflict', {
+					requestId,
+					userId: locals.user.id,
+					clientDraftId,
+					recordingId: existingRecording.id,
+					elapsedMs: Date.now() - startedAt
+				});
 				return json({
 					id: existingRecording.id,
 					duplicate: true,
@@ -209,7 +254,12 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 				});
 			}
 		}
-		console.error('[RECORDINGS] Error saving recording:', err);
+		console.error('[RECORDINGS] Error saving recording:', {
+			requestId,
+			userId: locals.user.id,
+			elapsedMs: Date.now() - startedAt,
+			error: err
+		});
 		return json({ error: 'Erreur interne' }, { status: 500 });
 	}
 

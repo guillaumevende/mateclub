@@ -2,6 +2,20 @@
 
 ---
 
+## v0.37.12 (2026-09-02) - Diagnostic des écrans blancs et uploads interrompus
+
+### 🐛 Corrections / Diagnostic
+
+- **Logs d’upload corrélables** : chaque envoi audio journalise désormais un `requestId`, le début de requête, la sauvegarde, les doublons ou l’échec de parsing multipart
+- **Erreurs client enrichies** : les échecs d’envoi remontent version app, navigateur, mode PWA, service worker, état réseau, viewport, progression d’upload et durée avant erreur
+- **Écrans blancs mieux traçables** : les erreurs JavaScript globales et promesses rejetées non gérées sont envoyées à `/api/debug`
+- **Endpoint debug plus utile** : `/api/debug` accepte davantage de contexte sécurisé et relève sa limite courte pour absorber les diagnostics groupés
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.12`
+- package.json / package-lock.json : version portée en `0.37.12`
+
 ## v0.37.11 (2026-06-18) - Envois de capsules idempotents
 
 ### 🐛 Corrections

@@ -6,7 +6,7 @@
 
 ![Status](https://img.shields.io/badge/Status-Beta-orange?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge)
-![Version](https://img.shields.io/badge/Version-0.37.11-blue?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.37.12-blue?style=for-the-badge)
 
 </div>
 
@@ -85,6 +85,7 @@ Ce projet suit [Semantic Versioning](https://semver.org/lang/fr/).
 - **Envoi groupé** - Une ou plusieurs capsules peuvent être envoyées d’un coup avec photo et URL propres à chacune
 - **Envois idempotents** - Une reprise après coupure ou une requête simultanée ne peut plus publier deux fois le même brouillon
 - **Progression d’upload** - Une barre indique l’avancement de l’envoi en cours, capsule par capsule
+- **Diagnostic d’upload** - Les erreurs intermittentes d’envoi remontent des logs enrichis côté serveur pour faciliter le diagnostic réseau/PWA
 - **Alertes de fin d’enregistrement** - Un son et un retour haptique préviennent à 15, 10 et 5 secondes de la fin
 - **Visualiseur rééquilibré** - Waveform d'enregistrement plus doux, plus bas et mieux réparti sur la voix
 - **Compatibilité Safari renforcée** - Les capsules Android WebM/OGG sont converties côté serveur en AAC/M4A si nécessaire pour rester lisibles dans Safari

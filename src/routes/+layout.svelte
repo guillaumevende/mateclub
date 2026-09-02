@@ -3,6 +3,7 @@
 	import { page } from '$app/stores';
 	import { playerStore, initPlayer, debugLogs, logsEnabled, jinglesEnabled } from '$lib/stores/player';
 	import { initHaptics } from '$lib/utils/haptics';
+	import { sendClientDiagnosticError } from '$lib/client/diagnostics';
 	import FloatingPlayer from '$lib/components/FloatingPlayer.svelte';
 	import { onMount } from 'svelte';
 	import '@khmyznikov/pwa-install';
@@ -119,12 +120,37 @@
 			updateBaselineViewportHeight();
 			refreshViewportBottomOffset();
 		};
+		const handleGlobalError = (event: Event) => {
+			const errorEvent = event as Event & {
+				filename?: string;
+				lineno?: number;
+				colno?: number;
+				error?: Error;
+				message?: string;
+			};
+			void sendClientDiagnosticError('GLOBAL_ERROR', {
+				source: errorEvent.filename,
+				line: errorEvent.lineno,
+				column: errorEvent.colno,
+				errorName: errorEvent.error?.name
+			}, errorEvent.error?.stack || errorEvent.message);
+		};
+		const handleUnhandledRejection = (event: Event) => {
+			const rejectionEvent = event as Event & { reason?: unknown };
+			const reason = rejectionEvent.reason;
+			const message = reason instanceof Error ? reason.message : String(reason || 'Unknown rejection');
+			void sendClientDiagnosticError(`UNHANDLED_REJECTION: ${message}`, {
+				errorName: reason instanceof Error ? reason.name : undefined
+			}, reason instanceof Error ? reason.stack || '' : '');
+		};
 
 		window.addEventListener('resize', handleViewportChange);
 		window.addEventListener('orientationchange', handleViewportChange);
 		window.addEventListener('focus', handleViewportChange);
 		window.addEventListener('blur', handleViewportChange);
 		window.addEventListener('pageshow', handleViewportChange);
+		window.addEventListener('error', handleGlobalError);
+		window.addEventListener('unhandledrejection', handleUnhandledRejection);
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 		window.visualViewport?.addEventListener('resize', handleViewportChange);
 		window.visualViewport?.addEventListener('scroll', handleViewportChange);
@@ -135,6 +161,8 @@
 			window.removeEventListener('focus', handleViewportChange);
 			window.removeEventListener('blur', handleViewportChange);
 			window.removeEventListener('pageshow', handleViewportChange);
+			window.removeEventListener('error', handleGlobalError);
+			window.removeEventListener('unhandledrejection', handleUnhandledRejection);
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
 			window.visualViewport?.removeEventListener('resize', handleViewportChange);
 			window.visualViewport?.removeEventListener('scroll', handleViewportChange);
