@@ -124,6 +124,8 @@
 	let showDeleteModal = $state(false);
 	let recordingToDelete = $state<UserRecording | null>(null);
 	let isDeleting = $state(false);
+	let showClearDraftsModal = $state(false);
+	let isClearingDrafts = $state(false);
 
 	let player = $state({ ...$playerStore });
 	let { data }: { data: PageData & { appSettings?: AppSettings } } = $props();
@@ -1406,12 +1408,28 @@
 	}
 
 	async function clearDraftQueue() {
+		isClearingDrafts = true;
 		for (const draft of draftQueue) {
 			revokeDraftUrls(draft);
 		}
 		draftQueue = [];
-		await clearRecordingDraftQueue();
-		queueNotice = 'Les brouillons locaux ont été supprimés.';
+		try {
+			await clearRecordingDraftQueue();
+			queueNotice = 'Les brouillons locaux ont été supprimés.';
+		} finally {
+			isClearingDrafts = false;
+			showClearDraftsModal = false;
+		}
+	}
+
+	function confirmClearDraftQueue() {
+		if (draftQueue.length === 0 || isSending) return;
+		showClearDraftsModal = true;
+	}
+
+	function cancelClearDraftQueue() {
+		if (isClearingDrafts) return;
+		showClearDraftsModal = false;
 	}
 
 	async function playRecording(recording: UserRecording) {
@@ -1590,7 +1608,7 @@
 						</button>
 					{/each}
 
-					<button class="mini-card delete-all-card" type="button" onclick={clearDraftQueue} disabled={isSending}>
+					<button class="mini-card delete-all-card" type="button" onclick={confirmClearDraftQueue} disabled={isSending}>
 						<svg viewBox="0 0 24 24" aria-hidden="true" class="trash-icon">
 							<path d="M9 4.5h6"></path>
 							<path d="M5.5 7.5h13"></path>
@@ -1819,6 +1837,42 @@
 				{isLoadingRecordings ? 'Chargement...' : 'Charger plus'}
 			</button>
 		{/if}
+	</div>
+{/if}
+
+<!-- Clear Local Drafts Confirmation Modal -->
+{#if showClearDraftsModal}
+	<div
+		class="modal-overlay"
+		use:scrollLock={showClearDraftsModal}
+		onclick={cancelClearDraftQueue}
+		onkeydown={(e) => e.key === 'Escape' && cancelClearDraftQueue()}
+		role="button"
+		tabindex="0"
+		aria-label="Fermer la modale"
+	>
+		<div
+			class="modal"
+			onclick={(e) => e.stopPropagation()}
+			onkeydown={(e) => e.key === 'Escape' && cancelClearDraftQueue()}
+			role="dialog"
+			aria-modal="true"
+			aria-labelledby="clear-drafts-modal-title"
+			tabindex="-1"
+		>
+			<h3 id="clear-drafts-modal-title">Supprimer les capsules en attente ?</h3>
+			<p>
+				Vous êtes sur le point de supprimer {draftQueue.length}
+				capsule{draftQueue.length > 1 ? 's' : ''} non envoyée{draftQueue.length > 1 ? 's' : ''}.
+				Cette action est irréversible.
+			</p>
+			<div class="modal-actions">
+				<button class="cancel-btn" onclick={cancelClearDraftQueue} disabled={isClearingDrafts}>Annuler</button>
+				<button class="confirm-delete-btn" onclick={clearDraftQueue} disabled={isClearingDrafts}>
+					{isClearingDrafts ? 'Suppression...' : 'Tout supprimer'}
+				</button>
+			</div>
+		</div>
 	</div>
 {/if}
 

@@ -2,6 +2,17 @@
 
 ---
 
+## v0.37.13 (2026-09-05) - Confirmation avant suppression des brouillons
+
+### 🐛 Corrections
+
+- **Suppression des capsules en attente sécurisée** : le bouton `Tout supprimer` demande désormais une confirmation en modale avant d’effacer les brouillons locaux non envoyés
+
+### 📚 Documentation
+
+- README.md : badge de version mis à jour en `0.37.13`
+- package.json / package-lock.json : version portée en `0.37.13`
+
 ## v0.37.12 (2026-09-02) - Diagnostic des écrans blancs et uploads interrompus
 
 ### 🐛 Corrections / Diagnostic
